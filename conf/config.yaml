@@ -1,3 +1,4 @@
 app:
   port: 8194
   debug: True
+  key: dify-sandbox
