@@ -22,3 +22,24 @@ Dify-Sandbox offers a simple way to run untrusted code in a secure environment. 
 5. Drop the privileges of the process to a non-root user which could not access any resource
 6. Execute the code and capture the output
 
+For now, Dify-Sandbox supports syscalls below:
+```go
+var allowedSyscalls = []int{
+    // file io, only write and close file descriptor
+	SYS_WRITE, SYS_CLOSE,
+	// thread, used to fasten the execution
+	SYS_FUTEX,
+	// memory, allocate and free memory
+	SYS_MMAP, SYS_BRK, SYS_MPROTECT, SYS_MUNMAP,
+	// user/group, used to drop the privileges
+	SYS_SETUID, SYS_SETGID,
+	// process
+	SYS_GETPID, SYS_GETPPID, SYS_GETTID,
+	SYS_EXIT, SYS_EXIT_GROUP,
+	SYS_TGKILL, SYS_RT_SIGACTION,
+	// time
+	SYS_CLOCK_GETTIME, SYS_GETTIMEOFDAY, SYS_TIME, SYS_NANOSLEEP,
+	SYS_EPOLL_CTL,
+}
+```
+
