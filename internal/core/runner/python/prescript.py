@@ -2,10 +2,16 @@ if __name__ == "__main__":
     import ctypes
     import os
     import sys
+    import json
+    import typing
+    import time
+
+    print(os.listdir("/tmp"))
+
     if len(sys.argv) != 4:
         sys.exit(-1)
 
-    lib = ctypes.CDLL("./tmp/sandbox-python/python.so")
+    lib = ctypes.CDLL("/tmp/sandbox-python/python.so")
     module = sys.argv[1]
     code = open(module).read()
 

@@ -12,7 +12,7 @@ import (
 type SeccompRunner struct {
 }
 
-func (s *SeccompRunner) WithTempDir(paths []string, closures func() error) error {
+func (s *SeccompRunner) WithTempDir(paths []string, closures func(path string) error) error {
 	uuid, err := uuid.NewRandom()
 	if err != nil {
 		return err
@@ -24,10 +24,6 @@ func (s *SeccompRunner) WithTempDir(paths []string, closures func() error) error
 	if err != nil {
 		return err
 	}
-	defer func() {
-		os.RemoveAll(tmp_dir)
-		os.Remove(tmp_dir)
-	}()
 
 	// copy files to tmp dir
 	for _, file_path := range paths {
@@ -62,7 +58,7 @@ func (s *SeccompRunner) WithTempDir(paths []string, closures func() error) error
 		return err
 	}
 
-	err = closures()
+	err = closures(tmp_dir)
 	if err != nil {
 		return err
 	}
