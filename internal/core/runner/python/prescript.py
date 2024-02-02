@@ -6,8 +6,6 @@ if __name__ == "__main__":
     import typing
     import time
 
-    print(os.listdir("/tmp"))
-
     if len(sys.argv) != 4:
         sys.exit(-1)
 
