@@ -11,15 +11,16 @@ import (
 const python_script = `def foo(a, b):
 	return a + b
 print(foo(1, 2))
-
 import json
 import os
-print(json.dumps({"a": 1, "b": 2}))
+import time
+print(json.dumps({"a": 1, "b": 2}), flush=True)
+time.sleep(3)
 `
 
 func main() {
 	runner := python.PythonRunner{}
-	stdout, stderr, done, err := runner.Run(python_script, time.Minute, nil)
+	stdout, stderr, done, err := runner.Run(python_script, time.Second*10, nil)
 	if err != nil {
 		log.Panic("failed to run python script: %v", err)
 	}
@@ -27,12 +28,11 @@ func main() {
 	for {
 		select {
 		case <-done:
-			fmt.Println("done")
 			return
 		case out := <-stdout:
-			fmt.Print(string(out))
+			fmt.Println(string(out))
 		case err := <-stderr:
-			fmt.Print(string(err))
+			fmt.Println(string(err))
 		}
 	}
 }

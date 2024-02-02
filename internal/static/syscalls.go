@@ -22,5 +22,5 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_TGKILL, syscall.SYS_RT_SIGACTION,
 	// time
 	syscall.SYS_CLOCK_GETTIME, syscall.SYS_GETTIMEOFDAY, syscall.SYS_TIME, syscall.SYS_NANOSLEEP,
-	syscall.SYS_EPOLL_CTL,
+	syscall.SYS_EPOLL_CTL, syscall.SYS_CLOCK_NANOSLEEP, syscall.SYS_PSELECT6,
 }
