@@ -1,30 +1,34 @@
-import os
-import uuid
-import shutil
+if __name__ == "__main__":
+    import ctypes
+    import os
+    import sys
+    if len(sys.argv) != 4:
+        sys.exit(-1)
 
-def create_sandbox_and_execute(paths, closures):
-    tmp_dir = os.path.join("/tmp", "sandbox-" + str(uuid.uuid4()))
-    os.makedirs(tmp_dir, mode=0o755)
-    
-    try:
-        for file_path in paths:
-            target_path = os.path.join(tmp_dir, file_path)
-            if os.path.isdir(file_path):
-                os.makedirs(target_path, mode=0o755)
-            else:
-                os.makedirs(os.path.dirname(target_path), mode=0o755, exist_ok=True)
-                shutil.copy(file_path, target_path)
-        
-        original_root = os.open("/", os.O_RDONLY)
-        os.chroot(tmp_dir)
+    lib = ctypes.CDLL("./tmp/sandbox-python/python.so")
+    module = sys.argv[1]
+    code = open(module).read()
+
+    def create_sandbox():
+        os.chroot(".")
         os.chdir("/")
-        
-        try:
-            closures()
-        finally:
-            os.fchdir(original_root)
-            os.chroot(".")
-    finally:
-        shutil.rmtree(tmp_dir)
 
-print(123)
+    def prtcl():
+        lib.DifySeccomp.argtypes = []
+        lib.DifySeccomp.restype = None
+        lib.DifySeccomp()
+
+    def drop_privileges(uid, gid):
+        os.setgid(gid)
+        os.setuid(uid)
+    
+    uid = int(sys.argv[2])
+    gid = int(sys.argv[3])
+
+    if not uid or not gid:
+        sys.exit(-1)
+
+    create_sandbox()
+    prtcl()
+    drop_privileges(uid, gid)
+    exec(code)
