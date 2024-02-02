@@ -8,10 +8,17 @@ import (
 )
 
 var (
-	queue chan bool = make(chan bool, static.GetCoshubGlobalConfigurations().MaxWorkers)
+	queue chan bool
 )
 
+func InitSandBoxQueue() {
+	if queue == nil {
+		queue = make(chan bool, static.GetCoshubGlobalConfigurations().MaxWorkers)
+	}
+}
+
 func RunSandboxController(c *gin.Context) {
+
 	BindRequest(c, func(req struct {
 		Language string `json:"language" form:"language" binding:"required"`
 		Code     string `json:"code" form:"code" binding:"required"`

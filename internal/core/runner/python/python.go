@@ -137,7 +137,6 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 			go func() {
 				var status syscall.WaitStatus
 				_, err := syscall.Wait4(int(pid), &status, 0, nil)
-				time.Sleep(time.Second)
 				if err != nil {
 					done <- err
 					return
