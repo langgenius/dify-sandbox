@@ -5,6 +5,7 @@ if __name__ == "__main__":
     import json
     import typing
     import time
+    import traceback
 
     if len(sys.argv) != 4:
         sys.exit(-1)
@@ -35,4 +36,12 @@ if __name__ == "__main__":
     create_sandbox()
     prtcl()
     drop_privileges(uid, gid)
+
+    # setup sys.excepthook
+    def excepthook(type, value, tb):
+        sys.stderr.write("".join(traceback.format_exception(type, value, tb)))
+        sys.stderr.flush()
+        sys.exit(-1)
+    sys.excepthook = excepthook
+
     exec(code)

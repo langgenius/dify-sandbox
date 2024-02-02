@@ -2,6 +2,7 @@ package static
 
 import (
 	"os"
+	"strconv"
 
 	"github.com/langgenius/dify-sandbox/internal/types"
 	"gopkg.in/yaml.v3"
@@ -25,6 +26,21 @@ func InitConfig(path string) error {
 	err = decoder.Decode(&difySandboxGlobalConfigurations)
 	if err != nil {
 		return err
+	}
+
+	max_workers := os.Getenv("MAX_WORKERS")
+	if max_workers != "" {
+		difySandboxGlobalConfigurations.MaxWorkers, _ = strconv.Atoi(max_workers)
+	}
+
+	port := os.Getenv("SANDBOX_PORT")
+	if port != "" {
+		difySandboxGlobalConfigurations.App.Port, _ = strconv.Atoi(port)
+	}
+
+	timeout := os.Getenv("WORKER_TIMEOUT")
+	if timeout != "" {
+		difySandboxGlobalConfigurations.WorkerTimeout, _ = strconv.Atoi(timeout)
 	}
 
 	return nil

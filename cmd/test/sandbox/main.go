@@ -8,15 +8,10 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
-const python_script = `def foo(a, b):
-	return a + b
-print(foo(1, 2))
-import json
-import os
-import time
-print(json.dumps({"a": 1, "b": 2}), flush=True)
-time.sleep(3)
-`
+const python_script = `import os
+import sys
+
+os.write(sys.stderr.fi)`
 
 func main() {
 	runner := python.PythonRunner{}
@@ -30,9 +25,13 @@ func main() {
 		case <-done:
 			return
 		case out := <-stdout:
-			fmt.Println(string(out))
+			if string(out) != "" {
+				fmt.Println(string(out))
+			}
 		case err := <-stderr:
-			fmt.Println(string(err))
+			if string(err) != "" {
+				fmt.Println(string(err))
+			}
 		}
 	}
 }

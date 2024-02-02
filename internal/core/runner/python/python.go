@@ -104,63 +104,69 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 				stderr <- []byte(fmt.Sprintf("failed to exec: %v", err))
 				return nil
 			}
-		}
+		} else {
+			syscall.Close(stdout_writer)
+			syscall.Close(stderr_writer)
 
-		// read the output
-		go func() {
-			buf := make([]byte, 1024)
-			for {
-				n, err := syscall.Read(stdout_reader, buf)
-				if err != nil {
-					break
-				}
-				stdout <- buf[:n]
-			}
-		}()
-
-		// read the error
-		go func() {
-			buf := make([]byte, 1024)
-			for {
-				n, err := syscall.Read(stderr_reader, buf)
-				if err != nil {
-					break
-				}
-				stderr <- buf[:n]
-			}
-		}()
-
-		// wait for the process to finish
-		done := make(chan error, 1)
-		go func() {
-			var status syscall.WaitStatus
-			_, err := syscall.Wait4(int(pid), &status, 0, nil)
-			if err != nil {
-				done <- err
-				return
-			}
-			done <- nil
-		}()
-
-		go func() {
-			for {
-				select {
-				case <-time.After(timeout):
-					// kill the process
-					syscall.Kill(int(pid), syscall.SIGKILL)
-					stderr <- []byte("timeout\n")
-				case err := <-done:
+			// read the output
+			go func() {
+				buf := make([]byte, 1024)
+				for {
+					n, err := syscall.Read(stdout_reader, buf)
 					if err != nil {
-						stderr <- []byte(fmt.Sprintf("error: %v\n", err))
+						break
 					}
-					os.Remove(temp_code_path)
-					os.RemoveAll(root_path)
-					os.Remove(root_path)
-					done_chan <- true
+					stdout <- buf[:n]
+				}
+			}()
+
+			// read the error
+			go func() {
+				buf := make([]byte, 1024)
+				for {
+					n, err := syscall.Read(stderr_reader, buf)
+					if err != nil {
+						break
+					}
+					stderr <- buf[:n]
+				}
+			}()
+
+			// wait for the process to finish
+			done := make(chan error, 1)
+			go func() {
+				var status syscall.WaitStatus
+				_, err := syscall.Wait4(int(pid), &status, 0, nil)
+				time.Sleep(time.Second)
+				if err != nil {
+					done <- err
 					return
 				}
-			}
-		}()
+				done <- nil
+			}()
+
+			go func() {
+				for {
+					select {
+					case <-time.After(timeout):
+						// kill the process
+						syscall.Kill(int(pid), syscall.SIGKILL)
+						stderr <- []byte("timeout\n")
+					case err := <-done:
+						if err != nil {
+							stderr <- []byte(fmt.Sprintf("error: %v\n", err))
+						}
+						os.Remove(temp_code_path)
+						os.RemoveAll(root_path)
+						os.Remove(root_path)
+						syscall.Close(stdout_reader)
+						syscall.Close(stderr_reader)
+						done_chan <- true
+						return
+					}
+				}
+			}()
+		}
 
 		return nil
 	})
