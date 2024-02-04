@@ -98,10 +98,7 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 		go func() {
 			for {
 				buf := make([]byte, 1024)
-				n, err := stderr_reader.Read(buf)
-				if n > 0 {
-					log.Debug("stdout %d: %s", stdout_reader, buf[:n])
-				}
+				n, err := stdout_reader.Read(buf)
 				if err != nil {
 					break
 				}
@@ -113,7 +110,7 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 		go func() {
 			buf := make([]byte, 1024)
 			for {
-				n, err := stdout_reader.Read(buf)
+				n, err := stderr_reader.Read(buf)
 				if err != nil {
 					break
 				}
@@ -127,10 +124,13 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 			if err != nil {
 				log.Error("process finished with status: %v", status.String())
 				stderr <- []byte(fmt.Sprintf("error: %v\n", err))
-				return
-			}
-			if err != nil {
-				stderr <- []byte(fmt.Sprintf("error: %v\n", err))
+			} else if status.ExitCode() != 0 {
+				exit_string := status.String()
+				if strings.Contains(exit_string, "bad system call (core dumped)") {
+					stderr <- []byte("error: operation not permitted\n")
+				} else {
+					stderr <- []byte(fmt.Sprintf("exit code: %v\n", status.ExitCode()))
+				}
 			}
 			os.Remove(temp_code_path)
 			os.RemoveAll(root_path)

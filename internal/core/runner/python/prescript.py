@@ -42,6 +42,7 @@ if __name__ == "__main__":
         sys.stderr.write("".join(traceback.format_exception(type, value, tb)))
         sys.stderr.flush()
         sys.exit(-1)
+    
     sys.excepthook = excepthook
 
     exec(code)

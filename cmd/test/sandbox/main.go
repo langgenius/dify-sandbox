@@ -9,7 +9,8 @@ import (
 )
 
 const python_script = `
-print(123)`
+raise Exception("hello world")
+`
 
 func main() {
 	runner := python.PythonRunner{}
