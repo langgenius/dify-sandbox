@@ -1,17 +1,19 @@
 package python
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
 	"github.com/langgenius/dify-sandbox/internal/static"
+	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
 type PythonRunner struct {
@@ -59,113 +61,85 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 		temp_code_path,
 		"/tmp/sandbox-python/python.so",
 	}, func(root_path string) error {
-		var pipe_fds [2]int
-		// create stdout pipe
-		err = syscall.Pipe2(pipe_fds[0:], syscall.O_CLOEXEC)
-		if err != nil {
-			return err
-		}
-		stdout_reader, stdout_writer := pipe_fds[0], pipe_fds[1]
-		// create stderr pipe
-		err = syscall.Pipe2(pipe_fds[0:], syscall.O_CLOEXEC)
-		if err != nil {
-			return err
-		}
-		stderr_reader, stderr_writer := pipe_fds[0], pipe_fds[1]
-
 		// create a new process
-		pid, _, errno := syscall.RawSyscall(syscall.SYS_FORK, 0, 0, 0)
-		if errno != 0 {
-			return fmt.Errorf("failed to fork: %v", errno)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		cmd := exec.CommandContext(ctx,
+			"/usr/bin/python3",
+			"-c",
+			string(python_sandbox_fs),
+			temp_code_path,
+			strconv.Itoa(static.SANDBOX_USER_UID),
+			strconv.Itoa(static.SANDBOX_GROUP_ID),
+		)
+		cmd.Env = []string{}
+
+		// create a pipe for the stdout
+		stdout_reader, err := cmd.StdoutPipe()
+		if err != nil {
+			cancel()
+			return err
 		}
 
-		if pid == 0 {
-			// child process
-			syscall.Close(stdout_reader)
-			syscall.Close(stderr_reader)
+		// create a pipe for the stderr
+		stderr_reader, err := cmd.StderrPipe()
+		if err != nil {
+			cancel()
+			return err
+		}
 
-			// dup the stdout and stderr
-			syscall.Dup2(stdout_writer, int(os.Stdout.Fd()))
-			syscall.Dup2(stderr_writer, int(os.Stderr.Fd()))
-			err := syscall.Exec(
-				"/usr/bin/python3",
-				[]string{
-					"/usr/bin/python3",
-					"-c",
-					string(python_sandbox_fs),
-					temp_code_path,
-					strconv.Itoa(static.SANDBOX_USER_UID),
-					strconv.Itoa(static.SANDBOX_GROUP_ID),
-				},
-				nil,
-			)
+		// start the process
+		err = cmd.Start()
+		if err != nil {
+			cancel()
+			return err
+		}
 
-			if err != nil {
-				stderr <- []byte(fmt.Sprintf("failed to exec: %v", err))
-				return nil
-			}
-		} else {
-			syscall.Close(stdout_writer)
-			syscall.Close(stderr_writer)
-
-			// read the output
-			go func() {
+		// read the output
+		go func() {
+			for {
 				buf := make([]byte, 1024)
-				for {
-					n, err := syscall.Read(stdout_reader, buf)
-					if err != nil {
-						break
-					}
-					stdout <- buf[:n]
+				n, err := stderr_reader.Read(buf)
+				if n > 0 {
+					log.Debug("stdout %d: %s", stdout_reader, buf[:n])
 				}
-			}()
-
-			// read the error
-			go func() {
-				buf := make([]byte, 1024)
-				for {
-					n, err := syscall.Read(stderr_reader, buf)
-					if err != nil {
-						break
-					}
-					stderr <- buf[:n]
-				}
-			}()
-
-			// wait for the process to finish
-			done := make(chan error, 1)
-			go func() {
-				var status syscall.WaitStatus
-				_, err := syscall.Wait4(int(pid), &status, 0, nil)
 				if err != nil {
-					done <- err
-					return
+					break
 				}
-				done <- nil
-			}()
+				stdout <- buf[:n]
+			}
+		}()
 
-			go func() {
-				for {
-					select {
-					case <-time.After(timeout):
-						// kill the process
-						syscall.Kill(int(pid), syscall.SIGKILL)
-						stderr <- []byte("timeout\n")
-					case err := <-done:
-						if err != nil {
-							stderr <- []byte(fmt.Sprintf("error: %v\n", err))
-						}
-						os.Remove(temp_code_path)
-						os.RemoveAll(root_path)
-						os.Remove(root_path)
-						syscall.Close(stdout_reader)
-						syscall.Close(stderr_reader)
-						done_chan <- true
-						return
-					}
+		// read the error
+		go func() {
+			buf := make([]byte, 1024)
+			for {
+				n, err := stdout_reader.Read(buf)
+				if err != nil {
+					break
 				}
-			}()
-		}
+				stderr <- buf[:n]
+			}
+		}()
+
+		// wait for the process to finish
+		go func() {
+			status, err := cmd.Process.Wait()
+			if err != nil {
+				log.Error("process finished with status: %v", status.String())
+				stderr <- []byte(fmt.Sprintf("error: %v\n", err))
+				return
+			}
+			if err != nil {
+				stderr <- []byte(fmt.Sprintf("error: %v\n", err))
+			}
+			os.Remove(temp_code_path)
+			os.RemoveAll(root_path)
+			os.Remove(root_path)
+			stderr_reader.Close()
+			stdout_reader.Close()
+			cancel()
+			done_chan <- true
+		}()
 
 		return nil
 	})

@@ -18,15 +18,10 @@ func InitSandBoxQueue() {
 }
 
 func RunSandboxController(c *gin.Context) {
-
 	BindRequest(c, func(req struct {
 		Language string `json:"language" form:"language" binding:"required"`
 		Code     string `json:"code" form:"code" binding:"required"`
 	}) {
-		queue <- true
-		defer func() {
-			<-queue
-		}()
 		switch req.Language {
 		case "python3":
 			c.JSON(200, service.RunPython3Code(req.Code))

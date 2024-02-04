@@ -4,7 +4,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"syscall"
 
 	"github.com/google/uuid"
 )
@@ -53,7 +52,7 @@ func (s *SeccompRunner) WithTempDir(paths []string, closures func(path string) e
 	}
 
 	// chdir
-	err = syscall.Chdir(tmp_dir)
+	err = os.Chdir(tmp_dir)
 	if err != nil {
 		return err
 	}

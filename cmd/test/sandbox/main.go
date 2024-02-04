@@ -8,10 +8,8 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
-const python_script = `import os
-import sys
-
-os.write(sys.stderr.fi)`
+const python_script = `
+print(123)`
 
 func main() {
 	runner := python.PythonRunner{}
