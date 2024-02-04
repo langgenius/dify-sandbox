@@ -7,5 +7,6 @@ type DifySandboxGlobalConfigurations struct {
 		Key   string `yaml:"key"`
 	} `yaml:"app"`
 	MaxWorkers    int `yaml:"max_workers"`
+	MaxRequests   int `yaml:"max_requests"`
 	WorkerTimeout int `yaml:"worker_timeout"`
 }

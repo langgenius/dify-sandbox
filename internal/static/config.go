@@ -33,6 +33,11 @@ func InitConfig(path string) error {
 		difySandboxGlobalConfigurations.MaxWorkers, _ = strconv.Atoi(max_workers)
 	}
 
+	max_requests := os.Getenv("MAX_REQUESTS")
+	if max_requests != "" {
+		difySandboxGlobalConfigurations.MaxRequests, _ = strconv.Atoi(max_requests)
+	}
+
 	port := os.Getenv("SANDBOX_PORT")
 	if port != "" {
 		difySandboxGlobalConfigurations.App.Port, _ = strconv.Atoi(port)

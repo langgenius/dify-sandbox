@@ -2,5 +2,6 @@ app:
   port: 8194
   debug: True
   key: dify-sandbox
-max_workers: 100
+max_workers: 3
+max_requests: 100
 worker_timeout: 5
