@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -53,9 +54,9 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 		return nil, nil, nil, err
 	}
 
-	stdout := make(chan []byte, 1)
-	stderr := make(chan []byte, 1)
-	done_chan := make(chan bool, 1)
+	stdout := make(chan []byte)
+	stderr := make(chan []byte)
+	done_chan := make(chan bool)
 
 	err = p.WithTempDir([]string{
 		temp_code_path,
@@ -94,10 +95,14 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 			return err
 		}
 
+		wg := sync.WaitGroup{}
+		wg.Add(2)
+
 		// read the output
 		go func() {
+			buf := make([]byte, 1024)
+			defer wg.Done()
 			for {
-				buf := make([]byte, 1024)
 				n, err := stdout_reader.Read(buf)
 				if err != nil {
 					break
@@ -109,6 +114,7 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 		// read the error
 		go func() {
 			buf := make([]byte, 1024)
+			defer wg.Done()
 			for {
 				n, err := stderr_reader.Read(buf)
 				if err != nil {
@@ -137,6 +143,7 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 			os.Remove(root_path)
 			stderr_reader.Close()
 			stdout_reader.Close()
+			wg.Wait()
 			cancel()
 			done_chan <- true
 		}()
