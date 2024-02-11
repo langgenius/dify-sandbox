@@ -13,7 +13,7 @@ import (
 	sg "github.com/seccomp/libseccomp-golang"
 )
 
-var allow_syscalls = []int{}
+//var allow_syscalls = []int{}
 
 func InitSeccomp() error {
 	disabled_syscall, err := strconv.Atoi(os.Getenv("DISABLE_SYSCALL"))
@@ -27,9 +27,9 @@ func InitSeccomp() error {
 	}
 	defer ctx.Release()
 
-	for i := 0; i < 400; i++ {
-		allow_syscalls = append(allow_syscalls, i)
-	}
+	// for i := 0; i < 400; i++ {
+	// 	allow_syscalls = append(allow_syscalls, i)
+	// }
 
 	for _, syscall := range static.ALLOW_SYSCALLS {
 		if syscall == disabled_syscall {

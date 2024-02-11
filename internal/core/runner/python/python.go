@@ -29,19 +29,22 @@ var python_sandbox_fs []byte
 //go:embed python.so
 var python_lib []byte
 
-func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (chan []byte, chan []byte, chan bool, error) {
+func init() {
 	// check if libpython.so exists
+	log.Info("initializing python runner environment...")
 	if _, err := os.Stat("/tmp/sandbox-python/python.so"); os.IsNotExist(err) {
 		err := os.MkdirAll("/tmp/sandbox-python", 0755)
 		if err != nil {
-			return nil, nil, nil, err
+			log.Panic("failed to create /tmp/sandbox-python")
 		}
 		err = os.WriteFile("/tmp/sandbox-python/python.so", python_lib, 0755)
 		if err != nil {
-			return nil, nil, nil, err
+			log.Panic("failed to write /tmp/sandbox-python/python.so")
 		}
 	}
+}
 
+func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (chan []byte, chan []byte, chan bool, error) {
 	// create a tmp dir and copy the python script
 	temp_code_name := strings.ReplaceAll(uuid.New().String(), "-", "_")
 	temp_code_name = strings.ReplaceAll(temp_code_name, "/", ".")
