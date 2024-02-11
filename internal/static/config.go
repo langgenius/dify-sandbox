@@ -52,6 +52,6 @@ func InitConfig(path string) error {
 }
 
 // avoid global modification, use value copy instead
-func GetCoshubGlobalConfigurations() types.DifySandboxGlobalConfigurations {
+func GetDifySandboxGlobalConfigurations() types.DifySandboxGlobalConfigurations {
 	return difySandboxGlobalConfigurations
 }

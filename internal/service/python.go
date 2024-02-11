@@ -15,7 +15,7 @@ type RunCodeResponse struct {
 
 func RunPython3Code(code string) *types.DifySandboxResponse {
 	runner := python.PythonRunner{}
-	stdout, stderr, done, err := runner.Run(code, time.Duration(static.GetCoshubGlobalConfigurations().WorkerTimeout*int(time.Second)), nil)
+	stdout, stderr, done, err := runner.Run(code, time.Duration(static.GetDifySandboxGlobalConfigurations().WorkerTimeout*int(time.Second)), nil)
 	if err != nil {
 		return types.ErrorResponse(-500, err.Error())
 	}

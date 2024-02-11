@@ -19,7 +19,7 @@ func initConfig() {
 }
 
 func initServer() {
-	config := static.GetCoshubGlobalConfigurations()
+	config := static.GetDifySandboxGlobalConfigurations()
 	if !config.App.Debug {
 		gin.SetMode(gin.ReleaseMode)
 	}

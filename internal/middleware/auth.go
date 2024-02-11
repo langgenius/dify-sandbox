@@ -6,7 +6,7 @@ import (
 )
 
 func Auth() gin.HandlerFunc {
-	config := static.GetCoshubGlobalConfigurations()
+	config := static.GetDifySandboxGlobalConfigurations()
 	return func(c *gin.Context) {
 		if config.App.Key != c.GetHeader("X-Api-Key") {
 			c.AbortWithStatus(401)
