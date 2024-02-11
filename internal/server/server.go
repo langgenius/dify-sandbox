@@ -26,7 +26,6 @@ func initServer() {
 
 	r := gin.Default()
 	controller.Setup(r)
-	controller.InitSandBoxQueue()
 
 	r.Run(fmt.Sprintf(":%d", config.App.Port))
 }

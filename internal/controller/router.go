@@ -9,7 +9,7 @@ import (
 func Setup(eng *gin.Engine) {
 	eng.Use(middleware.MaxRequest(static.GetCoshubGlobalConfigurations().MaxRequests))
 	eng.Use(middleware.Auth())
-	eng.Use(middleware.MaxWoker(static.GetCoshubGlobalConfigurations().MaxWorkers))
+	eng.Use(middleware.MaxWorker(static.GetCoshubGlobalConfigurations().MaxWorkers))
 
 	eng.POST("/v1/sandbox/run", RunSandboxController)
 }

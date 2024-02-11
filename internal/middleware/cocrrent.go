@@ -9,24 +9,16 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
-func MaxWoker(max int) gin.HandlerFunc {
-	queue := make(chan *gin.Context, max)
-
-	for i := 0; i < max; i++ {
-		i := i
-		go func() {
-			log.Info("code runner worker %d started", i)
-			for {
-				select {
-				case c := <-queue:
-					c.Next()
-				}
-			}
-		}()
-	}
+func MaxWorker(max int) gin.HandlerFunc {
+	log.Info("setting max workers to %d", max)
+	sem := make(chan struct{}, max)
 
 	return func(c *gin.Context) {
-		queue <- c
+		sem <- struct{}{}
+		defer func() {
+			<-sem
+		}()
+		c.Next()
 	}
 }
 
