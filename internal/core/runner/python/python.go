@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -104,8 +105,14 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 			defer wg.Done()
 			for {
 				n, err := stdout_reader.Read(buf)
+				// exit if EOF
 				if err != nil {
-					break
+					if err == io.EOF {
+						break
+					} else {
+						stderr <- []byte(fmt.Sprintf("error: %v\n", err))
+						break
+					}
 				}
 				stdout <- buf[:n]
 			}
@@ -117,8 +124,14 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 			defer wg.Done()
 			for {
 				n, err := stderr_reader.Read(buf)
+				// exit if EOF
 				if err != nil {
-					break
+					if err == io.EOF {
+						break
+					} else {
+						stderr <- []byte(fmt.Sprintf("error: %v\n", err))
+						break
+					}
 				}
 				stderr <- buf[:n]
 			}
@@ -138,12 +151,14 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 					stderr <- []byte(fmt.Sprintf("exit code: %v\n", status.ExitCode()))
 				}
 			}
+
+			// wait for the stdout and stderr to finish
+			wg.Wait()
+			stderr_reader.Close()
+			stdout_reader.Close()
 			os.Remove(temp_code_path)
 			os.RemoveAll(root_path)
 			os.Remove(root_path)
-			stderr_reader.Close()
-			stdout_reader.Close()
-			wg.Wait()
 			cancel()
 			done_chan <- true
 		}()
