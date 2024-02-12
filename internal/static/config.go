@@ -48,6 +48,11 @@ func InitConfig(path string) error {
 		difySandboxGlobalConfigurations.WorkerTimeout, _ = strconv.Atoi(timeout)
 	}
 
+	api_key := os.Getenv("API_KEY")
+	if api_key != "" {
+		difySandboxGlobalConfigurations.App.Key = api_key
+	}
+
 	return nil
 }
 
