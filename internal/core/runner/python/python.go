@@ -69,7 +69,7 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 		// create a new process
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		cmd := exec.CommandContext(ctx,
-			"/usr/bin/python3",
+			static.GetDifySandboxGlobalConfigurations().PythonPath,
 			"-c",
 			string(python_sandbox_fs),
 			temp_code_path,

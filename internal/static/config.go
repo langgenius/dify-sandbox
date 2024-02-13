@@ -53,6 +53,15 @@ func InitConfig(path string) error {
 		difySandboxGlobalConfigurations.App.Key = api_key
 	}
 
+	python_path := os.Getenv("PYTHON_PATH")
+	if python_path != "" {
+		difySandboxGlobalConfigurations.PythonPath = python_path
+	}
+
+	if difySandboxGlobalConfigurations.PythonPath == "" {
+		difySandboxGlobalConfigurations.PythonPath = "/usr/local/bin/python3"
+	}
+
 	return nil
 }
 
