@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
-	"strconv"
 	"syscall"
 	"unsafe"
 
@@ -16,10 +15,10 @@ import (
 //var allow_syscalls = []int{}
 
 func InitSeccomp() error {
-	disabled_syscall, err := strconv.Atoi(os.Getenv("DISABLE_SYSCALL"))
-	if err != nil {
-		disabled_syscall = -1
-	}
+	// disabled_syscall, err := strconv.Atoi(os.Getenv("DISABLE_SYSCALL"))
+	// if err != nil {
+	// 	disabled_syscall = -1
+	// }
 
 	ctx, err := sg.NewFilter(sg.ActKillProcess)
 	if err != nil {
@@ -32,9 +31,9 @@ func InitSeccomp() error {
 	// }
 
 	for _, syscall := range static.ALLOW_SYSCALLS {
-		if syscall == disabled_syscall {
-			continue
-		}
+		// if syscall == disabled_syscall {
+		// 	continue
+		// }
 		err = ctx.AddRule(sg.ScmpSyscall(syscall), sg.ActAllow)
 		if err != nil {
 			return err
