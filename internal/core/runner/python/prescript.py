@@ -6,6 +6,7 @@ if __name__ == "__main__":
     import typing
     import time
     import traceback
+    import jinja2
 
     if len(sys.argv) != 4:
         sys.exit(-1)
