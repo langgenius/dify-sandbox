@@ -14,6 +14,8 @@ func RunSandboxController(c *gin.Context) {
 		switch req.Language {
 		case "python3":
 			c.JSON(200, service.RunPython3Code(req.Code))
+		case "nodejs":
+			c.JSON(200, service.RunNodeJsCode(req.Code))
 		default:
 			c.JSON(400, types.ErrorResponse(-400, "unsupported language"))
 		}

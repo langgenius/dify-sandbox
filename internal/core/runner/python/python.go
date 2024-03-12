@@ -30,18 +30,20 @@ var python_sandbox_fs []byte
 var python_lib []byte
 
 func init() {
-	// check if libpython.so exists
 	log.Info("initializing python runner environment...")
-	if _, err := os.Stat("/tmp/sandbox-python/python.so"); os.IsNotExist(err) {
-		err := os.MkdirAll("/tmp/sandbox-python", 0755)
-		if err != nil {
-			log.Panic("failed to create /tmp/sandbox-python")
-		}
-		err = os.WriteFile("/tmp/sandbox-python/python.so", python_lib, 0755)
-		if err != nil {
-			log.Panic("failed to write /tmp/sandbox-python/python.so")
-		}
+	// remove /tmp/sandbox-python
+	os.RemoveAll("/tmp/sandbox-python")
+	os.Remove("/tmp/sandbox-python")
+
+	err := os.MkdirAll("/tmp/sandbox-python", 0755)
+	if err != nil {
+		log.Panic("failed to create /tmp/sandbox-python")
 	}
+	err = os.WriteFile("/tmp/sandbox-python/python.so", python_lib, 0755)
+	if err != nil {
+		log.Panic("failed to write /tmp/sandbox-python/python.so")
+	}
+	log.Info("python runner environment initialized")
 }
 
 func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (chan []byte, chan []byte, chan bool, error) {

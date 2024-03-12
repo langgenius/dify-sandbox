@@ -1,0 +1,11 @@
+{
+  "name": "Koffi Config",
+  "author": "Niels Martignène <niels.martignene@protonmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "pack": "cd src && npm install && cd .. && nwbuild --glob=false src"
+  },
+  "devDependencies": {
+    "nw-builder": "^4.3.3"
+  }
+}

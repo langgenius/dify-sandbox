@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Koffi Configuration</title>
+
+        <style>
+            html {
+                height: 100%;
+            }
+            body {
+                font-family: 'Open Sans', sans-serif;
+                display: flex;
+                min-height: calc(100% - 17px);
+                align-items: center;
+                justify-content: center;
+                font-size: 14px;
+            }
+
+            #error {
+                position: fixed;
+                top: 50px;
+                left: calc(50% - 200px);
+                width: 400px;
+                padding: 8px;
+                background: #db0a0a;
+                color: white;
+                box-shadow: 1px 1px rgba(0, 0, 0, 0.5);
+                text-align: center;
+            }
+            #error:empty { display: none; }
+
+            #config {
+                background: #f8f8f8;
+                border-radius: 8px;
+                padding: 1em;
+                font-size: 1.2em;
+            }
+            form {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5em;
+            }
+            label {
+                display: flex;
+                gap: 12px;
+            }
+            label > span { width: 200px; }
+            label > :not(span) { flex: 1; }
+            button {
+                margin-top: 1em;
+                background: white;
+                border: white;
+                border-radius: 6px;
+                padding: 6px;
+                cursor: pointer;
+            }
+            button:hover { background: #ededed; }
+        </style>
+    </head>
+
+    <body>
+        <div id="error"></div>
+        <div id="config"></div>
+
+        <script>
+            const koffi = require('koffi');
+
+            update();
+
+            function update() {
+                let config = koffi.config();
+
+                let container = document.querySelector('#config');
+                let form = document.createElement('form');
+
+                form.addEventListener('submit', e => { e.preventDefault(); apply(e.target.elements); });
+
+                for (let key in config) {
+                    let value = config[key];
+
+                    if (typeof value != 'number')
+                        continue;
+
+                    let label = document.createElement('label');
+                    let span = document.createElement('span');
+                    let input = document.createElement('input');
+
+                    span.textContent = key;
+                    input.name = key;
+                    input.type = 'number';
+                    input.value = config[key];
+
+                    label.appendChild(span);
+                    label.appendChild(input);
+                    form.appendChild(label);
+                }
+
+                let button = document.createElement('button');
+                button.textContent = 'Modifier';
+                button.type = 'submit';
+
+                form.appendChild(button);
+
+                window.requestAnimationFrame(() => {
+                    container.innerHTML = '';
+                    container.appendChild(form);
+                });
+            }
+
+            async function apply(elements) {
+                let config = koffi.config();
+
+                for (let key in elements) {
+                    if (!config.hasOwnProperty(key))
+                        continue;
+
+                    let value = elements[key].valueAsNumber;
+
+                    if (typeof value == 'number')
+                        config[key] = value;
+                }
+
+                try {
+                    koffi.config(config);
+                } catch (err) {
+                    console.error(err);
+                    flashError(err.message);
+                }
+
+                update();
+            }
+
+            function flashError(msg) {
+                let div = document.querySelector('#error');
+
+                if (flashError.timer != null)
+                    clearTimeout(flashError.timer);
+                flashError.timer = setTimeout(() => { div.textContent = '' }, 4000);
+
+                div.textContent = msg;
+            }
+        </script>
+    </body>
+</html>

@@ -1,0 +1,37 @@
+{
+  "name": "KoffiConfig",
+  "version": "1.0.0",
+  "description": "Koffi Electron Example",
+  "main": ".webpack/main",
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+    "lint": "echo \"No linting configured\""
+  },
+  "keywords": [],
+  "author": {
+    "name": "Niels Martignène",
+    "email": "niels.martignene@protonmail.com"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@electron-forge/cli": "^6.2.1",
+    "@electron-forge/maker-deb": "^6.2.1",
+    "@electron-forge/maker-rpm": "^6.2.1",
+    "@electron-forge/maker-squirrel": "^6.2.1",
+    "@electron-forge/maker-zip": "^6.2.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^6.2.1",
+    "@electron-forge/plugin-webpack": "^6.2.1",
+    "@vercel/webpack-asset-relocator-loader": "^1.7.3",
+    "css-loader": "^6.8.1",
+    "electron": "25.3.2",
+    "node-loader": "^2.0.0",
+    "style-loader": "^3.3.3"
+  },
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.0",
+    "koffi": "^2.5.18"
+  }
+}

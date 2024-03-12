@@ -62,6 +62,15 @@ func InitConfig(path string) error {
 		difySandboxGlobalConfigurations.PythonPath = "/usr/local/bin/python3"
 	}
 
+	nodejs_path := os.Getenv("NODEJS_PATH")
+	if nodejs_path != "" {
+		difySandboxGlobalConfigurations.NodejsPath = nodejs_path
+	}
+
+	if difySandboxGlobalConfigurations.NodejsPath == "" {
+		difySandboxGlobalConfigurations.NodejsPath = "/usr/local/bin/node"
+	}
+
 	return nil
 }
 

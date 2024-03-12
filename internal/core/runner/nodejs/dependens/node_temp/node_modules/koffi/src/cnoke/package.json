@@ -1,0 +1,24 @@
+{
+  "name": "cnoke",
+  "version": "4.0.3",
+  "description": "Build native Node addons based on CMake, without extra dependency",
+  "keywords": [
+    "native",
+    "addon",
+    "cmake",
+    "c",
+    "c++"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Koromix/rygel.git"
+  },
+  "author": {
+    "name": "Niels Martignène",
+    "email": "niels.martignene@protonmail.com",
+    "url": "https://koromix.dev/"
+  },
+  "index": "src/index.js",
+  "bin": "cnoke.js",
+  "license": "MIT"
+}

@@ -7,6 +7,7 @@ if __name__ == "__main__":
     import time
     import traceback
     import jinja2
+    import re
 
     if len(sys.argv) != 4:
         sys.exit(-1)
@@ -15,18 +16,10 @@ if __name__ == "__main__":
     module = sys.argv[1]
     code = open(module).read()
 
-    def create_sandbox():
-        os.chroot(".")
-        os.chdir("/")
-
-    def prtcl():
-        lib.DifySeccomp.argtypes = []
+    def sandbox(uid, gid):
+        lib.DifySeccomp.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
         lib.DifySeccomp.restype = None
-        lib.DifySeccomp()
-
-    def drop_privileges(uid, gid):
-        os.setgid(gid)
-        os.setuid(uid)
+        lib.DifySeccomp(uid, gid)
     
     uid = int(sys.argv[2])
     gid = int(sys.argv[3])
@@ -34,9 +27,7 @@ if __name__ == "__main__":
     if not uid or not gid:
         sys.exit(-1)
 
-    create_sandbox()
-    prtcl()
-    drop_privileges(uid, gid)
+    sandbox(uid, gid)
 
     # setup sys.excepthook
     def excepthook(type, value, tb):

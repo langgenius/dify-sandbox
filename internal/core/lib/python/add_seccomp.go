@@ -8,13 +8,21 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/langgenius/dify-sandbox/internal/static"
+	"github.com/langgenius/dify-sandbox/internal/static/python_syscall"
 	sg "github.com/seccomp/libseccomp-golang"
 )
 
 //var allow_syscalls = []int{}
 
-func InitSeccomp() error {
+func InitSeccomp(uid int, gid int) error {
+	err := syscall.Chroot(".")
+	if err != nil {
+		return err
+	}
+	err = syscall.Chdir("/")
+	if err != nil {
+		return err
+	}
 	// disabled_syscall, err := strconv.Atoi(os.Getenv("DISABLE_SYSCALL"))
 	// if err != nil {
 	// 	disabled_syscall = -1
@@ -30,7 +38,7 @@ func InitSeccomp() error {
 	// 	allow_syscalls = append(allow_syscalls, i)
 	// }
 
-	for _, syscall := range static.ALLOW_SYSCALLS {
+	for _, syscall := range python_syscall.ALLOW_SYSCALLS {
 		// if syscall == disabled_syscall {
 		// 	continue
 		// }
@@ -72,6 +80,18 @@ func InitSeccomp() error {
 	_, _, err2 := syscall.RawSyscall6(syscall.SYS_PRCTL, syscall.PR_SET_SECCOMP, 2, uintptr(unsafe.Pointer(&bpf)), 0, 0, 0)
 	if err2 != 0 {
 		return fmt.Errorf("prctl failed: %v", err2)
+	}
+
+	// setuid
+	err = syscall.Setuid(uid)
+	if err != nil {
+		return err
+	}
+
+	// setgid
+	err = syscall.Setgid(gid)
+	if err != nil {
+		return err
 	}
 
 	return nil

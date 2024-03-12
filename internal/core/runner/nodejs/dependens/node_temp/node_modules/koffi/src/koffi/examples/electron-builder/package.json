@@ -1,0 +1,21 @@
+{
+  "name": "KoffiConfig",
+  "version": "1.0.0",
+  "description": "Koffi Electron Example",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "author": "Niels Martignène <niels.martignene@protonmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^25.3.2",
+    "electron-builder": "^24.6.3",
+    "esbuild": "^0.18.17"
+  },
+  "dependencies": {
+    "koffi": "^2.5.18"
+  }
+}

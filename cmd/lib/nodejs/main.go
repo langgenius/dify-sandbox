@@ -4,8 +4,8 @@ import "github.com/langgenius/dify-sandbox/internal/core/lib/nodejs"
 import "C"
 
 //export DifySeccomp
-func DifySeccomp() {
-	nodejs.InitSeccomp()
+func DifySeccomp(uid int, gid int) {
+	nodejs.InitSeccomp(uid, gid)
 }
 
 func main() {}

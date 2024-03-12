@@ -10,4 +10,5 @@ type DifySandboxGlobalConfigurations struct {
 	MaxRequests   int    `yaml:"max_requests"`
 	WorkerTimeout int    `yaml:"worker_timeout"`
 	PythonPath    string `yaml:"python_path"`
+	NodejsPath    string `yaml:"nodejs_path"`
 }
