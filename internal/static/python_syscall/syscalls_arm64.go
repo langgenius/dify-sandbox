@@ -15,7 +15,8 @@ var ALLOW_SYSCALLS = []int{
 	// thread
 	syscall.SYS_FUTEX,
 	// memory
-	syscall.SYS_MMAP, syscall.SYS_BRK, syscall.SYS_MPROTECT, syscall.SYS_MUNMAP, syscall.SYS_RT_SIGRETURN,
+	syscall.SYS_MMAP, syscall.SYS_BRK, syscall.SYS_MPROTECT, syscall.SYS_MUNMAP, syscall.SYS_RT_SIGRETURN, syscall.SYS_RT_SIGPROCMASK,
+	syscall.SYS_SIGALTSTACK,
 	// user/group
 	syscall.SYS_SETUID, syscall.SYS_SETGID,
 	// process
@@ -25,5 +26,5 @@ var ALLOW_SYSCALLS = []int{
 	// time
 	syscall.SYS_CLOCK_GETTIME, syscall.SYS_GETTIMEOFDAY, syscall.SYS_NANOSLEEP,
 	syscall.SYS_EPOLL_CTL, syscall.SYS_CLOCK_NANOSLEEP, syscall.SYS_PSELECT6,
-	syscall.SYS_TIME,
+	syscall.SYS_TIMERFD_CREATE, syscall.SYS_TIMERFD_SETTIME, syscall.SYS_TIMERFD_GETTIME,
 }
