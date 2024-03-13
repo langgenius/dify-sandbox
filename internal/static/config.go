@@ -28,6 +28,11 @@ func InitConfig(path string) error {
 		return err
 	}
 
+	debug, err := strconv.ParseBool(os.Getenv("DEBUG"))
+	if err == nil {
+		difySandboxGlobalConfigurations.App.Debug = debug
+	}
+
 	max_workers := os.Getenv("MAX_WORKERS")
 	if max_workers != "" {
 		difySandboxGlobalConfigurations.MaxWorkers, _ = strconv.Atoi(max_workers)
