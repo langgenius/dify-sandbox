@@ -6,12 +6,9 @@ import "syscall"
 
 var ALLOW_SYSCALLS = []int{
 	// file
-	syscall.SYS_CLOSE, syscall.SYS_READ, syscall.SYS_WRITE, syscall.SYS_OPENAT,
+	syscall.SYS_CLOSE, syscall.SYS_WRITE,
 	syscall.SYS_FSTAT, syscall.SYS_FCNTL,
-	syscall.SYS_READLINKAT, syscall.SYS_FSTATAT,
-
-	// io
-	syscall.SYS_IOCTL,
+	syscall.SYS_READLINKAT,
 
 	// process
 	syscall.SYS_GETPID, syscall.SYS_TGKILL, syscall.SYS_FUTEX, syscall.SYS_EXIT_GROUP,
@@ -26,4 +23,9 @@ var ALLOW_SYSCALLS = []int{
 
 	// epoll
 	syscall.SYS_EPOLL_CTL, syscall.SYS_EPOLL_PWAIT,
+}
+
+var ERROR_CODE_SYSCALLS = []int{
+	// file io
+	syscall.SYS_OPENAT, syscall.SYS_FSTATAT, syscall.SYS_IOCTL, syscall.SYS_READ, syscall.SYS_LSEEK,
 }

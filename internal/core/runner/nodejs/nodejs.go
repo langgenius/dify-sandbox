@@ -151,9 +151,9 @@ func (p *NodeJsRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 
 		// read the output
 		go func() {
-			buf := make([]byte, 1024)
 			defer wg.Done()
 			for {
+				buf := make([]byte, 1024)
 				n, err := stdout_reader.Read(buf)
 				// exit if EOF
 				if err != nil {

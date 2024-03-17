@@ -28,3 +28,8 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_EPOLL_CTL, syscall.SYS_CLOCK_NANOSLEEP, syscall.SYS_PSELECT6,
 	syscall.SYS_TIMERFD_CREATE, syscall.SYS_TIMERFD_SETTIME, syscall.SYS_TIMERFD_GETTIME,
 }
+
+var ERROR_CODE_SYSCALLS = []int{
+	// file io
+	syscall.SYS_OPENAT, syscall.SYS_FSTATAT, syscall.SYS_IOCTL, syscall.SYS_READ, syscall.SYS_LSEEK,
+}
