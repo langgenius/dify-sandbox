@@ -48,6 +48,16 @@ func InitSeccomp(uid int, gid int) error {
 		}
 	}
 
+	for _, syscall := range python_syscall.ERROR_CODE_SYSCALLS {
+		// if syscall == disabled_syscall {
+		// 	continue
+		// }
+		err = ctx.AddRule(sg.ScmpSyscall(syscall), sg.ActErrno)
+		if err != nil {
+			return err
+		}
+	}
+
 	reader, writer, err := os.Pipe()
 	if err != nil {
 		return err

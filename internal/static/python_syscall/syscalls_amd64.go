@@ -29,3 +29,8 @@ var ALLOW_SYSCALLS = []int{
 
 	syscall.SYS_RT_SIGPROCMASK, syscall.SYS_SIGALTSTACK,
 }
+
+var ERROR_CODE_SYSCALLS = []int{
+	// file io
+	syscall.SYS_OPENAT, syscall.SYS_NEWFSTATAT, syscall.SYS_IOCTL, syscall.SYS_READ, syscall.SYS_LSEEK,
+}
