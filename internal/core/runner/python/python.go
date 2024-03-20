@@ -1,7 +1,6 @@
 package python
 
 import (
-	"context"
 	_ "embed"
 	"fmt"
 	"io"
@@ -60,8 +59,17 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 		return nil, nil, nil, err
 	}
 
-	stdout := make(chan []byte)
-	stderr := make(chan []byte)
+	stdout := make(chan []byte, 42)
+	stderr := make(chan []byte, 42)
+
+	write_out := func(data []byte) {
+		stdout <- data
+	}
+
+	write_err := func(data []byte) {
+		stderr <- data
+	}
+
 	done_chan := make(chan bool)
 
 	err = p.WithTempDir([]string{
@@ -69,8 +77,7 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 		"/tmp/sandbox-python/python.so",
 	}, func(root_path string) error {
 		// create a new process
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		cmd := exec.CommandContext(ctx,
+		cmd := exec.Command(
 			static.GetDifySandboxGlobalConfigurations().PythonPath,
 			"-c",
 			string(python_sandbox_fs),
@@ -83,23 +90,35 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 		// create a pipe for the stdout
 		stdout_reader, err := cmd.StdoutPipe()
 		if err != nil {
-			cancel()
 			return err
 		}
 
 		// create a pipe for the stderr
 		stderr_reader, err := cmd.StderrPipe()
 		if err != nil {
-			cancel()
+			stdout_reader.Close()
 			return err
 		}
 
 		// start the process
 		err = cmd.Start()
 		if err != nil {
-			cancel()
+			stdout_reader.Close()
+			stderr_reader.Close()
 			return err
 		}
+
+		// start a timer for the timeout
+		timer := time.NewTimer(timeout)
+		go func() {
+			<-timer.C
+			if cmd != nil && cmd.Process != nil {
+				// write the error
+				write_err([]byte("error: timeout\n"))
+				// send a signal to the process
+				cmd.Process.Kill()
+			}
+		}()
 
 		wg := sync.WaitGroup{}
 		wg.Add(2)
@@ -115,11 +134,11 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 					if err == io.EOF {
 						break
 					} else {
-						stderr <- []byte(fmt.Sprintf("error: %v\n", err))
+						write_err([]byte(fmt.Sprintf("error: %v\n", err)))
 						break
 					}
 				}
-				stdout <- buf[:n]
+				write_out(buf[:n])
 			}
 		}()
 
@@ -134,11 +153,11 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 					if err == io.EOF {
 						break
 					} else {
-						stderr <- []byte(fmt.Sprintf("error: %v\n", err))
+						write_err([]byte(fmt.Sprintf("error: %v\n", err)))
 						break
 					}
 				}
-				stderr <- buf[:n]
+				write_err(buf[:n])
 			}
 		}()
 
@@ -147,13 +166,13 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 			status, err := cmd.Process.Wait()
 			if err != nil {
 				log.Error("process finished with status: %v", status.String())
-				stderr <- []byte(fmt.Sprintf("error: %v\n", err))
+				write_err([]byte(fmt.Sprintf("error: %v\n", err)))
 			} else if status.ExitCode() != 0 {
 				exit_string := status.String()
 				if strings.Contains(exit_string, "bad system call (core dumped)") {
-					stderr <- []byte("error: operation not permitted\n")
+					write_err([]byte("error: bad system call\n"))
 				} else {
-					stderr <- []byte(fmt.Sprintf("exit code: %v\n", status.ExitCode()))
+					write_err([]byte(fmt.Sprintf("error: %v\n", status.String())))
 				}
 			}
 
@@ -164,7 +183,7 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 			os.Remove(temp_code_path)
 			os.RemoveAll(root_path)
 			os.Remove(root_path)
-			cancel()
+			timer.Stop()
 			done_chan <- true
 		}()
 

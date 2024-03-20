@@ -18,6 +18,10 @@ func RunNodeJsCode(code string) *types.DifySandboxResponse {
 	stdout_str := ""
 	stderr_str := ""
 
+	defer close(done)
+	defer close(stdout)
+	defer close(stderr)
+
 	for {
 		select {
 		case <-done:
