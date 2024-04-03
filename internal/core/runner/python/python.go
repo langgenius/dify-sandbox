@@ -169,10 +169,10 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 				write_err([]byte(fmt.Sprintf("error: %v\n", err)))
 			} else if status.ExitCode() != 0 {
 				exit_string := status.String()
-				if strings.Contains(exit_string, "bad system call (core dumped)") {
-					write_err([]byte("error: bad system call\n"))
+				if strings.Contains(exit_string, "bad system call") {
+					write_err([]byte("error: operation not permitted\n"))
 				} else {
-					write_err([]byte(fmt.Sprintf("error: %v\n", status.String())))
+					write_err([]byte(fmt.Sprintf("error: %v\n", exit_string)))
 				}
 			}
 
