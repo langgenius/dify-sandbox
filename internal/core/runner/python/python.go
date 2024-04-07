@@ -45,7 +45,9 @@ func init() {
 	log.Info("python runner environment initialized")
 }
 
-func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (chan []byte, chan []byte, chan bool, error) {
+func (p *PythonRunner) Run(
+	code string, timeout time.Duration, stdin []byte, preload string,
+) (chan []byte, chan []byte, chan bool, error) {
 	// create a tmp dir and copy the python script
 	temp_code_name := strings.ReplaceAll(uuid.New().String(), "-", "_")
 	temp_code_name = strings.ReplaceAll(temp_code_name, "/", ".")
@@ -76,11 +78,18 @@ func (p *PythonRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 		temp_code_path,
 		"/tmp/sandbox-python/python.so",
 	}, func(root_path string) error {
+		python_sandbox_file := string(python_sandbox_fs)
+		if preload != "" {
+			python_sandbox_file = fmt.Sprintf("%s\n%s", preload, python_sandbox_file)
+		}
+
+		fmt.Println(python_sandbox_file)
+
 		// create a new process
 		cmd := exec.Command(
 			static.GetDifySandboxGlobalConfigurations().PythonPath,
 			"-c",
-			string(python_sandbox_fs),
+			python_sandbox_file,
 			temp_code_path,
 			strconv.Itoa(static.SANDBOX_USER_UID),
 			strconv.Itoa(static.SANDBOX_GROUP_ID),

@@ -8,9 +8,11 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/types"
 )
 
-func RunNodeJsCode(code string) *types.DifySandboxResponse {
+func RunNodeJsCode(code string, preload string) *types.DifySandboxResponse {
+	timeout := time.Duration(static.GetDifySandboxGlobalConfigurations().WorkerTimeout * int(time.Second))
+
 	runner := nodejs.NodeJsRunner{}
-	stdout, stderr, done, err := runner.Run(code, time.Duration(static.GetDifySandboxGlobalConfigurations().WorkerTimeout*int(time.Second)), nil)
+	stdout, stderr, done, err := runner.Run(code, timeout, nil, preload)
 	if err != nil {
 		return types.ErrorResponse(-500, err.Error())
 	}

@@ -13,9 +13,14 @@ type RunCodeResponse struct {
 	Stdout string `json:"stdout"`
 }
 
-func RunPython3Code(code string) *types.DifySandboxResponse {
+func RunPython3Code(code string, preload string) *types.DifySandboxResponse {
+	timeout := time.Duration(
+		static.GetDifySandboxGlobalConfigurations().WorkerTimeout * int(time.Second),
+	)
 	runner := python.PythonRunner{}
-	stdout, stderr, done, err := runner.Run(code, time.Duration(static.GetDifySandboxGlobalConfigurations().WorkerTimeout*int(time.Second)), nil)
+	stdout, stderr, done, err := runner.Run(
+		code, timeout, nil, preload,
+	)
 	if err != nil {
 		return types.ErrorResponse(-500, err.Error())
 	}

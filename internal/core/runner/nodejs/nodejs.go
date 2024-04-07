@@ -94,7 +94,9 @@ func init() {
 	log.Info("nodejs runner environment initialized")
 }
 
-func (p *NodeJsRunner) Run(code string, timeout time.Duration, stdin []byte) (chan []byte, chan []byte, chan bool, error) {
+func (p *NodeJsRunner) Run(
+	code string, timeout time.Duration, stdin []byte, preload string,
+) (chan []byte, chan []byte, chan bool, error) {
 	// create a tmp dir and copy the nodejs script
 	stdout := make(chan []byte)
 	stderr := make(chan []byte)
@@ -113,8 +115,13 @@ func (p *NodeJsRunner) Run(code string, timeout time.Duration, stdin []byte) (ch
 		"/tmp/sandbox-nodejs-project/node_temp",
 		"/tmp/sandbox-nodejs/nodejs.so",
 	}, func(root_path string) error {
+		node_sandbox_file := string(nodejs_sandbox_fs)
+		if preload != "" {
+			node_sandbox_file = fmt.Sprintf("%s\n%s", preload, node_sandbox_file)
+		}
+
 		// join nodejs_sandbox_fs and code
-		code = string(nodejs_sandbox_fs) + code
+		code = node_sandbox_file + code
 
 		// override root_path/tmp/sandbox-nodejs-project/prescript.js
 		script_path := path.Join(root_path, "tmp/sandbox-nodejs-project/node_temp/node_temp/test.js")
