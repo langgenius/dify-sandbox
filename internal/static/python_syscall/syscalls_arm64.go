@@ -16,7 +16,7 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_FUTEX,
 	// memory
 	syscall.SYS_MMAP, syscall.SYS_BRK, syscall.SYS_MPROTECT, syscall.SYS_MUNMAP, syscall.SYS_RT_SIGRETURN, syscall.SYS_RT_SIGPROCMASK,
-	syscall.SYS_SIGALTSTACK,
+	syscall.SYS_SIGALTSTACK, syscall.SYS_MREMAP,
 	// user/group
 	syscall.SYS_SETUID, syscall.SYS_SETGID,
 	// process
