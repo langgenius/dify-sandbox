@@ -83,8 +83,6 @@ func (p *PythonRunner) Run(
 			python_sandbox_file = fmt.Sprintf("%s\n%s", preload, python_sandbox_file)
 		}
 
-		fmt.Println(python_sandbox_file)
-
 		// create a new process
 		cmd := exec.Command(
 			static.GetDifySandboxGlobalConfigurations().PythonPath,
