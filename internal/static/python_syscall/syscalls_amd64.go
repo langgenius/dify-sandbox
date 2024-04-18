@@ -34,3 +34,8 @@ var ERROR_CODE_SYSCALLS = []int{
 	// file io
 	syscall.SYS_OPENAT, syscall.SYS_NEWFSTATAT, syscall.SYS_IOCTL, syscall.SYS_READ, syscall.SYS_LSEEK,
 }
+
+var ALLOW_NETWORK_SYSCALLS = []int{
+	syscall.SYS_SOCKET, syscall.SYS_CONNECT, syscall.SYS_BIND, syscall.SYS_LISTEN, syscall.SYS_ACCEPT, syscall.SYS_SENDTO, syscall.SYS_RECVFROM,
+	syscall.SYS_GETSOCKNAME, syscall.SYS_GETPEERNAME,
+}
