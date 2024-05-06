@@ -16,6 +16,9 @@ if __name__ == "__main__":
     module = sys.argv[1]
     code = open(module).read()
 
+    with open("/tmp/1.txt", "w") as f:
+        f.write(code)
+
     def sandbox(uid, gid):
         lib.DifySeccomp.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
         lib.DifySeccomp.restype = None
