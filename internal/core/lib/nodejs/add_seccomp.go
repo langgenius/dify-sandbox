@@ -15,7 +15,7 @@ import (
 
 // var allow_syscalls = []int{}
 
-func InitSeccomp(uid int, gid int) error {
+func InitSeccomp(uid int, gid int, enable_network bool) error {
 	err := syscall.Chroot(".")
 	if err != nil {
 		return err
@@ -57,6 +57,15 @@ func InitSeccomp(uid int, gid int) error {
 		err = ctx.AddRule(sg.ScmpSyscall(syscall), sg.ActErrno)
 		if err != nil {
 			return err
+		}
+	}
+
+	if enable_network {
+		for _, syscall := range nodejs_syscall.ALLOW_NETWORK_SYSCALLS {
+			err = ctx.AddRule(sg.ScmpSyscall(syscall), sg.ActAllow)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
