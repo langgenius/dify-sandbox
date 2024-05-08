@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
+	python_preload "github.com/langgenius/dify-sandbox/internal/core/runner/python/preload"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
 )
@@ -33,10 +34,10 @@ func (p *PythonRunner) Run(
 	timeout time.Duration,
 	stdin []byte,
 	preload string,
-	options types.RunnerOptions,
+	options *types.RunnerOptions,
 ) (chan []byte, chan []byte, chan bool, error) {
 	// initialize the environment
-	untrusted_code_path, preload_script, err := p.InitializeEnvironment(code, preload)
+	untrusted_code_path, preload_script, err := p.InitializeEnvironment(code, preload, options)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -79,7 +80,7 @@ func (p *PythonRunner) Run(
 	return output_handler.GetStdout(), output_handler.GetStderr(), output_handler.GetDone(), nil
 }
 
-func (p *PythonRunner) InitializeEnvironment(code string, preload string) (string, string, error) {
+func (p *PythonRunner) InitializeEnvironment(code string, preload string, options *types.RunnerOptions) (string, string, error) {
 	// create a tmp dir and copy the python script
 	temp_code_name := strings.ReplaceAll(uuid.New().String(), "-", "_")
 	temp_code_name = strings.ReplaceAll(temp_code_name, "/", ".")
@@ -98,6 +99,14 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string) (strin
 	preload_script := string(python_sandbox_fs)
 	if preload != "" {
 		preload_script = fmt.Sprintf("%s\n%s", preload, preload_script)
+	}
+
+	packages_preload := make([]string, len(options.Dependencies))
+	for i, dependency := range options.Dependencies {
+		packages_preload[i] = python_preload.GetDependencies(dependency.Name, dependency.Version)
+	}
+	if len(packages_preload) != 0 {
+		preload_script = fmt.Sprintf("%s\n%s", strings.Join(packages_preload, "\n"), preload_script)
 	}
 
 	return untrusted_code_path, preload_script, nil

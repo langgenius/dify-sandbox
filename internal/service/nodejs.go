@@ -9,7 +9,7 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/types"
 )
 
-func RunNodeJsCode(code string, preload string, options runner_types.RunnerOptions) *types.DifySandboxResponse {
+func RunNodeJsCode(code string, preload string, options *runner_types.RunnerOptions) *types.DifySandboxResponse {
 	if err := checkOptions(options); err != nil {
 		return types.ErrorResponse(-400, err.Error())
 	}

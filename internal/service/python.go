@@ -14,7 +14,7 @@ type RunCodeResponse struct {
 	Stdout string `json:"stdout"`
 }
 
-func RunPython3Code(code string, preload string, options runner_types.RunnerOptions) *types.DifySandboxResponse {
+func RunPython3Code(code string, preload string, options *runner_types.RunnerOptions) *types.DifySandboxResponse {
 	if err := checkOptions(options); err != nil {
 		return types.ErrorResponse(-400, err.Error())
 	}

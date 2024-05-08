@@ -103,7 +103,7 @@ func (p *NodeJsRunner) Run(
 	timeout time.Duration,
 	stdin []byte,
 	preload string,
-	options types.RunnerOptions,
+	options *types.RunnerOptions,
 ) (chan []byte, chan []byte, chan bool, error) {
 	// capture the output
 	output_handler := runner.NewOutputCaptureRunner()
