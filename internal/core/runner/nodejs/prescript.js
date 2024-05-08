@@ -7,5 +7,7 @@ const difySeccomp = lib.func('void DifySeccomp(int, int)')
 const uid = parseInt(argv[2])
 const gid = parseInt(argv[3])
 
-difySeccomp(uid, gid)
+const options = JSON.parse(argv[4])
+
+difySeccomp(uid, gid, options['enable_network'])
 

@@ -88,3 +88,24 @@ func InitConfig(path string) error {
 func GetDifySandboxGlobalConfigurations() types.DifySandboxGlobalConfigurations {
 	return difySandboxGlobalConfigurations
 }
+
+type RunnerDependencies struct {
+	PythonRequirements string
+}
+
+var runnerDependencies RunnerDependencies
+
+func GetRunnerDependencies() RunnerDependencies {
+	return runnerDependencies
+}
+
+func SetupRunnerDependencies() error {
+	file, err := os.ReadFile("dependencies/python-requirements.txt")
+	if err != nil {
+		return err
+	}
+
+	runnerDependencies.PythonRequirements = string(file)
+
+	return nil
+}

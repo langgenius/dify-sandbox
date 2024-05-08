@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/langgenius/dify-sandbox/internal/controller"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/python"
 	"github.com/langgenius/dify-sandbox/internal/static"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
@@ -16,6 +17,12 @@ func initConfig() {
 		log.Panic("failed to init config: %v", err)
 	}
 	log.Info("config init success")
+
+	err = static.SetupRunnerDependencies()
+	if err != nil {
+		log.Panic("failed to setup runner dependencies: %v", err)
+	}
+	log.Info("runner dependencies init success")
 }
 
 func initServer() {
@@ -30,7 +37,18 @@ func initServer() {
 	r.Run(fmt.Sprintf(":%d", config.App.Port))
 }
 
+func initDependencies() {
+	log.Info("installing python dependencies...")
+	dependenices := static.GetRunnerDependencies()
+	err := python.InstallDependencies(dependenices.PythonRequirements)
+	if err != nil {
+		log.Panic("failed to install python dependencies: %v", err)
+	}
+	log.Info("python dependencies installed")
+}
+
 func Run() {
 	initConfig()
+	initDependencies()
 	initServer()
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
-	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
 type PythonRunner struct {
@@ -22,26 +21,6 @@ type PythonRunner struct {
 
 //go:embed prescript.py
 var python_sandbox_fs []byte
-
-//go:embed python.so
-var python_lib []byte
-
-func init() {
-	log.Info("initializing python runner environment...")
-	// remove /tmp/sandbox-python
-	os.RemoveAll("/tmp/sandbox-python")
-	os.Remove("/tmp/sandbox-python")
-
-	err := os.MkdirAll("/tmp/sandbox-python", 0755)
-	if err != nil {
-		log.Panic("failed to create /tmp/sandbox-python")
-	}
-	err = os.WriteFile("/tmp/sandbox-python/python.so", python_lib, 0755)
-	if err != nil {
-		log.Panic("failed to write /tmp/sandbox-python/python.so")
-	}
-	log.Info("python runner environment initialized")
-}
 
 var (
 	PYTHON_REQUIRED_FS = []string{
@@ -81,6 +60,7 @@ func (p *PythonRunner) Run(
 			untrusted_code_path,
 			strconv.Itoa(static.SANDBOX_USER_UID),
 			strconv.Itoa(static.SANDBOX_GROUP_ID),
+			options.Json(),
 		)
 		cmd.Env = []string{}
 

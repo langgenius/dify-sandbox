@@ -30,7 +30,9 @@ if __name__ == "__main__":
     if not uid or not gid:
         sys.exit(-1)
 
-    sandbox(uid, gid)
+    options = json.loads(sys.argv[4])
+
+    sandbox(uid, gid, options.get("enable_network", False))
 
     # setup sys.excepthook
     def excepthook(type, value, tb):

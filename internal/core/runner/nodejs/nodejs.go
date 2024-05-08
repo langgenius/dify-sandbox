@@ -127,6 +127,7 @@ func (p *NodeJsRunner) Run(
 			script_path,
 			strconv.Itoa(static.SANDBOX_USER_UID),
 			strconv.Itoa(static.SANDBOX_GROUP_ID),
+			options.Json(),
 		)
 		cmd.Env = []string{}
 
