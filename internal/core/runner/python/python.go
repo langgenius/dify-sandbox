@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
-	python_preload "github.com/langgenius/dify-sandbox/internal/core/runner/python/preload"
+	python_dependencies "github.com/langgenius/dify-sandbox/internal/core/runner/python/dependencies"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
 )
@@ -103,7 +103,7 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 
 	packages_preload := make([]string, len(options.Dependencies))
 	for i, dependency := range options.Dependencies {
-		packages_preload[i] = python_preload.GetDependencies(dependency.Name, dependency.Version)
+		packages_preload[i] = python_dependencies.GetDependencies(dependency.Name, dependency.Version)
 	}
 	if len(packages_preload) != 0 {
 		preload_script = fmt.Sprintf("%s\n%s", strings.Join(packages_preload, "\n"), preload_script)

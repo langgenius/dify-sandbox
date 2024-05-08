@@ -7,9 +7,16 @@ import (
 )
 
 func Setup(eng *gin.Engine) {
-	eng.Use(middleware.MaxRequest(static.GetDifySandboxGlobalConfigurations().MaxRequests))
 	eng.Use(middleware.Auth())
-	eng.Use(middleware.MaxWorker(static.GetDifySandboxGlobalConfigurations().MaxWorkers))
 
-	eng.POST("/v1/sandbox/run", RunSandboxController)
+	eng.POST(
+		"/v1/sandbox/run",
+		middleware.MaxRequest(static.GetDifySandboxGlobalConfigurations().MaxRequests),
+		middleware.MaxWorker(static.GetDifySandboxGlobalConfigurations().MaxWorkers),
+		RunSandboxController,
+	)
+	eng.GET(
+		"/v1/sandbox/dependencies",
+		GetDependencies,
+	)
 }

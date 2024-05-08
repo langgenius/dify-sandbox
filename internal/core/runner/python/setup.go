@@ -7,6 +7,8 @@ import (
 	"path"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
+	python_dependencies "github.com/langgenius/dify-sandbox/internal/core/runner/python/dependencies"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
@@ -69,4 +71,8 @@ func InstallDependencies(requirements string) error {
 
 		return nil
 	})
+}
+
+func ListDependencies() []types.Dependency {
+	return python_dependencies.ListDependencies()
 }

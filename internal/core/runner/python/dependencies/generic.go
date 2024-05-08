@@ -1,4 +1,4 @@
-package preload
+package dependencies
 
 /*
 import json
@@ -24,7 +24,7 @@ import itertools
 
 func init() {
 	SetupDependency("json", "", "import json")
-	SetupDependency("datetime", "", "import datetime")
+	SetupDependency("datetime", "", "import datetime\nfrom datetime import datetime\ndatetime.strptime('2021-01-01', '%Y-%m-%d')")
 	SetupDependency("math", "", "import math")
 	SetupDependency("random", "", "import random")
 	SetupDependency("re", "", "import re")
@@ -42,5 +42,4 @@ func init() {
 	SetupDependency("functools", "", "import functools")
 	SetupDependency("operator", "", "import operator")
 	SetupDependency("itertools", "", "import itertools")
-	SetupDependency("datetime.datetime", "", "import datetime.datetime\ndatetime.datetime.strptime('2024-05-08', '%Y-%m-%d')")
 }
