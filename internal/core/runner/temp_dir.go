@@ -8,10 +8,9 @@ import (
 	"github.com/google/uuid"
 )
 
-type SeccompRunner struct {
-}
+type TempDirRunner struct{}
 
-func (s *SeccompRunner) WithTempDir(paths []string, closures func(path string) error) error {
+func (s *TempDirRunner) WithTempDir(paths []string, closures func(path string) error) error {
 	uuid, err := uuid.NewRandom()
 	if err != nil {
 		return err

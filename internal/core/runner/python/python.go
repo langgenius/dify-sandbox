@@ -3,23 +3,21 @@ package python
 import (
 	_ "embed"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
 type PythonRunner struct {
-	runner.Runner
-	runner.SeccompRunner
+	runner.TempDirRunner
 }
 
 //go:embed prescript.py
@@ -45,154 +43,51 @@ func init() {
 	log.Info("python runner environment initialized")
 }
 
-func (p *PythonRunner) Run(
-	code string, timeout time.Duration, stdin []byte, preload string,
-) (chan []byte, chan []byte, chan bool, error) {
-	// create a tmp dir and copy the python script
-	temp_code_name := strings.ReplaceAll(uuid.New().String(), "-", "_")
-	temp_code_name = strings.ReplaceAll(temp_code_name, "/", ".")
-	temp_code_path := fmt.Sprintf("/tmp/code/%s.py", temp_code_name)
-	err := os.MkdirAll("/tmp/code", 0755)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	err = os.WriteFile(temp_code_path, []byte(code), 0755)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	stdout := make(chan []byte, 42)
-	stderr := make(chan []byte, 42)
-
-	write_out := func(data []byte) {
-		stdout <- data
-	}
-
-	write_err := func(data []byte) {
-		stderr <- data
-	}
-
-	done_chan := make(chan bool)
-
-	err = p.WithTempDir([]string{
-		temp_code_path,
+var (
+	PYTHON_REQUIRED_FS = []string{
 		"/tmp/sandbox-python/python.so",
-	}, func(root_path string) error {
-		python_sandbox_file := string(python_sandbox_fs)
-		if preload != "" {
-			python_sandbox_file = fmt.Sprintf("%s\n%s", preload, python_sandbox_file)
-		}
+	}
+)
+
+func (p *PythonRunner) Run(
+	code string,
+	timeout time.Duration,
+	stdin []byte,
+	preload string,
+	options types.RunnerOptions,
+) (chan []byte, chan []byte, chan bool, error) {
+	// initialize the environment
+	untrusted_code_path, preload_script, err := p.InitializeEnvironment(code, preload)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// capture the output
+	output_handler := runner.NewOutputCaptureRunner()
+	output_handler.SetTimeout(timeout)
+
+	err = p.WithTempDir(PYTHON_REQUIRED_FS, func(root_path string) error {
+		// cleanup
+		output_handler.SetAfterExitHook(func() {
+			os.RemoveAll(root_path)
+			os.Remove(root_path)
+		})
 
 		// create a new process
 		cmd := exec.Command(
 			static.GetDifySandboxGlobalConfigurations().PythonPath,
 			"-c",
-			python_sandbox_file,
-			temp_code_path,
+			preload_script,
+			untrusted_code_path,
 			strconv.Itoa(static.SANDBOX_USER_UID),
 			strconv.Itoa(static.SANDBOX_GROUP_ID),
 		)
 		cmd.Env = []string{}
 
-		// create a pipe for the stdout
-		stdout_reader, err := cmd.StdoutPipe()
+		err = output_handler.CaptureOutput(cmd)
 		if err != nil {
 			return err
 		}
-
-		// create a pipe for the stderr
-		stderr_reader, err := cmd.StderrPipe()
-		if err != nil {
-			stdout_reader.Close()
-			return err
-		}
-
-		// start the process
-		err = cmd.Start()
-		if err != nil {
-			stdout_reader.Close()
-			stderr_reader.Close()
-			return err
-		}
-
-		// start a timer for the timeout
-		timer := time.NewTimer(timeout)
-		go func() {
-			<-timer.C
-			if cmd != nil && cmd.Process != nil {
-				// write the error
-				write_err([]byte("error: timeout\n"))
-				// send a signal to the process
-				cmd.Process.Kill()
-			}
-		}()
-
-		wg := sync.WaitGroup{}
-		wg.Add(2)
-
-		// read the output
-		go func() {
-			defer wg.Done()
-			for {
-				buf := make([]byte, 1024)
-				n, err := stdout_reader.Read(buf)
-				// exit if EOF
-				if err != nil {
-					if err == io.EOF {
-						break
-					} else {
-						write_err([]byte(fmt.Sprintf("error: %v\n", err)))
-						break
-					}
-				}
-				write_out(buf[:n])
-			}
-		}()
-
-		// read the error
-		go func() {
-			buf := make([]byte, 1024)
-			defer wg.Done()
-			for {
-				n, err := stderr_reader.Read(buf)
-				// exit if EOF
-				if err != nil {
-					if err == io.EOF {
-						break
-					} else {
-						write_err([]byte(fmt.Sprintf("error: %v\n", err)))
-						break
-					}
-				}
-				write_err(buf[:n])
-			}
-		}()
-
-		// wait for the process to finish
-		go func() {
-			status, err := cmd.Process.Wait()
-			if err != nil {
-				log.Error("process finished with status: %v", status.String())
-				write_err([]byte(fmt.Sprintf("error: %v\n", err)))
-			} else if status.ExitCode() != 0 {
-				exit_string := status.String()
-				if strings.Contains(exit_string, "bad system call") {
-					write_err([]byte("error: operation not permitted\n"))
-				} else {
-					write_err([]byte(fmt.Sprintf("error: %v\n", exit_string)))
-				}
-			}
-
-			// wait for the stdout and stderr to finish
-			wg.Wait()
-			stderr_reader.Close()
-			stdout_reader.Close()
-			os.Remove(temp_code_path)
-			os.RemoveAll(root_path)
-			os.Remove(root_path)
-			timer.Stop()
-			done_chan <- true
-		}()
 
 		return nil
 	})
@@ -201,5 +96,29 @@ func (p *PythonRunner) Run(
 		return nil, nil, nil, err
 	}
 
-	return stdout, stderr, done_chan, nil
+	return output_handler.GetStdout(), output_handler.GetStderr(), output_handler.GetDone(), nil
+}
+
+func (p *PythonRunner) InitializeEnvironment(code string, preload string) (string, string, error) {
+	// create a tmp dir and copy the python script
+	temp_code_name := strings.ReplaceAll(uuid.New().String(), "-", "_")
+	temp_code_name = strings.ReplaceAll(temp_code_name, "/", ".")
+
+	untrusted_code_path := fmt.Sprintf("/tmp/code/%s.py", temp_code_name)
+	err := os.MkdirAll("/tmp/code", 0755)
+	if err != nil {
+		return "", "", err
+	}
+
+	err = os.WriteFile(untrusted_code_path, []byte(code), 0755)
+	if err != nil {
+		return "", "", err
+	}
+
+	preload_script := string(python_sandbox_fs)
+	if preload != "" {
+		preload_script = fmt.Sprintf("%s\n%s", preload, preload_script)
+	}
+
+	return untrusted_code_path, preload_script, nil
 }

@@ -11,4 +11,5 @@ type DifySandboxGlobalConfigurations struct {
 	WorkerTimeout int    `yaml:"worker_timeout"`
 	PythonPath    string `yaml:"python_path"`
 	NodejsPath    string `yaml:"nodejs_path"`
+	EnableNetwork bool   `yaml:"enable_network"`
 }

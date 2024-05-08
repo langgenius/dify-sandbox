@@ -4,15 +4,22 @@ import (
 	"time"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner/nodejs"
+	runner_types "github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
 	"github.com/langgenius/dify-sandbox/internal/types"
 )
 
-func RunNodeJsCode(code string, preload string) *types.DifySandboxResponse {
-	timeout := time.Duration(static.GetDifySandboxGlobalConfigurations().WorkerTimeout * int(time.Second))
+func RunNodeJsCode(code string, preload string, options runner_types.RunnerOptions) *types.DifySandboxResponse {
+	if err := checkOptions(options); err != nil {
+		return types.ErrorResponse(-400, err.Error())
+	}
+
+	timeout := time.Duration(
+		static.GetDifySandboxGlobalConfigurations().WorkerTimeout * int(time.Second),
+	)
 
 	runner := nodejs.NodeJsRunner{}
-	stdout, stderr, done, err := runner.Run(code, timeout, nil, preload)
+	stdout, stderr, done, err := runner.Run(code, timeout, nil, preload, options)
 	if err != nil {
 		return types.ErrorResponse(-500, err.Error())
 	}

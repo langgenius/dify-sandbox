@@ -76,6 +76,11 @@ func InitConfig(path string) error {
 		difySandboxGlobalConfigurations.NodejsPath = "/usr/local/bin/node"
 	}
 
+	enable_network := os.Getenv("ENABLE_NETWORK")
+	if enable_network != "" {
+		difySandboxGlobalConfigurations.EnableNetwork, _ = strconv.ParseBool(enable_network)
+	}
+
 	return nil
 }
 
