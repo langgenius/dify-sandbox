@@ -42,4 +42,5 @@ func init() {
 	SetupDependency("functools", "", "import functools")
 	SetupDependency("operator", "", "import operator")
 	SetupDependency("itertools", "", "import itertools")
+	SetupDependency("uuid", "", "import uuid")
 }

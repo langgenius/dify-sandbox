@@ -24,7 +24,7 @@ func GetDependencies(package_name string, version string) string {
 		return script
 	}
 
-	return fmt.Sprintf("import %s", package_name)
+	return ""
 }
 
 func ListDependencies() []types.Dependency {
