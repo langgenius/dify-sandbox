@@ -28,9 +28,11 @@ var (
 		"/tmp/sandbox-python/python.so",
 		"/etc/ssl/certs/ca-certificates.crt",
 		"/usr/local/lib/python3.10/site-packages/certifi/cacert.pem",
+		"/usr/local/lib/python3.10/dist-packages/certifi/cacert.pem",
 		"/etc/nsswitch.conf",
 		"/etc/resolv.conf",
 		"/run/systemd/resolve/stub-resolv.conf",
+		"/run/resolvconf/resolv.conf",
 		"/etc/hosts",
 	}
 )

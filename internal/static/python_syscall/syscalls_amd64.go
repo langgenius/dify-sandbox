@@ -7,6 +7,7 @@ import "syscall"
 const (
 	SYS_GETRANDOM = 318
 	SYS_RSEQ      = 334
+	SYS_SENDMMSG  = 307
 )
 
 var ALLOW_SYSCALLS = []int{
@@ -19,7 +20,7 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_MMAP, syscall.SYS_BRK, syscall.SYS_MPROTECT, syscall.SYS_MUNMAP, syscall.SYS_RT_SIGRETURN, syscall.SYS_MREMAP,
 
 	// user/group
-	syscall.SYS_SETUID, syscall.SYS_SETGID,
+	syscall.SYS_SETUID, syscall.SYS_SETGID, syscall.SYS_GETUID,
 	// process
 	syscall.SYS_GETPID, syscall.SYS_GETPPID, syscall.SYS_GETTID,
 	syscall.SYS_EXIT, syscall.SYS_EXIT_GROUP,
@@ -29,12 +30,12 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_EPOLL_CTL, syscall.SYS_CLOCK_NANOSLEEP, syscall.SYS_PSELECT6,
 	syscall.SYS_TIME,
 
-	syscall.SYS_RT_SIGPROCMASK, syscall.SYS_SIGALTSTACK,
+	syscall.SYS_RT_SIGPROCMASK, syscall.SYS_SIGALTSTACK, SYS_GETRANDOM,
 }
 
 var ALLOW_NETWORK_SYSCALLS = []int{
 	syscall.SYS_SOCKET, syscall.SYS_CONNECT, syscall.SYS_BIND, syscall.SYS_LISTEN, syscall.SYS_ACCEPT, syscall.SYS_SENDTO, syscall.SYS_RECVFROM,
 	syscall.SYS_GETSOCKNAME, syscall.SYS_RECVMSG, syscall.SYS_GETPEERNAME, syscall.SYS_SETSOCKOPT, syscall.SYS_PPOLL, syscall.SYS_UNAME,
-	syscall.SYS_SENDMSG, syscall.SYS_GETSOCKOPT,
-	syscall.SYS_FSTAT, syscall.SYS_FCNTL, syscall.SYS_FSTATFS,
+	syscall.SYS_SENDMSG, SYS_SENDMMSG, syscall.SYS_GETSOCKOPT,
+	syscall.SYS_FSTAT, syscall.SYS_FCNTL, syscall.SYS_FSTATFS, syscall.SYS_POLL,
 }

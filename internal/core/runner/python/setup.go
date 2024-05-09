@@ -2,6 +2,7 @@ package python
 
 import (
 	_ "embed"
+	"fmt"
 	"os"
 	"os/exec"
 	"path"
@@ -114,7 +115,7 @@ func InstallDependencies(requirements string) error {
 				continue
 			}
 
-			python_dependencies.SetupDependency(package_name, version, "")
+			python_dependencies.SetupDependency(package_name, version, fmt.Sprintf("import %s", package_name))
 			log.Info("Python dependency installed: %s %s", package_name, version)
 		}
 
