@@ -27,6 +27,7 @@ var (
 	PYTHON_REQUIRED_FS = []string{
 		"/tmp/sandbox-python/python.so",
 		"/etc/ssl/certs/ca-certificates.crt",
+		"/usr/local/lib/python3.10/site-packages/certifi/cacert.pem",
 		"/etc/nsswitch.conf",
 		"/etc/resolv.conf",
 		"/run/systemd/resolve/stub-resolv.conf",

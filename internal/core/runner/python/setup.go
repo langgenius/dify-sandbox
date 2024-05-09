@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
+	"strings"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
 	python_dependencies "github.com/langgenius/dify-sandbox/internal/core/runner/python/dependencies"
@@ -32,6 +34,29 @@ func init() {
 	log.Info("python runner environment initialized")
 }
 
+func ExtractOnelineDepency(dependency string) (string, string) {
+	delimiters := []string{"==", ">=", "<=", "~="}
+	for _, delimiter := range delimiters {
+		if strings.Contains(dependency, delimiter) {
+			parts := strings.Split(dependency, delimiter)
+			if len(parts) >= 2 {
+				return parts[0], parts[1]
+			} else if len(parts) == 1 {
+				return parts[0], ""
+			} else if len(parts) == 0 {
+				return "", ""
+			}
+		}
+	}
+
+	preg := regexp.MustCompile(`([a-zA-Z0-9_-]+)`)
+	if preg.MatchString(dependency) {
+		return dependency, ""
+	}
+
+	return "", ""
+}
+
 func InstallDependencies(requirements string) error {
 	if requirements == "" {
 		return nil
@@ -44,7 +69,8 @@ func InstallDependencies(requirements string) error {
 		// create a requirements file
 		err := os.WriteFile(path.Join(root_path, "requirements.txt"), []byte(requirements), 0644)
 		if err != nil {
-			log.Panic("failed to create requirements.txt")
+			log.Error("failed to create requirements.txt")
+			return nil
 		}
 
 		// install dependencies
@@ -58,9 +84,9 @@ func InstallDependencies(requirements string) error {
 
 		err = cmd.Start()
 		if err != nil {
-			log.Panic("failed to start pip3")
+			log.Error("failed to start pip3")
+			return nil
 		}
-		defer cmd.Wait()
 
 		for {
 			buf := make([]byte, 1024)
@@ -69,6 +95,27 @@ func InstallDependencies(requirements string) error {
 				break
 			}
 			log.Info(string(buf[:n]))
+		}
+
+		status := cmd.Wait()
+
+		if status != nil {
+			log.Error("failed to install dependencies")
+			return nil
+		}
+
+		// split the requirements
+		requirements = strings.ReplaceAll(requirements, "\r\n", "\n")
+		requirements = strings.ReplaceAll(requirements, "\r", "\n")
+		lines := strings.Split(requirements, "\n")
+		for _, line := range lines {
+			package_name, version := ExtractOnelineDepency(line)
+			if package_name == "" {
+				continue
+			}
+
+			python_dependencies.SetupDependency(package_name, version, "")
+			log.Info("Python dependency installed: %s %s", package_name, version)
 		}
 
 		return nil

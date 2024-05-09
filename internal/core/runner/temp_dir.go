@@ -29,7 +29,7 @@ func (s *TempDirRunner) WithTempDir(paths []string, closures func(path string) e
 		// check if it's a dir
 		file_info, err := os.Stat(file_path)
 		if err != nil {
-			return err
+			continue
 		}
 
 		if file_info.IsDir() {

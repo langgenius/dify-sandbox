@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/langgenius/dify-sandbox/internal/types"
+	"github.com/langgenius/dify-sandbox/internal/utils/log"
 	"gopkg.in/yaml.v3"
 )
 
@@ -79,6 +80,10 @@ func InitConfig(path string) error {
 	enable_network := os.Getenv("ENABLE_NETWORK")
 	if enable_network != "" {
 		difySandboxGlobalConfigurations.EnableNetwork, _ = strconv.ParseBool(enable_network)
+	}
+
+	if difySandboxGlobalConfigurations.EnableNetwork {
+		log.Info("network has been enabled")
 	}
 
 	return nil
