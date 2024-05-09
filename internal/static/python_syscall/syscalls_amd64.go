@@ -34,5 +34,7 @@ var ALLOW_SYSCALLS = []int{
 
 var ALLOW_NETWORK_SYSCALLS = []int{
 	syscall.SYS_SOCKET, syscall.SYS_CONNECT, syscall.SYS_BIND, syscall.SYS_LISTEN, syscall.SYS_ACCEPT, syscall.SYS_SENDTO, syscall.SYS_RECVFROM,
-	syscall.SYS_GETSOCKNAME, syscall.SYS_GETPEERNAME, syscall.SYS_SETSOCKOPT, syscall.SYS_PPOLL, syscall.SYS_UNAME, syscall.SYS_EPOLL_CREATE1,
+	syscall.SYS_GETSOCKNAME, syscall.SYS_RECVMSG, syscall.SYS_GETPEERNAME, syscall.SYS_SETSOCKOPT, syscall.SYS_PPOLL, syscall.SYS_UNAME,
+	syscall.SYS_SENDMSG, syscall.SYS_GETSOCKOPT,
+	syscall.SYS_FSTAT, syscall.SYS_FCNTL, syscall.SYS_FSTATFS,
 }
