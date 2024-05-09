@@ -1,0 +1,1 @@
+CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -o build/arm64_permission_test cmd/test/permission/main.go

@@ -26,6 +26,11 @@ var python_sandbox_fs []byte
 var (
 	PYTHON_REQUIRED_FS = []string{
 		"/tmp/sandbox-python/python.so",
+		"/etc/ssl/certs/ca-certificates.crt",
+		"/etc/nsswitch.conf",
+		"/etc/resolv.conf",
+		"/run/systemd/resolve/stub-resolv.conf",
+		"/etc/hosts",
 	}
 )
 
@@ -37,7 +42,7 @@ func (p *PythonRunner) Run(
 	options *types.RunnerOptions,
 ) (chan []byte, chan []byte, chan bool, error) {
 	// initialize the environment
-	untrusted_code_path, preload_script, err := p.InitializeEnvironment(code, preload, options)
+	untrusted_code_path, err := p.InitializeEnvironment(code, preload, options)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -56,12 +61,7 @@ func (p *PythonRunner) Run(
 		// create a new process
 		cmd := exec.Command(
 			static.GetDifySandboxGlobalConfigurations().PythonPath,
-			"-c",
-			preload_script,
 			untrusted_code_path,
-			strconv.Itoa(static.SANDBOX_USER_UID),
-			strconv.Itoa(static.SANDBOX_GROUP_ID),
-			options.Json(),
 		)
 		cmd.Env = []string{}
 
@@ -80,34 +80,61 @@ func (p *PythonRunner) Run(
 	return output_handler.GetStdout(), output_handler.GetStderr(), output_handler.GetDone(), nil
 }
 
-func (p *PythonRunner) InitializeEnvironment(code string, preload string, options *types.RunnerOptions) (string, string, error) {
+func (p *PythonRunner) InitializeEnvironment(code string, preload string, options *types.RunnerOptions) (string, error) {
 	// create a tmp dir and copy the python script
 	temp_code_name := strings.ReplaceAll(uuid.New().String(), "-", "_")
 	temp_code_name = strings.ReplaceAll(temp_code_name, "/", ".")
-
-	untrusted_code_path := fmt.Sprintf("/tmp/code/%s.py", temp_code_name)
-	err := os.MkdirAll("/tmp/code", 0755)
-	if err != nil {
-		return "", "", err
-	}
-
-	err = os.WriteFile(untrusted_code_path, []byte(code), 0755)
-	if err != nil {
-		return "", "", err
-	}
-
-	preload_script := string(python_sandbox_fs)
-	if preload != "" {
-		preload_script = fmt.Sprintf("%s\n%s", preload, preload_script)
-	}
 
 	packages_preload := make([]string, len(options.Dependencies))
 	for i, dependency := range options.Dependencies {
 		packages_preload[i] = python_dependencies.GetDependencies(dependency.Name, dependency.Version)
 	}
-	if len(packages_preload) != 0 {
-		preload_script = fmt.Sprintf("%s\n%s", strings.Join(packages_preload, "\n"), preload_script)
+
+	script := strings.Replace(
+		string(python_sandbox_fs),
+		"{{uid}}", strconv.Itoa(static.SANDBOX_USER_UID), 1,
+	)
+
+	script = strings.Replace(
+		script,
+		"{{gid}}", strconv.Itoa(static.SANDBOX_GROUP_ID), 1,
+	)
+
+	if options.EnableNetwork {
+		script = strings.Replace(
+			script,
+			"{{enable_network}}", "1", 1,
+		)
+	} else {
+		script = strings.Replace(
+			script,
+			"{{enable_network}}", "0", 1,
+		)
 	}
 
-	return untrusted_code_path, preload_script, nil
+	script = strings.Replace(
+		script,
+		"{{preload}}",
+		fmt.Sprintf("%s\n%s", preload, strings.Join(packages_preload, "\n")),
+		1,
+	)
+
+	code = strings.Replace(
+		script,
+		"{{code}}",
+		code,
+		1,
+	)
+
+	untrusted_code_path := fmt.Sprintf("/tmp/code/%s.py", temp_code_name)
+	err := os.MkdirAll("/tmp/code", 0755)
+	if err != nil {
+		return "", err
+	}
+	err = os.WriteFile(untrusted_code_path, []byte(code), 0755)
+	if err != nil {
+		return "", err
+	}
+
+	return untrusted_code_path, nil
 }

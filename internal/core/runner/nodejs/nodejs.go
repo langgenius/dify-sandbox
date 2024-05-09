@@ -95,6 +95,11 @@ var (
 	NODEJS_REQUIRED_FS = []string{
 		"/tmp/sandbox-nodejs-project/node_temp",
 		"/tmp/sandbox-nodejs/nodejs.so",
+		"/etc/ssl/certs/ca-certificates.crt",
+		"/etc/nsswitch.conf",
+		"/etc/resolv.conf",
+		"/run/systemd/resolve/stub-resolv.conf",
+		"/etc/hosts",
 	}
 )
 

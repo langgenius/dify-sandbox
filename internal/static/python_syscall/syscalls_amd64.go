@@ -11,11 +11,13 @@ const (
 
 var ALLOW_SYSCALLS = []int{
 	// file io
-	syscall.SYS_WRITE, syscall.SYS_CLOSE,
+	syscall.SYS_NEWFSTATAT, syscall.SYS_IOCTL, syscall.SYS_LSEEK,
+	syscall.SYS_WRITE, syscall.SYS_CLOSE, syscall.SYS_OPENAT, syscall.SYS_READ,
 	// thread
 	syscall.SYS_FUTEX,
 	// memory
 	syscall.SYS_MMAP, syscall.SYS_BRK, syscall.SYS_MPROTECT, syscall.SYS_MUNMAP, syscall.SYS_RT_SIGRETURN, syscall.SYS_MREMAP,
+
 	// user/group
 	syscall.SYS_SETUID, syscall.SYS_SETGID,
 	// process
@@ -30,12 +32,7 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_RT_SIGPROCMASK, syscall.SYS_SIGALTSTACK,
 }
 
-var ERROR_CODE_SYSCALLS = []int{
-	// file io
-	syscall.SYS_OPENAT, syscall.SYS_NEWFSTATAT, syscall.SYS_IOCTL, syscall.SYS_READ, syscall.SYS_LSEEK,
-}
-
 var ALLOW_NETWORK_SYSCALLS = []int{
 	syscall.SYS_SOCKET, syscall.SYS_CONNECT, syscall.SYS_BIND, syscall.SYS_LISTEN, syscall.SYS_ACCEPT, syscall.SYS_SENDTO, syscall.SYS_RECVFROM,
-	syscall.SYS_GETSOCKNAME, syscall.SYS_GETPEERNAME,
+	syscall.SYS_GETSOCKNAME, syscall.SYS_GETPEERNAME, syscall.SYS_SETSOCKOPT, syscall.SYS_PPOLL, syscall.SYS_UNAME, syscall.SYS_EPOLL_CREATE1,
 }

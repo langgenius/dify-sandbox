@@ -39,6 +39,8 @@ func InstallDependencies(requirements string) error {
 
 	runner := runner.TempDirRunner{}
 	return runner.WithTempDir([]string{}, func(root_path string) error {
+		defer os.Remove(root_path)
+		defer os.RemoveAll(root_path)
 		// create a requirements file
 		err := os.WriteFile(path.Join(root_path, "requirements.txt"), []byte(requirements), 0644)
 		if err != nil {
