@@ -29,6 +29,10 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_DUP3,
 }
 
+var ALLOW_ERROR_SYSCALLS = []int{
+	syscall.SYS_CLONE,
+}
+
 var ALLOW_NETWORK_SYSCALLS = []int{
 	syscall.SYS_SOCKET, syscall.SYS_CONNECT, syscall.SYS_BIND, syscall.SYS_LISTEN, syscall.SYS_ACCEPT, syscall.SYS_SENDTO, syscall.SYS_RECVFROM,
 	syscall.SYS_GETSOCKNAME, syscall.SYS_RECVMSG, syscall.SYS_GETPEERNAME, syscall.SYS_SETSOCKOPT, syscall.SYS_PPOLL, syscall.SYS_UNAME,

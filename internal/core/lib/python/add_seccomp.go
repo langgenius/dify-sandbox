@@ -3,6 +3,7 @@ package python
 import (
 	"syscall"
 
+	"github.com/langgenius/dify-sandbox/internal/core/lib"
 	"github.com/langgenius/dify-sandbox/internal/static/python_syscall"
 	sg "github.com/seccomp/libseccomp-golang"
 )
@@ -18,6 +19,8 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 	if err != nil {
 		return err
 	}
+
+	lib.SetNoNewPrivs()
 
 	ctx, err := sg.NewFilter(sg.ActKillProcess)
 	if err != nil {

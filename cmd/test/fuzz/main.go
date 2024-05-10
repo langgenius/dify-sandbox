@@ -4,27 +4,74 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 	"sync"
+
+	"github.com/langgenius/dify-sandbox/internal/static/nodejs_syscall"
 )
 
 const (
 	SYSCALL_NUMS = 400
 )
 
-func run(i int) {
-	os.Setenv("DISABLE_SYSCALL", fmt.Sprintf("%d", i))
-	_, err := exec.Command("node", "test.js").Output()
-	if err != nil {
-		fmt.Println(i)
+func run(allowed_syscalls []int) {
+	os.Chdir("/tmp/sandbox-463ec16c-8796-4e8f-988a-f61de7dc6976/tmp/sandbox-nodejs-project/node_temp/node_temp")
+
+	nums := []string{}
+	for _, syscall := range allowed_syscalls {
+		nums = append(nums, strconv.Itoa(syscall))
+	}
+	os.Setenv("ALLOWED_SYSCALLS", strings.Join(nums, ","))
+	_, err := exec.Command("node", "test.js", "65537", "1001", "{\"enable_network\":true}").Output()
+	if err == nil {
+		fmt.Println("success")
+	} else {
+		fmt.Println("failed")
 	}
 }
 
+func find_syscall(syscall int, syscalls []int) int {
+	for i, s := range syscalls {
+		if s == syscall {
+			return i
+		}
+	}
+	return -1
+}
+
 func main() {
-	os.Chdir(".node_temp")
+	original := nodejs_syscall.ALLOW_SYSCALLS
+	original = append(original, nodejs_syscall.ALLOW_NETWORK_SYSCALLS...)
+	original = append(original, nodejs_syscall.ALLOW_ERROR_SYSCALLS...)
+
 	// generate task list
-	list := make([]int, SYSCALL_NUMS)
+	list := make([][]int, SYSCALL_NUMS)
 	for i := 0; i < SYSCALL_NUMS; i++ {
-		list[i] = i
+		list[i] = make([]int, len(original))
+		copy(list[i], original)
+		// add i
+		if find_syscall(i, original) == -1 {
+			list[i] = append(list[i], i)
+		}
+
+		for j := 124; j < 125; j++ {
+			if find_syscall(j, list[i]) == -1 {
+				list[i] = append(list[i], j)
+			}
+		}
+
+		for j := 220; j < 221; j++ {
+			if find_syscall(j, list[i]) == -1 {
+				list[i] = append(list[i], j)
+			}
+		}
+
+		for j := 293; j < 294; j++ {
+			if find_syscall(j, list[i]) == -1 {
+				list[i] = append(list[i], j)
+			}
+		}
 	}
 
 	lock := sync.Mutex{}
