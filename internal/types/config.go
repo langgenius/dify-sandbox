@@ -12,4 +12,7 @@ type DifySandboxGlobalConfigurations struct {
 	PythonPath    string `yaml:"python_path"`
 	NodejsPath    string `yaml:"nodejs_path"`
 	EnableNetwork bool   `yaml:"enable_network"`
+	Proxy         struct {
+		Socks5 string `yaml:"socks5"`
+	} `yaml:"proxy"`
 }

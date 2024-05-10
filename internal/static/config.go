@@ -86,6 +86,12 @@ func InitConfig(path string) error {
 		log.Info("network has been enabled")
 	}
 
+	socks5_proxy := os.Getenv("SOCKS5_PROXY")
+	if socks5_proxy != "" {
+		difySandboxGlobalConfigurations.Proxy.Socks5 = socks5_proxy
+
+	}
+
 	return nil
 }
 

@@ -10,7 +10,7 @@ COPY main /main
 COPY conf/config.yaml /conf/config.yaml
 RUN rm -rf /var/lib/apt/lists/* \
     && chmod +x /main \
-    && pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple jinja2 requests httpx numpy \
+    && pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple jinja2 requests httpx numpy PySocks httpx[socks] \
     && wget -O /opt/node-v20.11.1-linux-arm64.tar.xz https://npmmirror.com/mirrors/node/v20.11.1/node-v20.11.1-linux-arm64.tar.xz \
     && tar -xvf /opt/node-v20.11.1-linux-arm64.tar.xz -C /opt \
     && ln -s /opt/node-v20.11.1-linux-arm64/bin/node /usr/local/bin/node \

@@ -44,6 +44,8 @@ func (p *PythonRunner) Run(
 	preload string,
 	options *types.RunnerOptions,
 ) (chan []byte, chan []byte, chan bool, error) {
+	configuration := static.GetDifySandboxGlobalConfigurations()
+
 	// initialize the environment
 	untrusted_code_path, err := p.InitializeEnvironment(code, preload, options)
 	if err != nil {
@@ -63,10 +65,15 @@ func (p *PythonRunner) Run(
 
 		// create a new process
 		cmd := exec.Command(
-			static.GetDifySandboxGlobalConfigurations().PythonPath,
+			configuration.PythonPath,
 			untrusted_code_path,
 		)
 		cmd.Env = []string{}
+
+		if configuration.Proxy.Socks5 != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=socks5://%s", configuration.Proxy.Socks5))
+			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=socks5://%s", configuration.Proxy.Socks5))
+		}
 
 		err = output_handler.CaptureOutput(cmd)
 		if err != nil {
