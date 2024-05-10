@@ -1,7 +1,12 @@
 package python
 
 import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"os"
 	"syscall"
+	"unsafe"
 
 	"github.com/langgenius/dify-sandbox/internal/core/lib"
 	"github.com/langgenius/dify-sandbox/internal/static/python_syscall"
@@ -43,9 +48,44 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 		}
 	}
 
-	err = ctx.Load()
+	reader, writer, err := os.Pipe()
 	if err != nil {
 		return err
+	}
+	defer reader.Close()
+	defer writer.Close()
+
+	file := os.NewFile(uintptr(writer.Fd()), "pipe")
+	ctx.ExportBPF(file)
+
+	// read from pipe
+	data := make([]byte, 4096)
+	n, err := reader.Read(data)
+	if err != nil {
+		return err
+	}
+	// load bpf
+	sock_filters := make([]syscall.SockFilter, n/8)
+	bytesBuffer := bytes.NewBuffer(data)
+	err = binary.Read(bytesBuffer, binary.LittleEndian, &sock_filters)
+	if err != nil {
+		return err
+	}
+
+	bpf := syscall.SockFprog{
+		Len:    uint16(len(sock_filters)),
+		Filter: &sock_filters[0],
+	}
+
+	_, _, err2 := syscall.Syscall(
+		syscall.SYS_SECCOMP,
+		uintptr(lib.SeccompSetModeFilter),
+		uintptr(lib.SeccompFilterFlagTSYNC),
+		uintptr(unsafe.Pointer(&bpf)),
+	)
+
+	if err2 != 0 {
+		return errors.New("seccomp error")
 	}
 
 	// setuid

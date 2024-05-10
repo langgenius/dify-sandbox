@@ -15,11 +15,6 @@ import (
 	sg "github.com/seccomp/libseccomp-golang"
 )
 
-const (
-	seccompSetModeFilter   = 0x1
-	seccompFilterFlagTSYNC = 0x1
-)
-
 //var allow_syscalls = []int{}
 
 func InitSeccomp(uid int, gid int, enable_network bool) error {
@@ -108,8 +103,8 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 
 	_, _, err2 := syscall.Syscall(
 		syscall.SYS_SECCOMP,
-		uintptr(seccompSetModeFilter),
-		uintptr(seccompFilterFlagTSYNC),
+		uintptr(lib.SeccompSetModeFilter),
+		uintptr(lib.SeccompFilterFlagTSYNC),
 		uintptr(unsafe.Pointer(&bpf)),
 	)
 
