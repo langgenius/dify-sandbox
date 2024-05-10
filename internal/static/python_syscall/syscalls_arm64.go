@@ -20,7 +20,7 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_GETPID, syscall.SYS_GETPPID, syscall.SYS_GETTID,
 	syscall.SYS_EXIT, syscall.SYS_EXIT_GROUP,
 	syscall.SYS_TGKILL, syscall.SYS_RT_SIGACTION,
-	syscall.SYS_IOCTL,
+	syscall.SYS_IOCTL, syscall.SYS_SCHED_YIELD,
 	// time
 	syscall.SYS_CLOCK_GETTIME, syscall.SYS_GETTIMEOFDAY, syscall.SYS_NANOSLEEP,
 	syscall.SYS_EPOLL_CTL, syscall.SYS_CLOCK_NANOSLEEP, syscall.SYS_PSELECT6,
@@ -35,5 +35,5 @@ var ALLOW_NETWORK_SYSCALLS = []int{
 	syscall.SYS_RECVFROM, syscall.SYS_RECVMSG, syscall.SYS_GETSOCKOPT,
 	syscall.SYS_GETSOCKNAME, syscall.SYS_GETPEERNAME, syscall.SYS_SETSOCKOPT,
 	syscall.SYS_PPOLL, syscall.SYS_UNAME, syscall.SYS_SENDMMSG,
-	syscall.SYS_FSTATAT, syscall.SYS_FSTAT, syscall.SYS_FSTATFS,
+	syscall.SYS_FSTATAT, syscall.SYS_FSTAT, syscall.SYS_FSTATFS, syscall.SYS_EPOLL_PWAIT,
 }
