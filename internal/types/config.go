@@ -14,5 +14,7 @@ type DifySandboxGlobalConfigurations struct {
 	EnableNetwork bool   `yaml:"enable_network"`
 	Proxy         struct {
 		Socks5 string `yaml:"socks5"`
+		Https  string `yaml:"https"`
+		Http   string `yaml:"http"`
 	} `yaml:"proxy"`
 }

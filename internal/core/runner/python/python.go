@@ -71,8 +71,15 @@ func (p *PythonRunner) Run(
 		cmd.Env = []string{}
 
 		if configuration.Proxy.Socks5 != "" {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=socks5://%s", configuration.Proxy.Socks5))
-			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=socks5://%s", configuration.Proxy.Socks5))
+			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Socks5))
+			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Socks5))
+		} else if configuration.Proxy.Https != "" || configuration.Proxy.Http != "" {
+			if configuration.Proxy.Https != "" {
+				cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Https))
+			}
+			if configuration.Proxy.Http != "" {
+				cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Http))
+			}
 		}
 
 		err = output_handler.CaptureOutput(cmd)

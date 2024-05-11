@@ -84,14 +84,33 @@ func InitConfig(path string) error {
 
 	if difySandboxGlobalConfigurations.EnableNetwork {
 		log.Info("network has been enabled")
+		socks5_proxy := os.Getenv("SOCKS5_PROXY")
+		if socks5_proxy != "" {
+			difySandboxGlobalConfigurations.Proxy.Socks5 = socks5_proxy
+		}
+
+		if difySandboxGlobalConfigurations.Proxy.Socks5 != "" {
+			log.Info("using socks5 proxy: %s", difySandboxGlobalConfigurations.Proxy.Socks5)
+		}
+
+		https_proxy := os.Getenv("HTTPS_PROXY")
+		if https_proxy != "" {
+			difySandboxGlobalConfigurations.Proxy.Https = https_proxy
+		}
+
+		if difySandboxGlobalConfigurations.Proxy.Https != "" {
+			log.Info("using https proxy: %s", difySandboxGlobalConfigurations.Proxy.Https)
+		}
+
+		http_proxy := os.Getenv("HTTP_PROXY")
+		if http_proxy != "" {
+			difySandboxGlobalConfigurations.Proxy.Http = http_proxy
+		}
+
+		if difySandboxGlobalConfigurations.Proxy.Http != "" {
+			log.Info("using http proxy: %s", difySandboxGlobalConfigurations.Proxy.Http)
+		}
 	}
-
-	socks5_proxy := os.Getenv("SOCKS5_PROXY")
-	if socks5_proxy != "" {
-		difySandboxGlobalConfigurations.Proxy.Socks5 = socks5_proxy
-
-	}
-
 	return nil
 }
 
