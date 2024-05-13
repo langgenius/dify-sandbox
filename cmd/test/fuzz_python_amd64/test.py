@@ -23,10 +23,6 @@ import base64
 import subprocess
 import os
 
-import requests
-from netrc import netrc, NetrcParseError
-import urllib3
-import socket
 import json
 import datetime
 from datetime import datetime
@@ -57,7 +53,7 @@ lib.DifySeccomp(65537, 1001, 1)
 def main() -> dict:
     import requests
     return {
-        "result": requests.get("https://bilibili.com").text,
+        "result": "awdawd",
     }
 
 from json import loads, dumps

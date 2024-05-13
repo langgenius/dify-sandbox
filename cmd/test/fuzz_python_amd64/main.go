@@ -53,11 +53,11 @@ func main() {
 			list[i] = append(list[i], i)
 		}
 
-		for j := 281; j < 282; j++ {
-			if find_syscall(j, list[i]) == -1 {
-				list[i] = append(list[i], j)
-			}
-		}
+		// for j := 217; j < 218; j++ {
+		// 	if find_syscall(j, list[i]) == -1 {
+		// 		list[i] = append(list[i], j)
+		// 	}
+		// }
 	}
 
 	lock := sync.Mutex{}

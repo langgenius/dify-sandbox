@@ -12,7 +12,7 @@ const (
 
 var ALLOW_SYSCALLS = []int{
 	// file io
-	syscall.SYS_NEWFSTATAT, syscall.SYS_IOCTL, syscall.SYS_LSEEK,
+	syscall.SYS_NEWFSTATAT, syscall.SYS_IOCTL, syscall.SYS_LSEEK, syscall.SYS_GETDENTS64,
 	syscall.SYS_WRITE, syscall.SYS_CLOSE, syscall.SYS_OPENAT, syscall.SYS_READ,
 	// thread
 	syscall.SYS_FUTEX,
