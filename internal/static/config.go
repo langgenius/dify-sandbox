@@ -132,6 +132,9 @@ func GetRunnerDependencies() RunnerDependencies {
 func SetupRunnerDependencies() error {
 	file, err := os.ReadFile("dependencies/python-requirements.txt")
 	if err != nil {
+		if err == os.ErrNotExist {
+			return nil
+		}
 		return err
 	}
 
