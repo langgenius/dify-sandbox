@@ -20,7 +20,7 @@ func initConfig() {
 
 	err = static.SetupRunnerDependencies()
 	if err != nil {
-		log.Panic("failed to setup runner dependencies: %v", err)
+		log.Error("failed to setup runner dependencies: %v", err)
 	}
 	log.Info("runner dependencies init success")
 }

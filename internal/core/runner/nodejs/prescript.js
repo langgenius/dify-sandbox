@@ -1,7 +1,7 @@
 const argv = process.argv
 
 const koffi = require('koffi')
-const lib = koffi.load('/tmp/sandbox-nodejs/nodejs.so')
+const lib = koffi.load('./var/sandbox/sandbox-nodejs/nodejs.so')
 const difySeccomp = lib.func('void DifySeccomp(int, int, bool)')
 
 const uid = parseInt(argv[2])

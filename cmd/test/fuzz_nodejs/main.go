@@ -16,7 +16,7 @@ const (
 )
 
 func run(allowed_syscalls []int) {
-	os.Chdir("/tmp/sandbox-463ec16c-8796-4e8f-988a-f61de7dc6976/tmp/sandbox-nodejs-project/node_temp/node_temp")
+	os.Chdir("/tmp/sandbox-f5faacb9-f441-43ec-a077-a09a8b7cc7f0/var/sandbox/sandbox-nodejs/nodejs-project/node_temp/node_temp")
 
 	nums := []string{}
 	for _, syscall := range allowed_syscalls {
@@ -55,19 +55,7 @@ func main() {
 			list[i] = append(list[i], i)
 		}
 
-		for j := 124; j < 125; j++ {
-			if find_syscall(j, list[i]) == -1 {
-				list[i] = append(list[i], j)
-			}
-		}
-
-		for j := 220; j < 221; j++ {
-			if find_syscall(j, list[i]) == -1 {
-				list[i] = append(list[i], j)
-			}
-		}
-
-		for j := 293; j < 294; j++ {
+		for j := 0; j < 0; j++ {
 			if find_syscall(j, list[i]) == -1 {
 				list[i] = append(list[i], j)
 			}

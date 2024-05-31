@@ -18,21 +18,37 @@ import (
 //go:embed python.so
 var python_lib []byte
 
-func init() {
-	log.Info("initializing python runner environment...")
-	// remove /tmp/sandbox-python
-	os.RemoveAll("/tmp/sandbox-python")
-	os.Remove("/tmp/sandbox-python")
+const (
+	LIB_PATH = "/var/sandbox/sandbox-python"
+	LIB_NAME = "python.so"
+)
 
-	err := os.MkdirAll("/tmp/sandbox-python", 0755)
+func init() {
+	releaseLibBinary()
+}
+
+func releaseLibBinary() {
+	log.Info("initializing python runner environment...")
+	os.RemoveAll(LIB_PATH)
+	os.Remove(LIB_PATH)
+
+	err := os.MkdirAll(LIB_PATH, 0755)
 	if err != nil {
-		log.Panic("failed to create /tmp/sandbox-python")
+		log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
 	}
-	err = os.WriteFile("/tmp/sandbox-python/python.so", python_lib, 0755)
+	err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755)
 	if err != nil {
-		log.Panic("failed to write /tmp/sandbox-python/python.so")
+		log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
 	}
 	log.Info("python runner environment initialized")
+}
+
+func checkLibAvaliable() bool {
+	if _, err := os.Stat(path.Join(LIB_PATH, LIB_NAME)); err != nil {
+		return false
+	}
+
+	return true
 }
 
 func ExtractOnelineDepency(dependency string) (string, string) {

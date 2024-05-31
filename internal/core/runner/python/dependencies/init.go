@@ -14,7 +14,9 @@ var preload_script_map_lock = &sync.RWMutex{}
 func SetupDependency(package_name string, version string, script string) {
 	preload_script_map_lock.Lock()
 	defer preload_script_map_lock.Unlock()
-	preload_script_map[fmt.Sprintf("%s==%s", package_name, version)] = script
+	if _, ok := preload_script_map[fmt.Sprintf("%s==%s", package_name, version)]; !ok {
+		preload_script_map[fmt.Sprintf("%s==%s", package_name, version)] = script
+	}
 }
 
 func GetDependencies(package_name string, version string) string {

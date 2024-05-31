@@ -19,7 +19,7 @@ var ALLOW_SYSCALLS = []int{
 	// memory
 	syscall.SYS_RT_SIGPROCMASK, syscall.SYS_SIGALTSTACK, syscall.SYS_RT_SIGACTION,
 	syscall.SYS_MMAP, syscall.SYS_MUNMAP, syscall.SYS_MADVISE, syscall.SYS_MPROTECT,
-	syscall.SYS_RT_SIGRETURN,
+	syscall.SYS_RT_SIGRETURN, syscall.SYS_BRK,
 
 	//user/group
 	syscall.SYS_SETUID, syscall.SYS_SETGID, syscall.SYS_GETTID,

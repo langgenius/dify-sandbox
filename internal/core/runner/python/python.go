@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -21,11 +22,11 @@ type PythonRunner struct {
 }
 
 //go:embed prescript.py
-var python_sandbox_fs []byte
+var sandbox_fs []byte
 
 var (
-	PYTHON_REQUIRED_FS = []string{
-		"/tmp/sandbox-python/python.so",
+	REQUIRED_FS = []string{
+		path.Join(LIB_PATH, LIB_NAME),
 		"/etc/ssl/certs/ca-certificates.crt",
 		"/usr/local/lib/python3.10/site-packages/certifi/cacert.pem",
 		"/usr/local/lib/python3.10/dist-packages/certifi/cacert.pem",
@@ -56,7 +57,7 @@ func (p *PythonRunner) Run(
 	output_handler := runner.NewOutputCaptureRunner()
 	output_handler.SetTimeout(timeout)
 
-	err = p.WithTempDir(PYTHON_REQUIRED_FS, func(root_path string) error {
+	err = p.WithTempDir(REQUIRED_FS, func(root_path string) error {
 		// cleanup
 		output_handler.SetAfterExitHook(func() {
 			os.RemoveAll(root_path)
@@ -98,6 +99,11 @@ func (p *PythonRunner) Run(
 }
 
 func (p *PythonRunner) InitializeEnvironment(code string, preload string, options *types.RunnerOptions) (string, error) {
+	if !checkLibAvaliable() {
+		// ensure environment is reversed
+		releaseLibBinary()
+	}
+
 	// create a tmp dir and copy the python script
 	temp_code_name := strings.ReplaceAll(uuid.New().String(), "-", "_")
 	temp_code_name = strings.ReplaceAll(temp_code_name, "/", ".")
@@ -108,7 +114,7 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 	}
 
 	script := strings.Replace(
-		string(python_sandbox_fs),
+		string(sandbox_fs),
 		"{{uid}}", strconv.Itoa(static.SANDBOX_USER_UID), 1,
 	)
 
