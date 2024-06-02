@@ -1,7 +1,9 @@
 package python
 
 import (
+	"crypto/rand"
 	_ "embed"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -39,7 +41,7 @@ func (p *PythonRunner) Run(
 	configuration := static.GetDifySandboxGlobalConfigurations()
 
 	// initialize the environment
-	untrusted_code_path, err := p.InitializeEnvironment(code, preload, options)
+	untrusted_code_path, key, err := p.InitializeEnvironment(code, preload, options)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -53,7 +55,6 @@ func (p *PythonRunner) Run(
 		output_handler.SetAfterExitHook(func() {
 			os.RemoveAll(root_path)
 			os.Remove(root_path)
-			os.Remove(untrusted_code_path)
 		})
 
 		// create a new process
@@ -61,6 +62,7 @@ func (p *PythonRunner) Run(
 			configuration.PythonPath,
 			untrusted_code_path,
 			LIB_PATH,
+			key,
 		)
 		cmd.Env = []string{}
 
@@ -91,7 +93,7 @@ func (p *PythonRunner) Run(
 	return output_handler.GetStdout(), output_handler.GetStderr(), output_handler.GetDone(), nil
 }
 
-func (p *PythonRunner) InitializeEnvironment(code string, preload string, options *types.RunnerOptions) (string, error) {
+func (p *PythonRunner) InitializeEnvironment(code string, preload string, options *types.RunnerOptions) (string, string, error) {
 	if !checkLibAvaliable() {
 		// ensure environment is reversed
 		releaseLibBinary()
@@ -130,6 +132,25 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 		1,
 	)
 
+	// generate a random 512 bit key
+	key_len := 64
+	key := make([]byte, key_len)
+	_, err := rand.Read(key)
+	if err != nil {
+		return "", "", err
+	}
+
+	// encrypt the code
+	encrypted_code := make([]byte, len(code))
+	for i := 0; i < len(code); i++ {
+		encrypted_code[i] = code[i] ^ key[i%key_len]
+	}
+
+	// encode code using base64
+	code = base64.StdEncoding.EncodeToString(encrypted_code)
+	// encode key using base64
+	encoded_key := base64.StdEncoding.EncodeToString(key)
+
 	code = strings.Replace(
 		script,
 		"{{code}}",
@@ -138,14 +159,14 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 	)
 
 	untrusted_code_path := fmt.Sprintf("%s/tmp/%s.py", LIB_PATH, temp_code_name)
-	err := os.MkdirAll(path.Dir(untrusted_code_path), 0755)
+	err = os.MkdirAll(path.Dir(untrusted_code_path), 0755)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	err = os.WriteFile(untrusted_code_path, []byte(code), 0755)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return untrusted_code_path, nil
+	return untrusted_code_path, encoded_key, nil
 }
