@@ -35,5 +35,13 @@ jobs:
       - name: Compile library
         run: bash ./build/build_amd64.sh
 
+      - name: Setup Python3.10
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+
+      - name: Install Python dependencies
+        run: pip install httpx requests jinja2
+
       - name: Run Intgeration tests
         run: sudo go test -v github.com/langgenius/dify-sandbox/tests/integration_tests/...
