@@ -43,14 +43,6 @@ jobs:
       - name: Install Python dependencies
         run: pip install httpx requests jinja2
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        with:
-          limit-access-to-actor: true
-
-      - name: Wait for tmate connection
-        run: sleep 3600
-
       - name: Run Intgeration tests
         run: sudo go test -v github.com/langgenius/dify-sandbox/tests/integration_tests/...
         env:
