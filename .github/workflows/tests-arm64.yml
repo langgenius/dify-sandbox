@@ -1,0 +1,37 @@
+name: ARM Linux Simulation
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  simulate-arm-linux:
+    runs-on: macos-14
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Pull ARM64 Docker image
+      run: |
+        docker pull --platform linux/arm64 ubuntu:20.04
+
+    - name: Run ARM64 Docker container
+      run: |
+        docker run --privileged --rm --platform linux/arm64 -v $(pwd):/workspace -w /workspace ubuntu:20.04 /bin/bash -c "
+          apt-get update &&
+          apt-get install -y qemu-user-static binfmt-support &&
+          # Your ARM-specific commands go here
+          echo 'Running on ARM architecture'
+        "
+
+    - name: Run your tasks in the ARM container
+      run: |
+        docker run --privileged --rm --platform linux/arm64 -v $(pwd):/workspace -w /workspace ubuntu:20.04 /bin/bash -c "
+          # Execute your test commands or build scripts here
+          ./your-script.sh
+        "
