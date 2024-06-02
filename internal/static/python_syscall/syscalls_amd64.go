@@ -30,6 +30,7 @@ var ALLOW_SYSCALLS = []int{
 
 	// time
 	syscall.SYS_CLOCK_GETTIME, syscall.SYS_GETTIMEOFDAY, syscall.SYS_NANOSLEEP,
+	syscall.SYS_EPOLL_CREATE1,
 	syscall.SYS_EPOLL_CTL, syscall.SYS_CLOCK_NANOSLEEP, syscall.SYS_PSELECT6,
 	syscall.SYS_TIME,
 
