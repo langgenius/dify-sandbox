@@ -10,7 +10,7 @@ on:
 
 jobs:
   simulate-arm-linux:
-    runs-on: macos-14
+    runs-on: macos-13
 
     steps:
     - name: Checkout code
