@@ -16,8 +16,6 @@ const (
 )
 
 func run(allowed_syscalls []int) {
-	// os.Chdir("/tmp/123")
-
 	nums := []string{}
 	for _, syscall := range allowed_syscalls {
 		nums = append(nums, strconv.Itoa(syscall))

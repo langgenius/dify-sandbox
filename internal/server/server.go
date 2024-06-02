@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/langgenius/dify-sandbox/internal/controller"
@@ -45,6 +46,26 @@ func initDependencies() {
 		log.Panic("failed to install python dependencies: %v", err)
 	}
 	log.Info("python dependencies installed")
+
+	log.Info("initializing python dependencies sandbox...")
+	err = python.PreparePythonDependenciesEnv()
+	if err != nil {
+		log.Panic("failed to initialize python dependencies sandbox: %v", err)
+	}
+	log.Info("python dependencies sandbox initialized")
+
+	// start a ticker to update python dependencies every 30 minutes to keep the sandbox up-to-date
+	go func() {
+		ticker := time.NewTicker(30 * time.Minute)
+		for range ticker.C {
+			log.Info("updating python dependencies...")
+			err := python.InstallDependencies(dependenices.PythonRequirements)
+			if err != nil {
+				log.Error("failed to update python dependencies: %v", err)
+			}
+			log.Info("python dependencies updated")
+		}
+	}()
 }
 
 func Run() {

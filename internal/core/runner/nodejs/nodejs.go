@@ -44,7 +44,7 @@ func (p *NodeJsRunner) Run(
 	output_handler := runner.NewOutputCaptureRunner()
 	output_handler.SetTimeout(timeout)
 
-	err := p.WithTempDir(REQUIRED_FS, func(root_path string) error {
+	err := p.WithTempDir("/", REQUIRED_FS, func(root_path string) error {
 		output_handler.SetAfterExitHook(func() {
 			os.RemoveAll(root_path)
 			os.Remove(root_path)

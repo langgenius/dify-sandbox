@@ -3,6 +3,7 @@ package static
 import (
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/langgenius/dify-sandbox/internal/types"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
@@ -66,6 +67,15 @@ func InitConfig(path string) error {
 
 	if difySandboxGlobalConfigurations.PythonPath == "" {
 		difySandboxGlobalConfigurations.PythonPath = "/usr/local/bin/python3"
+	}
+
+	python_lib_path := os.Getenv("PYTHON_LIB_PATH")
+	if python_lib_path != "" {
+		difySandboxGlobalConfigurations.PythonLibPaths = strings.Split(python_lib_path, ",")
+	}
+
+	if len(difySandboxGlobalConfigurations.PythonLibPaths) == 0 {
+		difySandboxGlobalConfigurations.PythonLibPaths = DEFAULT_PYTHON_LIB_REQUIREMENTS
 	}
 
 	nodejs_path := os.Getenv("NODEJS_PATH")

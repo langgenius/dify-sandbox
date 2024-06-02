@@ -10,14 +10,14 @@ import (
 
 type TempDirRunner struct{}
 
-func (s *TempDirRunner) WithTempDir(paths []string, closures func(path string) error) error {
+func (s *TempDirRunner) WithTempDir(basedir string, paths []string, closures func(path string) error) error {
 	uuid, err := uuid.NewRandom()
 	if err != nil {
 		return err
 	}
 
 	// create a tmp dir
-	tmp_dir := path.Join("/tmp", "sandbox-"+uuid.String())
+	tmp_dir := path.Join(basedir, "tmp", "sandbox-"+uuid.String())
 	err = os.Mkdir(tmp_dir, 0755)
 	if err != nil {
 		return err

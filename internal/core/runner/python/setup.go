@@ -80,7 +80,7 @@ func InstallDependencies(requirements string) error {
 	}
 
 	runner := runner.TempDirRunner{}
-	return runner.WithTempDir([]string{}, func(root_path string) error {
+	return runner.WithTempDir("/", []string{}, func(root_path string) error {
 		defer os.Remove(root_path)
 		defer os.RemoveAll(root_path)
 		// create a requirements file
@@ -131,7 +131,7 @@ func InstallDependencies(requirements string) error {
 				continue
 			}
 
-			python_dependencies.SetupDependency(package_name, version, fmt.Sprintf("import %s", package_name))
+			python_dependencies.SetupDependency(package_name, version)
 			log.Info("Python dependency installed: %s %s", package_name, version)
 		}
 

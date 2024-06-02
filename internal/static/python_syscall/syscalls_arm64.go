@@ -22,6 +22,7 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_TGKILL, syscall.SYS_RT_SIGACTION,
 	syscall.SYS_IOCTL, syscall.SYS_SCHED_YIELD,
 	// time
+	syscall.SYS_EPOLL_CREATE1,
 	syscall.SYS_CLOCK_GETTIME, syscall.SYS_GETTIMEOFDAY, syscall.SYS_NANOSLEEP,
 	syscall.SYS_EPOLL_CTL, syscall.SYS_CLOCK_NANOSLEEP, syscall.SYS_PSELECT6,
 	syscall.SYS_TIMERFD_CREATE, syscall.SYS_TIMERFD_SETTIME, syscall.SYS_TIMERFD_GETTIME,

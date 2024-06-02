@@ -19,4 +19,9 @@ func Setup(eng *gin.Engine) {
 		"/v1/sandbox/dependencies",
 		GetDependencies,
 	)
+
+	eng.POST(
+		"/v1/sandbox/dependencies/update",
+		UpdateDependencies,
+	)
 }

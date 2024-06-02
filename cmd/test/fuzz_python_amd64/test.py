@@ -2,7 +2,6 @@ import ctypes
 import os
 import sys
 import json
-import time
 import traceback
 
 # setup sys.excepthook
@@ -13,39 +12,20 @@ def excepthook(type, value, tb):
 
 sys.excepthook = excepthook
 
-lib = ctypes.CDLL("/tmp/sandbox-python/python.so")
+lib = ctypes.CDLL("/var/sandbox/sandbox-python/python.so")
 lib.DifySeccomp.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_bool]
 lib.DifySeccomp.restype = None
 
 
 import json
-import base64
-import subprocess
 import os
 
 import json
-import datetime
-from datetime import datetime
-datetime.strptime('2021-01-01', '%Y-%m-%d')
-import math
-import random
-import re
-import string
 import sys
-import time
 import traceback
-import uuid
 import os
-import base64
-import hashlib
-import hmac
-import binascii
-import collections
-import functools
-import operator
-import itertools
 
-os.chdir("/")
+os.chdir("/var/sandbox/sandbox-python")
 
 lib.DifySeccomp(65537, 1001, 1)
 

@@ -12,7 +12,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
-	python_dependencies "github.com/langgenius/dify-sandbox/internal/core/runner/python/dependencies"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
 )
@@ -27,14 +26,6 @@ var sandbox_fs []byte
 var (
 	REQUIRED_FS = []string{
 		path.Join(LIB_PATH, LIB_NAME),
-		"/etc/ssl/certs/ca-certificates.crt",
-		"/usr/local/lib/python3.10/site-packages/certifi/cacert.pem",
-		"/usr/local/lib/python3.10/dist-packages/certifi/cacert.pem",
-		"/etc/nsswitch.conf",
-		"/etc/resolv.conf",
-		"/run/systemd/resolve/stub-resolv.conf",
-		"/run/resolvconf/resolv.conf",
-		"/etc/hosts",
 	}
 )
 
@@ -57,7 +48,7 @@ func (p *PythonRunner) Run(
 	output_handler := runner.NewOutputCaptureRunner()
 	output_handler.SetTimeout(timeout)
 
-	err = p.WithTempDir(REQUIRED_FS, func(root_path string) error {
+	err = p.WithTempDir(LIB_PATH, REQUIRED_FS, func(root_path string) error {
 		// cleanup
 		output_handler.SetAfterExitHook(func() {
 			os.RemoveAll(root_path)
@@ -68,6 +59,7 @@ func (p *PythonRunner) Run(
 		cmd := exec.Command(
 			configuration.PythonPath,
 			untrusted_code_path,
+			LIB_PATH,
 		)
 		cmd.Env = []string{}
 
@@ -108,11 +100,6 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 	temp_code_name := strings.ReplaceAll(uuid.New().String(), "-", "_")
 	temp_code_name = strings.ReplaceAll(temp_code_name, "/", ".")
 
-	packages_preload := make([]string, len(options.Dependencies))
-	for i, dependency := range options.Dependencies {
-		packages_preload[i] = python_dependencies.GetDependencies(dependency.Name, dependency.Version)
-	}
-
 	script := strings.Replace(
 		string(sandbox_fs),
 		"{{uid}}", strconv.Itoa(static.SANDBOX_USER_UID), 1,
@@ -138,7 +125,7 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 	script = strings.Replace(
 		script,
 		"{{preload}}",
-		fmt.Sprintf("%s\n%s", preload, strings.Join(packages_preload, "\n")),
+		fmt.Sprintf("%s\n", preload),
 		1,
 	)
 
@@ -149,8 +136,8 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 		1,
 	)
 
-	untrusted_code_path := fmt.Sprintf("/tmp/code/%s.py", temp_code_name)
-	err := os.MkdirAll("/tmp/code", 0755)
+	untrusted_code_path := fmt.Sprintf("%s/tmp/%s.py", LIB_PATH, temp_code_name)
+	err := os.MkdirAll(path.Dir(untrusted_code_path), 0755)
 	if err != nil {
 		return "", err
 	}

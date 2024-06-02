@@ -62,3 +62,14 @@ func ListPython3Dependencies() *types.DifySandboxResponse {
 		Dependencies: python.ListDependencies(),
 	})
 }
+
+type UpdateDependenciesResponse struct{}
+
+func UpdateDependencies() *types.DifySandboxResponse {
+	err := python.PreparePythonDependenciesEnv()
+	if err != nil {
+		return types.ErrorResponse(-500, err.Error())
+	}
+
+	return types.SuccessResponse(&UpdateDependenciesResponse{})
+}
