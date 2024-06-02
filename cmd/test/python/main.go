@@ -12,8 +12,7 @@ import (
 func main() {
 	static.InitConfig("conf/config.yaml")
 	python.PreparePythonDependenciesEnv()
-	resp := service.RunPython3Code(`import httpx
-print(httpx.get("https://www.bilibili.com").text)`,
+	resp := service.RunPython3Code(`import json;print(json.dumps({"hello": "world"}))`,
 		``,
 		&types.RunnerOptions{
 			EnableNetwork: true,

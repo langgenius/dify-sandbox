@@ -31,10 +31,8 @@ lib.DifySeccomp(65537, 1001, 1)
 
 # declare main function here
 def main() -> dict:
-    import requests
-    return {
-        "result": "awdawd",
-    }
+    import json
+    print(json.dumps({"hello": "world"}))
 
 from json import loads, dumps
 from base64 import b64decode
