@@ -17,7 +17,6 @@ print(httpx.get("https://www.bilibili.com").text)`,
 		``,
 		&types.RunnerOptions{
 			EnableNetwork: true,
-			Dependencies:  []types.Dependency{},
 		})
 
 	fmt.Println(resp.Data)

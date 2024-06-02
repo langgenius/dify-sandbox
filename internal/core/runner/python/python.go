@@ -53,6 +53,7 @@ func (p *PythonRunner) Run(
 		output_handler.SetAfterExitHook(func() {
 			os.RemoveAll(root_path)
 			os.Remove(root_path)
+			os.Remove(untrusted_code_path)
 		})
 
 		// create a new process
