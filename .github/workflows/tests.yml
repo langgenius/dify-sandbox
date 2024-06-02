@@ -41,7 +41,9 @@ jobs:
           python-version: '3.10'
 
       - name: Install Python dependencies
-        run: pip install httpx requests jinja2
+        run: pip install httpx requests jinja2 && python -c "import sys;print(sys.executable)"
 
       - name: Run Intgeration tests
         run: sudo go test -v github.com/langgenius/dify-sandbox/tests/integration_tests/...
+        env:
+          PYTHON_PATH: /usr/bin/python3.10
