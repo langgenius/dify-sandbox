@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -30,7 +30,6 @@ jobs:
       - name: Test ARM64
         uses: docker/build-push-action@v5
         with:
-          context: {{defaultContext}}:dev
           file: ./dev/dockerfile-arm64-github-actions
           platforms: linux/arm64
           push: false
