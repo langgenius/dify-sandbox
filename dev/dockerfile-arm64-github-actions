@@ -21,8 +21,8 @@ RUN cd /workdir && go mod tidy \
 # install the necessary Python dependencies
 RUN pip install httpx requests jinja2
 
-# Set environment variables
-ENV PYTHON_PATH="/usr/local/bin/python3"
+# Link /usr/local/bin/python3 to /usr/bin/python3
+RUN ln -s /usr/local/bin/python3 /usr/bin/python3
 
 # run tests
-RUN cd /workdir && sudo go test -v github.com/langgenius/dify-sandbox/tests/integration_tests/...
+RUN cd /workdir && go test -v github.com/langgenius/dify-sandbox/tests/integration_tests/...
