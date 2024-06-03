@@ -19,7 +19,7 @@ RUN cd /workdir && go mod tidy \
     && bash ./build/build_arm64.sh
 
 # install the necessary Python dependencies
-RUN pip install httpx requests jinja2
+RUN pip install httpx requests jinja2 && pip install --upgrade urllib3 requests
 
 # Link /usr/local/bin/python3 to /usr/bin/python3
 RUN ln -s /usr/local/bin/python3 /usr/bin/python3
