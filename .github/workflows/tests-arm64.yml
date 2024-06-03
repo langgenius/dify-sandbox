@@ -18,7 +18,7 @@ jobs:
 
     - name: Install Docker
       run: |
-        brew install docker
+        brew install --cask docker
         colima start
         sudo ln -sf $HOME/.colima/default/docker.sock /var/run/docker.sock
 
