@@ -10,7 +10,7 @@ RUN wget https://go.dev/dl/go1.20.6.linux-arm64.tar.gz -O /opt/go1.20.6.linux-ar
     && rm /opt/go1.20.6.linux-arm64.tar.gz \
     && ln -s /opt/go/bin/go /usr/local/bin/go
 
-RUN go mod tidy \
+RUN ls -l && go mod tidy \
     && bash ./build/build_arm64.sh
 
 RUN pip install httpx requests jinja2
