@@ -16,8 +16,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Docker on macOS
-      uses: douglascamata/setup-docker-macos-action@v1-alpha
+    - name: Install Docker
+      run: |
+        brew install --cask docker
+        open --background -a Docker
+        while ! docker system info > /dev/null 2>&1; do
+          sleep 1
+        done
 
     - name: Pull ARM64 Docker image
       run: |
