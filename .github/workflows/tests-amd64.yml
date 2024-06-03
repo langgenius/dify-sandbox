@@ -9,7 +9,7 @@ on:
       - main
 
 concurrency:
-  group: test-tests-${{ github.head_ref || github.run_id }}
+  group: test-amd64-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
