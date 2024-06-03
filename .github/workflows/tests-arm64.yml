@@ -19,8 +19,7 @@ jobs:
     - name: Install Docker
       run: |
         brew install --cask docker
-        colima start
-        sudo ln -sf $HOME/.colima/default/docker.sock /var/run/docker.sock
+        open --background -a Docker
 
     - name: Pull ARM64 Docker image
       run: |
