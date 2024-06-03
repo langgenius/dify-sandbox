@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN wget https://go.dev/dl/go1.20.6.linux-arm64.tar.gz -O /opt/go1.20.6.linux-arm64.tar.gz \
-    && tar zxvf /opt/go1.20.6.linux-arm64.tar.gz -C /opt/go \
+    && tar zxvf /opt/go1.20.6.linux-arm64.tar.gz -C /opt \
     && rm /opt/go1.20.6.linux-arm64.tar.gz \
     && ln -s /opt/go/bin/go /usr/local/bin/go
 
