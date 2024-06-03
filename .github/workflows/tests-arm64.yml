@@ -9,20 +9,22 @@ on:
       - main
 
 jobs:
-  simulate-arm-linux:
+  test:
+    name: Test ARM64
     runs-on: ubuntu-latest
+    
     steps:
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Test ARM64
-      uses: docker/build-push-action@v5
-      with:
-        context: {{defaultContext}}:dev
-        file: ./dev/dockerfile-arm64-github-actions
-        platforms: linux/arm64
-        push: false
-        tags: ghcr.io/langgenius/dify-sandbox:arm64-test
+      - name: Test ARM64
+        uses: docker/build-push-action@v5
+        with:
+          context: {{defaultContext}}:dev
+          file: ./dev/dockerfile-arm64-github-actions
+          platforms: linux/arm64
+          push: false
+          tags: ghcr.io/langgenius/dify-sandbox:arm64-test

@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   test:
-    name: Test
+    name: Test AMD64
     runs-on: ubuntu-latest
 
     steps:
