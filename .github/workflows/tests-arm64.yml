@@ -19,7 +19,7 @@ jobs:
     - name: Install Docker
       run: |
         brew install --cask docker
-        open --background -a Docker
+        open --background -a /Applications/Docker.app
         while ! docker system info > /dev/null 2>&1; do
           sleep 1
         done
