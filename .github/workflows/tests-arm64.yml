@@ -30,7 +30,6 @@ jobs:
       - name: Test ARM64
         uses: docker/build-push-action@v5
         with:
-          context: .
           file: ./dev/dockerfile-arm64-github-actions
           platforms: linux/arm64
           push: false
