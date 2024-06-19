@@ -1,4 +1,4 @@
-name: Build AMD64
+name: Build Universal
 
 on:
   push:
@@ -9,11 +9,6 @@ on:
       - main
   release:
     types: [published]
-
-env:
-  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
-  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-  DIFY_SANDBOX_IMAGE_NAME: ${{ vars.DIFY_SANDBOX_IMAGE_NAME || 'langgenius/dify-sandbox' }}
 
 jobs:
   build-amd64:
