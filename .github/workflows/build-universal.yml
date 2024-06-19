@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   release:
     types: [published]
 
@@ -54,14 +57,14 @@ jobs:
 
       - name: Build Universal Docker Images
         run:
-          for tag in $(echo ${{ steps.meta.outputs.tags }} | tr ',' '\n');
+          for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n');
           do
             docker manifest create $tag $tag-amd64 $tag-arm64;
           done
 
       - name: Push Universal Docker Image
         run: 
-          for tag in $(echo ${{ steps.meta.outputs.tags }} | tr ',' '\n');
+          for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n');
           do
             docker manifest push $tag;
           done
