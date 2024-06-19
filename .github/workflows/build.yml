@@ -63,14 +63,11 @@ jobs:
 
       - name: Tag Docker Images
         run: 
-          tags=$(echo ${{ steps.meta.outputs.tags }} | tr ',' '\n')
-          IFS=$'\n' read -r -d '' -a tags_array <<< "$tags"
-          for tag in "${tags_array[@]}"; do
-              docker tag dify-sandbox "$tag-amd64"
+          for tag in $(echo ${{ steps.meta.outputs.tags }} | tr ',' '\n'); do
+              docker tag dify-sandbox "$tag-${{ inputs.arch }}"
           done
       - name: Push Docker Image
         run:
-          tags=$(echo ${{ steps.meta.outputs.tags }} | tr ',' '\n')
-          for tag in $tags; do
+          for tag in $(echo ${{ steps.meta.outputs.tags }} | tr ',' '\n'); do
             docker push $tag-${{ inputs.arch }}
           done
