@@ -66,9 +66,8 @@ jobs:
           tags=$(echo ${{ steps.meta.outputs.tags }} | tr ',' '\n')
           IFS=$'\n' read -r -d '' -a tags_array <<< "$tags"
           for tag in "${tags_array[@]}"; do
-            docker tag dify-sandbox $tag-${{ inputs.arch }}
+              docker tag dify-sandbox "$tag-amd64"
           done
-
       - name: Push Docker Image
         run:
           tags=$(echo ${{ steps.meta.outputs.tags }} | tr ',' '\n')
