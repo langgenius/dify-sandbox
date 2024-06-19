@@ -1,4 +1,4 @@
-name: ARM Linux Simulation
+name: Run GoTest
 
 on:
   pull_request:
@@ -8,35 +8,43 @@ on:
     branches:
       - main
 
+concurrency:
+  group: test-arm64-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
-  simulate-arm-linux:
-    runs-on: macos-13
+  test:
+    name: Test ARM64
+    runs-on: arm64_runner
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Install Docker
-      run: |
-        brew install --cask docker
-        open --background -a /Applications/Docker.app
+      - name: Install System Dependencies
+        run: sudo apt-get install -y pkg-config gcc libseccomp-dev
 
-    - name: Pull ARM64 Docker image
-      run: |
-        docker pull --platform linux/arm64 ubuntu:20.04
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.20.6
 
-    - name: Run ARM64 Docker container
-      run: |
-        docker run --privileged --rm --platform linux/arm64 -v $(pwd):/workspace -w /workspace ubuntu:20.04 /bin/bash -c "
-          apt-get update &&
-          apt-get install -y qemu-user-static binfmt-support &&
-          # Your ARM-specific commands go here
-          echo 'Running on ARM architecture'
-        "
+      - name: Install dependencies
+        run: go mod tidy
 
-    - name: Run your tasks in the ARM container
-      run: |
-        docker run --privileged --rm --platform linux/arm64 -v $(pwd):/workspace -w /workspace ubuntu:20.04 /bin/bash -c "
-          # Execute your test commands or build scripts here
-          ./your-script.sh
-        "
+      - name: Compile library
+        run: bash ./build/build_arm64.sh
+
+      - name: Setup Python3.10
+        run: sudo apt-get install -y python3.10 python3-pip
+
+      - name: Install Python dependencies
+        run: pip install httpx requests jinja2
+
+      - name: Link Go
+        run: sudo ln -s "$(which go)" /usr/local/bin/go
+
+      - name: Run Intgeration tests
+        run: sudo go test -v github.com/langgenius/dify-sandbox/tests/integration_tests/...
+        env:
+          PYTHON_PATH: /usr/bin/python3.10
