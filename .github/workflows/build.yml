@@ -64,7 +64,8 @@ jobs:
       - name: Tag Docker Images
         run: 
           tags=$(echo ${{ steps.meta.outputs.tags }} | tr ',' '\n')
-          for tag in $tags; do
+          IFS=$'\n' read -r -d '' -a tags_array <<< "$tags"
+          for tag in "${tags_array[@]}"; do
             docker tag dify-sandbox $tag-${{ inputs.arch }}
           done
 
