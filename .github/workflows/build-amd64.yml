@@ -53,7 +53,7 @@ jobs:
         run: bash ./build/build_amd64.sh 
 
       - name: Run Build Docker Image
-        run: docker build -t ${{ env.DIFY_SANDBOX_IMAGE_NAME }}:${{ steps.meta.outputs.tag }}-amd64 -f ./docker/amd64/dockerfile .
+        run: docker build -t ${{ env.DIFY_SANDBOX_IMAGE_NAME }}:${{ steps.meta.outputs.tags }}-amd64 -f ./docker/amd64/dockerfile .
 
       - name: Run Push Docker Image
-        run: docker push ${{ env.DIFY_SANDBOX_IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+        run: docker push ${{ env.DIFY_SANDBOX_IMAGE_NAME }}:${{ steps.meta.outputs.tags }}-amd64
