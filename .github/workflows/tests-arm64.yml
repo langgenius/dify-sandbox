@@ -41,9 +41,8 @@ jobs:
       - name: Install Python dependencies
         run: pip install httpx requests jinja2
 
-      - name: Setup Debug Session
-        uses: mxschmitt/action-tmate@v3
-        timeout-minutes: 15
+      - name: Link Go
+      - run: sudo ln -s "$(which go)" /usr/local/bin/go
 
       - name: Run Intgeration tests
         run: sudo go test -v github.com/langgenius/dify-sandbox/tests/integration_tests/...
