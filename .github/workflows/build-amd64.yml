@@ -1,11 +1,11 @@
 name: Build AMD64
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-  release:
-    types: [published]
+  # release:
+  #   types: [published]
 
 env:
   DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
