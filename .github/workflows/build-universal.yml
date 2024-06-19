@@ -17,8 +17,6 @@ jobs:
       runner: ubuntu-latest
       arch: amd64
       arch_label: AMD64
-      DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   build-arm64:
     uses: ./.github/workflows/build.yml
@@ -26,5 +24,4 @@ jobs:
       runner: arm64_runner
       arch: arm64
       arch_label: ARM64
-      DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
