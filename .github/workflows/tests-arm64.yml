@@ -42,7 +42,7 @@ jobs:
         run: pip install httpx requests jinja2
 
       - name: Link Go
-      - run: sudo ln -s "$(which go)" /usr/local/bin/go
+        run: sudo ln -s "$(which go)" /usr/local/bin/go
 
       - name: Run Intgeration tests
         run: sudo go test -v github.com/langgenius/dify-sandbox/tests/integration_tests/...
