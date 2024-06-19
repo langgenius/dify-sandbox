@@ -56,7 +56,7 @@ jobs:
         run: go mod tidy
 
       - name: Run Build Binary
-        run: bash ./build/build_${{ matrix.arch }}.sh
+        run: bash ./build/build_${{ inputs.arch }}.sh
 
       - name: Run Build Docker Image
         run: docker build -t ${{ steps.meta.outputs.tags }}-${{ inputs.arch }} -f ./docker/${{ inputs.arch }}/dockerfile .
