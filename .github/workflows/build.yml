@@ -13,11 +13,6 @@ on:
         required: true
         type: string
 
-env:
-  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
-  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-  DIFY_SANDBOX_IMAGE_NAME: ${{ vars.DIFY_SANDBOX_IMAGE_NAME || 'langgenius/dify-sandbox' }}
-
 jobs:
   build:
     name: Build ${{ inputs.arch_label }}
