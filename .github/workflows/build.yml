@@ -59,7 +59,17 @@ jobs:
         run: bash ./build/build_${{ inputs.arch }}.sh
 
       - name: Run Build Docker Image
-        run: docker build -t ${{ steps.meta.outputs.tags }}-${{ inputs.arch }} -f ./docker/${{ inputs.arch }}/dockerfile .
+        run: docker build -t dify-sandbox -f ./docker/${{ inputs.arch }}/dockerfile .
 
-      - name: Run Push Docker Image
-        run: docker push ${{ steps.meta.outputs.tags }}-${{ inputs.arch }}
+      - name: Tag Docker Images
+        run: 
+          for tag in $(echo ${{ steps.meta.outputs.tags }} | tr ',' '\n');
+          do
+            docker tag dify-sandbox "$tag-${{ inputs.arch }}";
+          done
+      - name: Push Docker Image
+        run:
+          for tag in $(echo ${{ steps.meta.outputs.tags }} | tr ',' '\n');
+          do
+            docker push $tag-${{ inputs.arch }};
+          done
