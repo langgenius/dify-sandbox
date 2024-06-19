@@ -41,6 +41,12 @@ jobs:
       - name: Install Python dependencies
         run: pip install httpx requests jinja2
 
+      - name: Setup Debug Session
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 15
+        with:
+          detached: true
+
       - name: Run Intgeration tests
         run: sudo go test -v github.com/langgenius/dify-sandbox/tests/integration_tests/...
         env:
