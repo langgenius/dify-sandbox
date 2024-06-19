@@ -1,4 +1,4 @@
-name: Build Universal
+name: Build And Push Universal
 
 on:
   push:
@@ -21,8 +21,9 @@ jobs:
       runner: ubuntu-latest
       arch: amd64
       arch_label: AMD64
-      DOCKERHUB_USER: ${{ env.DOCKERHUB_USER }}
-      DOCKERHUB_TOKEN: ${{ env.DOCKERHUB_TOKEN }}
+      secrets: 
+        DOCKERHUB_USER: ${{ env.DOCKERHUB_USER }}
+        DOCKERHUB_TOKEN: ${{ env.DOCKERHUB_TOKEN }}
 
   build-arm64:
     uses: ./.github/workflows/build.yml
@@ -30,5 +31,6 @@ jobs:
       runner: arm64_runner
       arch: arm64
       arch_label: ARM64
-      DOCKERHUB_USER: ${{ env.DOCKERHUB_USER }}
-      DOCKERHUB_TOKEN: ${{ env.DOCKERHUB_TOKEN }}
+      secrets: 
+        DOCKERHUB_USER: ${{ env.DOCKERHUB_USER }}
+        DOCKERHUB_TOKEN: ${{ env.DOCKERHUB_TOKEN }}
