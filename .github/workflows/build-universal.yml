@@ -1,0 +1,26 @@
+name: Build AMD64
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  release:
+    types: [published]
+
+jobs:
+  build-amd64:
+    uses: ./.github/workflows/build.yml
+    with:
+      runner: ubuntu-latest
+      arch: amd64
+      arch_label: AMD64
+
+  build-arm64:
+    uses: ./.github/workflows/build.yml
+    with:
+      runner: arm64_runner
+      arch: arm64
+      arch_label: ARM64

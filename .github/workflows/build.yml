@@ -1,14 +1,17 @@
-name: Build AMD64
+name: Universal Build
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+      arch:
+        required: true
+        type: string
+      arch_label:
+        required: true
+        type: string
 
 env:
   DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
@@ -16,9 +19,9 @@ env:
   DIFY_SANDBOX_IMAGE_NAME: ${{ vars.DIFY_SANDBOX_IMAGE_NAME || 'langgenius/dify-sandbox' }}
 
 jobs:
-  build_amd64:
-    name: Build AMD64
-    runs-on: ubuntu-latest
+  build:
+    name: Build ${{ inputs.arch_label }}
+    runs-on: ${{ inputs.runner }}
 
     steps:
       - name: Checkout code
@@ -53,10 +56,10 @@ jobs:
         run: go mod tidy
 
       - name: Run Build Binary
-        run: bash ./build/build_amd64.sh 
+        run: bash ./build/build_${{ matrix.arch }}.sh
 
       - name: Run Build Docker Image
-        run: docker build -t ${{ steps.meta.outputs.tags }}-amd64 -f ./docker/amd64/dockerfile .
+        run: docker build -t ${{ steps.meta.outputs.tags }}-${{ inputs.arch }} -f ./docker/${{ inputs.arch }}/dockerfile .
 
       - name: Run Push Docker Image
-        run: docker push ${{ steps.meta.outputs.tags }}-amd64
+        run: docker push ${{ steps.meta.outputs.tags }}-${{ inputs.arch }}
