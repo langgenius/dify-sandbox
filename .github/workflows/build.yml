@@ -12,9 +12,11 @@ on:
       arch_label:
         required: true
         type: string
-      secrets:
+    secrets:
+      DOCKERHUB_USER:
         required: true
-        type: object
+      DOCKERHUB_TOKEN:
+        required: true
 
 jobs:
   build:
