@@ -1,11 +1,11 @@
 name: Build AMD64
 
 on:
-  pull_request:
+  push:
     branches:
       - main
-  # release:
-  #   types: [published]
+  release:
+    types: [published]
 
 env:
   DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
@@ -13,7 +13,7 @@ env:
   DIFY_SANDBOX_IMAGE_NAME: ${{ vars.DIFY_SANDBOX_IMAGE_NAME || 'langgenius/dify-sandbox' }}
 
 jobs:
-  test:
+  build_amd64:
     name: Build AMD64
     runs-on: ubuntu-latest
 
@@ -53,8 +53,7 @@ jobs:
         run: bash ./build/build_amd64.sh 
 
       - name: Run Build Docker Image
-        run: docker build -t ${{ env.DIFY_SANDBOX_IMAGE_NAME }}:${{ steps.meta.outputs.tag }} -f ./docker/amd64/dockerfile .
+        run: docker build -t ${{ env.DIFY_SANDBOX_IMAGE_NAME }}:${{ steps.meta.outputs.tag }}-amd64 -f ./docker/amd64/dockerfile .
 
-      # setup meta mxschmitt/action-tmate@v3
-      - name: Setup tmate
-        uses: mxschmitt/action-tmate@v3
+      - name: Run Push Docker Image
+        run: docker push ${{ env.DIFY_SANDBOX_IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
