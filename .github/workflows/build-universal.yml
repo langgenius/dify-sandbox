@@ -10,10 +10,6 @@ on:
   release:
     types: [published]
 
-env:
-  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
-  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-
 jobs:
   build-amd64:
     uses: ./.github/workflows/build.yml
@@ -22,8 +18,8 @@ jobs:
       arch: amd64
       arch_label: AMD64
       secrets: 
-        DOCKERHUB_USER: ${{ env.DOCKERHUB_USER }}
-        DOCKERHUB_TOKEN: ${{ env.DOCKERHUB_TOKEN }}
+        DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
+        DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   build-arm64:
     uses: ./.github/workflows/build.yml
@@ -32,5 +28,5 @@ jobs:
       arch: arm64
       arch_label: ARM64
       secrets: 
-        DOCKERHUB_USER: ${{ env.DOCKERHUB_USER }}
-        DOCKERHUB_TOKEN: ${{ env.DOCKERHUB_TOKEN }}
+        DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
+        DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
