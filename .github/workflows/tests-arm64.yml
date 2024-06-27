@@ -48,9 +48,6 @@ jobs:
 
       - name: Link Go
         run: sudo ln -s "$(which go)" /usr/local/bin/go
-      
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
 
       - name: Run Intgeration tests
         run: sudo go test -v github.com/langgenius/dify-sandbox/tests/integration_tests/...
