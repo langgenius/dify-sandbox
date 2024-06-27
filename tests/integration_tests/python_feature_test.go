@@ -8,7 +8,7 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/service"
 )
 
-func TestBase64(t *testing.T) {
+func TestPythonBase64(t *testing.T) {
 	// Test case for base64
 	resp := service.RunPython3Code(`
 import base64
@@ -29,7 +29,7 @@ print(base64.b64decode(base64.b64encode(b"hello world")).decode())
 	}
 }
 
-func TestJSON(t *testing.T) {
+func TestPythonJSON(t *testing.T) {
 	// Test case for json
 	resp := service.RunPython3Code(`
 import json
@@ -50,7 +50,7 @@ print(json.dumps({"hello": "world"}))
 	}
 }
 
-func TestHttp(t *testing.T) {
+func TestPythonHttp(t *testing.T) {
 	// Test case for http
 	resp := service.RunPython3Code(`
 import requests
