@@ -40,6 +40,9 @@ jobs:
         with:
           node-version: '20.11.1'
 
+      - name: Link Nodejs
+        run: sudo ln -sf "$(which node)" /usr/local/bin/node
+
       - name: Setup Python3.10
         uses: actions/setup-python@v2
         with:
@@ -47,9 +50,6 @@ jobs:
 
       - name: Install Python dependencies
         run: pip install httpx requests jinja2
-
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
 
       - name: Run Intgeration tests
         run: sudo go test -v github.com/langgenius/dify-sandbox/tests/integration_tests/...
