@@ -35,6 +35,11 @@ jobs:
       - name: Compile library
         run: bash ./build/build_amd64.sh
 
+      - name: Setup Nodejs20.11.1
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.11.1'
+
       - name: Setup Python3.10
         uses: actions/setup-python@v2
         with:
