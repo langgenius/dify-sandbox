@@ -50,6 +50,6 @@ jobs:
         run: sudo ln -s "$(which go)" /usr/local/bin/go
 
       - name: Run Intgeration tests
-        run: sudo go test -timeout 120s -v github.com/langgenius/dify-sandbox/tests/integration_tests/...
+        run: sudo go test -timeout 120s -v ./tests/integration_tests/...
         env:
           PYTHON_PATH: /usr/bin/python3.10

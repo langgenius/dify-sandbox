@@ -52,6 +52,6 @@ jobs:
         run: pip install httpx requests jinja2
 
       - name: Run Intgeration tests
-        run: sudo go test -timeout 120s -v github.com/langgenius/dify-sandbox/tests/integration_tests/...
+        run: sudo go test -timeout 120s -v ./tests/integration_tests/...
         env:
           PYTHON_PATH: /usr/bin/python3.10
