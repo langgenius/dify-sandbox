@@ -27,6 +27,7 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_EXIT, syscall.SYS_EXIT_GROUP,
 	syscall.SYS_TGKILL, syscall.SYS_RT_SIGACTION, syscall.SYS_IOCTL,
 	syscall.SYS_SCHED_YIELD,
+	syscall.SYS_SET_ROBUST_LIST, SYS_RSEQ,
 
 	// time
 	syscall.SYS_CLOCK_GETTIME, syscall.SYS_GETTIMEOFDAY, syscall.SYS_NANOSLEEP,
