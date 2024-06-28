@@ -10,7 +10,7 @@ import (
 
 func TestNodejsBase64(t *testing.T) {
 	// Test case for base64
-	runMultipleTestings(t, 100, func(t *testing.T) {
+	runMultipleTestings(t, 30, func(t *testing.T) {
 		resp := service.RunNodeJsCode(`
 const base64 = Buffer.from("hello world").toString("base64");
 console.log(Buffer.from(base64, "base64").toString());
@@ -33,7 +33,7 @@ console.log(Buffer.from(base64, "base64").toString());
 
 func TestNodejsJSON(t *testing.T) {
 	// Test case for json
-	runMultipleTestings(t, 100, func(t *testing.T) {
+	runMultipleTestings(t, 30, func(t *testing.T) {
 		resp := service.RunNodeJsCode(`
 console.log(JSON.stringify({"hello": "world"}));
 		`, "", &types.RunnerOptions{

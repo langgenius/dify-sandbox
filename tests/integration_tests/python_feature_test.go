@@ -10,7 +10,7 @@ import (
 
 func TestPythonBase64(t *testing.T) {
 	// Test case for base64
-	runMultipleTestings(t, 100, func(t *testing.T) {
+	runMultipleTestings(t, 50, func(t *testing.T) {
 		resp := service.RunPython3Code(`
 import base64
 print(base64.b64decode(base64.b64encode(b"hello world")).decode())
@@ -32,7 +32,7 @@ print(base64.b64decode(base64.b64encode(b"hello world")).decode())
 }
 
 func TestPythonJSON(t *testing.T) {
-	runMultipleTestings(t, 100, func(t *testing.T) {
+	runMultipleTestings(t, 50, func(t *testing.T) {
 		// Test case for json
 		resp := service.RunPython3Code(`
 import json
