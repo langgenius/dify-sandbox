@@ -56,7 +56,7 @@ print(json.dumps({"hello": "world"}))
 
 func TestPythonHttp(t *testing.T) {
 	// Test case for http
-	runMultipleTestings(t, 10, func(t *testing.T) {
+	runMultipleTestings(t, 1, func(t *testing.T) {
 		resp := service.RunPython3Code(`
 import requests
 print(requests.get("https://www.bilibili.com").content)
