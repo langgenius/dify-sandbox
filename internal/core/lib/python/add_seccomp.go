@@ -25,7 +25,7 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 	lib.SetNoNewPrivs()
 
 	allowed_syscalls := []int{}
-	allowed_not_kill_syscalls := []int{}
+	// allowed_not_kill_syscalls := []int{}
 
 	allowed_syscall := os.Getenv("ALLOWED_SYSCALLS")
 	if allowed_syscall != "" {
@@ -45,10 +45,10 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 		}
 	}
 
-	err = lib.Seccomp(allowed_syscalls, allowed_not_kill_syscalls)
-	if err != nil {
-		return err
-	}
+	// err = lib.Seccomp(allowed_syscalls, allowed_not_kill_syscalls)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// setuid
 	err = syscall.Setuid(uid)
