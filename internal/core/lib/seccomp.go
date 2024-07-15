@@ -11,7 +11,7 @@ import (
 )
 
 func Seccomp(allowed_syscalls []int, allowed_not_kill_syscalls []int) error {
-	ctx, err := sg.NewFilter(sg.ActKillProcess)
+	ctx, err := sg.NewFilter(sg.ActLog)
 	if err != nil {
 		return err
 	}
