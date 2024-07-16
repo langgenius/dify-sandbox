@@ -7,8 +7,6 @@ var DEFAULT_PYTHON_LIB_REQUIREMENTS = []string{
 	"/usr/lib/python3.10",
 	"/usr/lib/python3",
 	"/usr/lib/x86_64-linux-gnu/libssl.so.3",
-	"/usr/lib/x86_64-linux-gnu/librt.so.1",
-	"/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
 	"/usr/lib/x86_64-linux-gnu/libcrypto.so.3",
 	"/etc/ssl/certs/ca-certificates.crt",
 	"/etc/nsswitch.conf",
