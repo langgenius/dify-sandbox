@@ -44,8 +44,3 @@ result = f"""<<RESULT>>
 <<RESULT>>"""
 
 print(result)
-
-try:
-    import numpy as np
-except NotImplementedError:
-    ...
