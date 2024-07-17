@@ -28,15 +28,6 @@ func run(allowed_syscalls []int) error {
 	return err
 }
 
-func find_syscall(syscall int, syscalls []int) int {
-	for i, s := range syscalls {
-		if s == syscall {
-			return i
-		}
-	}
-	return -1
-}
-
 func main() {
 	// generate all syscall list
 	list := make([]int, 0, SYSCALL_NUMS)
