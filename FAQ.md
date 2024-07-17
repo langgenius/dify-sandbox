@@ -1,7 +1,3 @@
-Here's the translated FAQ document in English, formatted in markdown for better readability:
-
----
-
 ## FAQ
 
 ### 1. Why does my Python code throw an exception like "xxx.so: cannot open shared object file: No such file or directory"?
@@ -108,6 +104,4 @@ To quickly identify the system calls your Python code depends on, here are two r
 
 1. Modify the `/cmd/test/syscall_dig/test.py` Python code to **append** your test codes to the end of this file.
 2. Run `go run cmd/test/syscall_dig/main.go` to get the required system calls.
-
----
 
