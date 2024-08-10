@@ -28,7 +28,23 @@ var DEFAULT_PYTHON_LIB_REQUIREMENTS = []string{
 }
 ```
 
-So, when encountering such errors, you need to modify the `python_lib_path` in your `config.yaml` to include the shared object paths required by your Python code.
+So, when encountering such errors, you need to modify the `python_lib_path` in your `config.yaml` to include the shared object paths required by your Python code. For example:
+```config.yaml
+python_path: /usr/local/bin/python3
+python_lib_path:
+  - /usr/local/lib/python3.10
+  - /usr/lib/python3.10
+  - /usr/lib/python3
+  - /usr/lib/x86_64-linux-gnu/libssl.so.3
+  - /usr/lib/x86_64-linux-gnu/libcrypto.so.3
+  - /etc/ssl/certs/ca-certificates.crt
+  - /etc/nsswitch.conf
+  - /etc/hosts
+  - /etc/resolv.conf
+  - /run/systemd/resolve/stub-resolv.conf
+  - /run/resolvconf/resolv.conf
+  - *** add path which you required here ***
+```
 
 **Note:** The Go process initializes this environment at startup, so if you configure too many `python_lib_path`, the startup will be very slow. For serverless environments, consider modifying the code to complete this build in a Docker container.
 
@@ -36,72 +52,36 @@ So, when encountering such errors, you need to modify the `python_lib_path` in y
 
 `dify-sandbox` uses Linux seccomp to restrict system calls. It’s recommended to read the source code ([internal/core/lib/python/add_seccomp.go](https://github.com/langgenius/dify-sandbox/blob/main/internal/core/lib/python/add_seccomp.go)). When you encounter this error, it usually means your code executed a restricted system call. The default allowed system calls are configured in [syscalls_amd64](https://github.com/langgenius/dify-sandbox/blob/main/internal/static/python_syscall/syscalls_amd64.go). You can modify this according to your system’s needs (currently, it cannot be modified through the configuration file).
 
-To quickly identify the system calls your Python code depends on, here are two recommended methods:
+To quickly identify the system calls your Python code depends on, here is the recommended method:
 
-#### Method 1: Using `strace` to log all the system calls
+1. Modify the `/cmd/test/syscall_dig/test.py`, add your own code besides or in the `main` function. For example, you can add `import numpy` before `main`.
 
-1. Write a test Python file, for example, `test_numpy.py`, and add a line of code to import numpy:
-    ```python
-    import numpy as np
-    ```
+2. Run `go run cmd/test/syscall_dig/main.go`, the output will like this:
+```shell
+~/dify-sandbox$ go run cmd/test/syscall_dig/main.go
+failed with signal: bad system call
+...
+failed with signal: bad system call
+Following syscalls are required: 0,1,3,5,8,9,10,11,12,13,14,15,16,17,24,28,35,39,60,63,105,106,131,186,202,204,217,231,233,234,237,257,262,273,281,291,318,334,435
+```
+If you haven't got output like this format, maybe it's your permission problem, try run it with `sudo` again.
 
-2. Use `strace` to log all the system calls:
-    ```sh
-    strace -o strace_output.txt -e trace=all python test_numpy.py
-    ```
+3. These syscalls is the sandbox already added: `0,1,3,8,9,10,11,12,13,14,15,16,16,24,25,35,39,60,96,102,105,106,110,131,186,201,202,217,228,230,231,233,234,257,262,270,273,291,318,334`. You need to compare what is the extras syscall numbers of previous step. You can use a simple script or ask LLM to archive that. In this case, it's `5, 17, 28, 63, 204, 237, 281, 435`
 
-3. Use `awk` and `sort` to print all the system calls:
-    ```sh
-    awk '{print $1}' strace_output.txt | sed 's/[(].*//' | sort | uniq -c | sort -nr
-    ```
+4. add the correct syscall alias in [/internal/static/python_syscall/syscalls_amd64.go](./internal/static/python_syscall/syscalls_amd64.go), you can find it in the golang lib, like`/usr/lib/go-1.18/src/syscall/zsysnum_linux_amd64.go`
+```golang
+var ALLOW_SYSCALLS = []int{
+	// file io
+	syscall.SYS_NEWFSTATAT, syscall.SYS_IOCTL, syscall.SYS_LSEEK, syscall.SYS_GETDENTS64,
+	syscall.SYS_WRITE, syscall.SYS_CLOSE, syscall.SYS_OPENAT, syscall.SYS_READ,
+    
+	...
 
-    Then, get the list of system calls, diff, and add:
-    ```
-        831 stat
-        418 fstat
-        393 read
-        337 lseek
-        278 openat
-        250 close
-        215 mmap
-        180 ioctl
-         68 rt_sigaction
-         60 mprotect
-         54 getdents64
-         42 brk
-         35 futex
-         18 pread64
-         17 munmap
-          7 clone
-          6 lstat
-          4 readlink
-          3 uname
-          3 dup
-          2 shmget
-          2 getuid
-          2 getgid
-          2 geteuid
-          2 getegid
-          2 getcwd
-          2 arch_prctl
-          1 sysinfo
-          1 shmdt
-          1 shmat
-          1 set_tid_address
-          1 set_robust_list
-          1 sched_getaffinity
-          1 rt_sigprocmask
-          1 prlimit64
-          1 gettid
-          1 fcntl
-          1 exit_group
-          1 execve
-          1 epoll_create1
-          1 access
-    ```
+	// run numpy required
+	syscall.SYS_FSTAT, syscall.SYS_PREAD64, syscall.SYS_MADVISE, syscall.SYS_UNAME,
+	syscall.SYS_SCHED_GETAFFINITY, syscall.SYS_MBIND, syscall.SYS_EPOLL_PWAIT, 435,
+}
+```
+If the syscall alias not defined in golang, you can direcly use the number instead.
 
-#### Method 2: Using `dify-sandbox` test code to scan and output all system calls
-
-1. Modify the `/cmd/test/syscall_dig/test.py` Python code to **append** your test codes to the end of this file.
-2. Run `go run cmd/test/syscall_dig/main.go` to get the required system calls.
-
+5. Build and Run the whole project again.
