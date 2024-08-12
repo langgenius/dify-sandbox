@@ -3,6 +3,7 @@ package python
 import (
 	_ "embed"
 	"fmt"
+	"github.com/langgenius/dify-sandbox/internal/static"
 	"os"
 	"os/exec"
 	"path"
@@ -140,5 +141,16 @@ func InstallDependencies(requirements string) error {
 }
 
 func ListDependencies() []types.Dependency {
+	return python_dependencies.ListDependencies()
+}
+
+func RefreshDependencies() []types.Dependency {
+	log.Info("updating python dependencies...")
+	dependencies := static.GetRunnerDependencies()
+	err := InstallDependencies(dependencies.PythonRequirements)
+	if err != nil {
+		log.Error("failed to update python dependencies: %v", err)
+	}
+	log.Info("python dependencies updated")
 	return python_dependencies.ListDependencies()
 }
