@@ -14,7 +14,7 @@ func Setup(Router *gin.Engine) {
 	PrivateGroup.Use(middleware.Auth())
 
 	{
-		// 健康监测
+		// health check
 		PublicGroup.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, "ok")
 		})
