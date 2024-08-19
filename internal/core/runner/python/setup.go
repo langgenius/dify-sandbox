@@ -3,12 +3,13 @@ package python
 import (
 	_ "embed"
 	"fmt"
-	"github.com/langgenius/dify-sandbox/internal/static"
 	"os"
 	"os/exec"
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/langgenius/dify-sandbox/internal/static"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
 	python_dependencies "github.com/langgenius/dify-sandbox/internal/core/runner/python/dependencies"
@@ -30,8 +31,13 @@ func init() {
 
 func releaseLibBinary() {
 	log.Info("initializing python runner environment...")
-	os.RemoveAll(LIB_PATH)
-	os.Remove(LIB_PATH)
+	// remove the old lib
+	if _, err := os.Stat(path.Join(LIB_PATH, LIB_NAME)); err == nil {
+		err := os.Remove(path.Join(LIB_PATH, LIB_NAME))
+		if err != nil {
+			log.Panic(fmt.Sprintf("failed to remove %s", path.Join(LIB_PATH, LIB_NAME)))
+		}
+	}
 
 	err := os.MkdirAll(LIB_PATH, 0755)
 	if err != nil {
