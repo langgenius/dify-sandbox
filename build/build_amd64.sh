@@ -8,3 +8,5 @@ echo "Building Nodejs lib" &&
 CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o internal/core/runner/nodejs/nodejs.so -buildmode=c-shared -ldflags="-s -w" cmd/lib/nodejs/main.go &&
 echo "Building main" &&
 GOOS=linux GOARCH=amd64 go build -o main -ldflags="-s -w" cmd/server/main.go
+echo "Building env"
+GOOS=linux GOARCH=amd64 go build -o env -ldflags="-s -w" cmd/dependencies/init.go

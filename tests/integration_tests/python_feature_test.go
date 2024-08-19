@@ -21,12 +21,12 @@ print(base64.b64decode(base64.b64encode(b"hello world")).decode())
 			t.Fatal(resp)
 		}
 
-		if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, "hello world") {
-			t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
-		}
-
 		if resp.Data.(*service.RunCodeResponse).Stderr != "" {
 			t.Fatalf("unexpected error: %s\n", resp.Data.(*service.RunCodeResponse).Stderr)
+		}
+
+		if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, "hello world") {
+			t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
 		}
 	})
 }
@@ -44,12 +44,12 @@ print(json.dumps({"hello": "world"}))
 			t.Fatal(resp)
 		}
 
-		if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, `{"hello": "world"}`) {
-			t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
-		}
-
 		if resp.Data.(*service.RunCodeResponse).Stderr != "" {
 			t.Fatalf("unexpected error: %s\n", resp.Data.(*service.RunCodeResponse).Stderr)
+		}
+
+		if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, `{"hello": "world"}`) {
+			t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
 		}
 	})
 }
@@ -67,12 +67,12 @@ print(requests.get("https://www.bilibili.com").content)
 			t.Fatal(resp)
 		}
 
-		if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, "bilibili") {
-			t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
-		}
-
 		if resp.Data.(*service.RunCodeResponse).Stderr != "" {
 			t.Fatalf("unexpected error: %s\n", resp.Data.(*service.RunCodeResponse).Stderr)
+		}
+
+		if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, "bilibili") {
+			t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
 		}
 	})
 }

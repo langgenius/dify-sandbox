@@ -74,7 +74,10 @@ func initDependencies() {
 }
 
 func Run() {
+	// init config
 	initConfig()
-	initDependencies()
+	// init dependencies, it will cost some times
+	go initDependencies()
+
 	initServer()
 }
