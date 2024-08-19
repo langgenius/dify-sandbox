@@ -12,14 +12,15 @@ func TestSysFork(t *testing.T) {
 	// Test case for sys_fork
 	resp := service.RunPython3Code(`
 import os
-os.fork()
+print(os.fork())
+print(123)
 	`, "", &types.RunnerOptions{})
 
 	if resp.Code != 0 {
 		t.Error(resp)
 	}
 
-	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "operation not permitted") {
+	if resp.Data.(*service.RunCodeResponse).Stdout != "0\n123\n" {
 		t.Error(resp.Data.(*service.RunCodeResponse).Stderr)
 	}
 }

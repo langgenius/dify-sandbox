@@ -27,7 +27,7 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_EXIT, syscall.SYS_EXIT_GROUP,
 	syscall.SYS_TGKILL, syscall.SYS_RT_SIGACTION, syscall.SYS_IOCTL,
 	syscall.SYS_SCHED_YIELD,
-	syscall.SYS_SET_ROBUST_LIST, SYS_RSEQ,
+	syscall.SYS_SET_ROBUST_LIST, syscall.SYS_GET_ROBUST_LIST, SYS_RSEQ,
 
 	// time
 	syscall.SYS_CLOCK_GETTIME, syscall.SYS_GETTIMEOFDAY, syscall.SYS_NANOSLEEP,
@@ -36,6 +36,10 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_TIME,
 
 	syscall.SYS_RT_SIGPROCMASK, syscall.SYS_SIGALTSTACK, SYS_GETRANDOM,
+}
+
+var ALLOW_ERROR_SYSCALLS = []int{
+	syscall.SYS_CLONE,
 }
 
 var ALLOW_NETWORK_SYSCALLS = []int{

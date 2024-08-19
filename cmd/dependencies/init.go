@@ -1,4 +1,4 @@
-package integrationtests_test
+package main
 
 import (
 	"github.com/langgenius/dify-sandbox/internal/core/runner/python"
@@ -6,11 +6,13 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
-func init() {
+func main() {
 	static.InitConfig("conf/config.yaml")
 
 	err := python.PreparePythonDependenciesEnv()
 	if err != nil {
 		log.Panic("failed to initialize python dependencies sandbox: %v", err)
 	}
+
+	log.Info("Python dependencies initialized successfully")
 }
