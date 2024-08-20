@@ -27,22 +27,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USER }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # - name: Login to Docker Hub
+      #   uses: docker/login-action@v2
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USER }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ vars.DIFY_SANDBOX_IMAGE_NAME || 'langgenius/dify-sandbox' }}
-          tags: |
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=ref,event=branch
-            type=sha,enable=true,priority=100,prefix=,suffix=,format=long
-            type=raw,value=${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
+      # - name: Extract metadata (tags, labels) for Docker
+      #   id: meta
+      #   uses: docker/metadata-action@v5
+      #   with:
+      #     images: ${{ vars.DIFY_SANDBOX_IMAGE_NAME || 'langgenius/dify-sandbox' }}
+      #     tags: |
+      #       type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+      #       type=ref,event=branch
+      #       type=sha,enable=true,priority=100,prefix=,suffix=,format=long
+      #       type=raw,value=${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
 
       - name: Install System Dependencies
         run: sudo apt-get install -y pkg-config gcc libseccomp-dev
@@ -61,15 +61,15 @@ jobs:
       - name: Run Build Docker Image
         run: docker build -t dify-sandbox -f ./docker/${{ inputs.arch }}/dockerfile .
 
-      - name: Tag Docker Images
-        run: 
-          for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n');
-          do
-            docker tag dify-sandbox "$tag-${{ inputs.arch }}";
-          done
-      - name: Push Docker Image
-        run:
-          for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n');
-          do
-            docker push $tag-${{ inputs.arch }};
-          done
+      # - name: Tag Docker Images
+      #   run: 
+      #     for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n');
+      #     do
+      #       docker tag dify-sandbox "$tag-${{ inputs.arch }}";
+      #     done
+      # - name: Push Docker Image
+      #   run:
+      #     for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n');
+      #     do
+      #       docker push $tag-${{ inputs.arch }};
+      #     done
