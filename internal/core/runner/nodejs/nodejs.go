@@ -66,6 +66,10 @@ func (p *NodeJsRunner) Run(
 		)
 		cmd.Env = []string{}
 
+		if os.Getenv("ALLOWED_SYSCALLS") != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("ALLOWED_SYSCALLS=%s", os.Getenv("ALLOWED_SYSCALLS")))
+		}
+
 		// capture the output
 		err = output_handler.CaptureOutput(cmd)
 		if err != nil {

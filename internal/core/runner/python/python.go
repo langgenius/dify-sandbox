@@ -77,6 +77,9 @@ func (p *PythonRunner) Run(
 				cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Http))
 			}
 		}
+		if os.Getenv("ALLOWED_SYSCALLS") != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("ALLOWED_SYSCALLS=%s", os.Getenv("ALLOWED_SYSCALLS")))
+		}
 
 		err = output_handler.CaptureOutput(cmd)
 		if err != nil {
