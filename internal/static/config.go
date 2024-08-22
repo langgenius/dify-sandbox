@@ -92,6 +92,19 @@ func InitConfig(path string) error {
 		difySandboxGlobalConfigurations.EnableNetwork, _ = strconv.ParseBool(enable_network)
 	}
 
+	allowed_syscalls := os.Getenv("ALLOWED_SYSCALLS")
+	if allowed_syscalls != "" {
+		strs := strings.Split(allowed_syscalls, ",")
+		ary := make([]int, len(strs))
+		for i := range ary {
+			ary[i], err = strconv.Atoi(strs[i])
+			if err != nil {
+				return err
+			}
+		}
+		difySandboxGlobalConfigurations.AllowedSyscalls = ary
+	}
+
 	if difySandboxGlobalConfigurations.EnableNetwork {
 		log.Info("network has been enabled")
 		socks5_proxy := os.Getenv("SOCKS5_PROXY")

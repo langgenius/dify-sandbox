@@ -77,8 +77,8 @@ func (p *PythonRunner) Run(
 				cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Http))
 			}
 		}
-		if os.Getenv("ALLOWED_SYSCALLS") != "" {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("ALLOWED_SYSCALLS=%s", os.Getenv("ALLOWED_SYSCALLS")))
+		if len(configuration.AllowedSyscalls) > 0 {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("ALLOWED_SYSCALLS=%s", strings.Trim(strings.Join(strings.Fields(fmt.Sprint(configuration.AllowedSyscalls)), ","), "[]")))
 		}
 
 		err = output_handler.CaptureOutput(cmd)

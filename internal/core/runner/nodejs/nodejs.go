@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
@@ -40,6 +41,8 @@ func (p *NodeJsRunner) Run(
 	preload string,
 	options *types.RunnerOptions,
 ) (chan []byte, chan []byte, chan bool, error) {
+	configuration := static.GetDifySandboxGlobalConfigurations()
+
 	// capture the output
 	output_handler := runner.NewOutputCaptureRunner()
 	output_handler.SetTimeout(timeout)
@@ -66,8 +69,8 @@ func (p *NodeJsRunner) Run(
 		)
 		cmd.Env = []string{}
 
-		if os.Getenv("ALLOWED_SYSCALLS") != "" {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("ALLOWED_SYSCALLS=%s", os.Getenv("ALLOWED_SYSCALLS")))
+		if len(configuration.AllowedSyscalls) > 0 {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("ALLOWED_SYSCALLS=%s", strings.Trim(strings.Join(strings.Fields(fmt.Sprint(configuration.AllowedSyscalls)), ","), "[]")))
 		}
 
 		// capture the output
