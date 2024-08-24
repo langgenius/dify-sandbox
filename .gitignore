@@ -1,1 +1,11 @@
+# log
 logs/
+# editor config
+.idea/
+.vscode/
+# temp file
+*.o
+*.a
+# compiled product
+env
+main
