@@ -78,6 +78,10 @@ func InitConfig(path string) error {
 		difySandboxGlobalConfigurations.PythonLibPaths = DEFAULT_PYTHON_LIB_REQUIREMENTS
 	}
 
+	python_pip_mirror_url := os.Getenv("PIP_MIRROR_URL")
+	if python_pip_mirror_url != "" {
+		difySandboxGlobalConfigurations.PythonPipMirrorURL = python_pip_mirror_url
+	}
 	nodejs_path := os.Getenv("NODEJS_PATH")
 	if nodejs_path != "" {
 		difySandboxGlobalConfigurations.NodejsPath = nodejs_path

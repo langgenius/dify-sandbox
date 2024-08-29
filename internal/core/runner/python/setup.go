@@ -98,8 +98,15 @@ func InstallDependencies(requirements string) error {
 		}
 
 		// install dependencies
-		cmd := exec.Command("pip3", "install", "-r", "requirements.txt")
+		pipMirrorURL := static.GetDifySandboxGlobalConfigurations().PythonPipMirrorURL
 
+		// Create the base command
+		args := []string{"install", "-r", "requirements.txt"}
+		if pipMirrorURL != "" {
+			// If a mirror URL is provided, include it in the command arguments
+			args = append(args, "-i", pipMirrorURL)
+		}
+		cmd := exec.Command("pip3", args...)
 		reader, err := cmd.StdoutPipe()
 		if err != nil {
 			log.Panic("failed to get stdout pipe of pip3")
