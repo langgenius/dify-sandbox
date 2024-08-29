@@ -37,7 +37,7 @@ elif [ -d "$src" ]; then
     mkdir -p "$dest/$src"
 
     # Find all files in the source directory
-    find "$src" -type f | while read -r file; do
+    find "$src" -type f,l | while read -r file; do
         # Get the relative path of the file
         rel_path="${file#$src/}"
         # Get the directory of the relative path
