@@ -12,3 +12,5 @@ proxy:
   socks5: ''
   http: ''
   https: ''
+python_lib_path:
+  - "/usr/lib/x86_64-linux-gnu"
