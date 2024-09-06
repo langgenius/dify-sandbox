@@ -70,7 +70,12 @@ func (p *NodeJsRunner) Run(
 		cmd.Env = []string{}
 
 		if len(configuration.AllowedSyscalls) > 0 {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("ALLOWED_SYSCALLS=%s", strings.Trim(strings.Join(strings.Fields(fmt.Sprint(configuration.AllowedSyscalls)), ","), "[]")))
+			cmd.Env = append(
+				cmd.Env,
+				fmt.Sprintf("ALLOWED_SYSCALLS=%s", strings.Trim(
+					strings.Join(strings.Fields(fmt.Sprint(configuration.AllowedSyscalls)), ","), "[]",
+				)),
+			)
 		}
 
 		// capture the output
