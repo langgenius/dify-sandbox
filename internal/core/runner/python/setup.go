@@ -49,7 +49,7 @@ func releaseLibBinary(force_remove_old_lib bool) {
 				log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
 			}
 		}
-	} else if err == os.ErrNotExist {
+	} else {
 		err = os.MkdirAll(LIB_PATH, 0755)
 		if err != nil {
 			log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
@@ -59,8 +59,6 @@ func releaseLibBinary(force_remove_old_lib bool) {
 			log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
 		}
 		log.Info("python runner environment initialized")
-	} else {
-		log.Panic(fmt.Sprintf("failed to initialize python runner environment: %v", err))
 	}
 }
 
