@@ -52,6 +52,7 @@ func (p *PythonRunner) Run(
 		key,
 	)
 	cmd.Env = []string{}
+	cmd.Dir = LIB_PATH
 
 	if configuration.Proxy.Socks5 != "" {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Socks5))
