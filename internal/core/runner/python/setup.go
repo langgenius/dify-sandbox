@@ -26,28 +26,40 @@ const (
 )
 
 func init() {
-	releaseLibBinary()
+	releaseLibBinary(true)
 }
 
-func releaseLibBinary() {
+func releaseLibBinary(force_remove_old_lib bool) {
 	log.Info("initializing python runner environment...")
 	// remove the old lib
 	if _, err := os.Stat(path.Join(LIB_PATH, LIB_NAME)); err == nil {
-		err := os.Remove(path.Join(LIB_PATH, LIB_NAME))
-		if err != nil {
-			log.Panic(fmt.Sprintf("failed to remove %s", path.Join(LIB_PATH, LIB_NAME)))
-		}
-	}
+		if force_remove_old_lib {
+			err := os.Remove(path.Join(LIB_PATH, LIB_NAME))
+			if err != nil {
+				log.Panic(fmt.Sprintf("failed to remove %s", path.Join(LIB_PATH, LIB_NAME)))
+			}
 
-	err := os.MkdirAll(LIB_PATH, 0755)
-	if err != nil {
-		log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
+			// write the new lib
+			err = os.MkdirAll(LIB_PATH, 0755)
+			if err != nil {
+				log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
+			}
+			err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755)
+			if err != nil {
+				log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
+			}
+		}
+	} else {
+		err = os.MkdirAll(LIB_PATH, 0755)
+		if err != nil {
+			log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
+		}
+		err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755)
+		if err != nil {
+			log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
+		}
+		log.Info("python runner environment initialized")
 	}
-	err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755)
-	if err != nil {
-		log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
-	}
-	log.Info("python runner environment initialized")
 }
 
 func checkLibAvaliable() bool {
@@ -88,7 +100,6 @@ func InstallDependencies(requirements string) error {
 
 	runner := runner.TempDirRunner{}
 	return runner.WithTempDir("/", []string{}, func(root_path string) error {
-		defer os.Remove(root_path)
 		defer os.RemoveAll(root_path)
 		// create a requirements file
 		err := os.WriteFile(path.Join(root_path, "requirements.txt"), []byte(requirements), 0644)

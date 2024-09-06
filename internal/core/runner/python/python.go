@@ -25,12 +25,6 @@ type PythonRunner struct {
 //go:embed prescript.py
 var sandbox_fs []byte
 
-var (
-	REQUIRED_FS = []string{
-		path.Join(LIB_PATH, LIB_NAME),
-	}
-)
-
 func (p *PythonRunner) Run(
 	code string,
 	timeout time.Duration,
@@ -50,45 +44,37 @@ func (p *PythonRunner) Run(
 	output_handler := runner.NewOutputCaptureRunner()
 	output_handler.SetTimeout(timeout)
 
-	err = p.WithTempDir(LIB_PATH, REQUIRED_FS, func(root_path string) error {
-		// cleanup
-		output_handler.SetAfterExitHook(func() {
-			os.RemoveAll(root_path)
-			os.Remove(root_path)
-		})
+	// create a new process
+	cmd := exec.Command(
+		configuration.PythonPath,
+		untrusted_code_path,
+		LIB_PATH,
+		key,
+	)
+	cmd.Env = []string{}
+	cmd.Dir = LIB_PATH
 
-		// create a new process
-		cmd := exec.Command(
-			configuration.PythonPath,
-			untrusted_code_path,
-			LIB_PATH,
-			key,
+	if configuration.Proxy.Socks5 != "" {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Socks5))
+		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Socks5))
+	} else if configuration.Proxy.Https != "" || configuration.Proxy.Http != "" {
+		if configuration.Proxy.Https != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Https))
+		}
+		if configuration.Proxy.Http != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Http))
+		}
+	}
+
+	if len(configuration.AllowedSyscalls) > 0 {
+		cmd.Env = append(cmd.Env,
+			fmt.Sprintf("ALLOWED_SYSCALLS=%s",
+				strings.Trim(strings.Join(strings.Fields(fmt.Sprint(configuration.AllowedSyscalls)), ","), "[]"),
+			),
 		)
-		cmd.Env = []string{}
+	}
 
-		if configuration.Proxy.Socks5 != "" {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Socks5))
-			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Socks5))
-		} else if configuration.Proxy.Https != "" || configuration.Proxy.Http != "" {
-			if configuration.Proxy.Https != "" {
-				cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Https))
-			}
-			if configuration.Proxy.Http != "" {
-				cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Http))
-			}
-		}
-		if len(configuration.AllowedSyscalls) > 0 {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("ALLOWED_SYSCALLS=%s", strings.Trim(strings.Join(strings.Fields(fmt.Sprint(configuration.AllowedSyscalls)), ","), "[]")))
-		}
-
-		err = output_handler.CaptureOutput(cmd)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
+	err = output_handler.CaptureOutput(cmd)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -99,7 +85,7 @@ func (p *PythonRunner) Run(
 func (p *PythonRunner) InitializeEnvironment(code string, preload string, options *types.RunnerOptions) (string, string, error) {
 	if !checkLibAvaliable() {
 		// ensure environment is reversed
-		releaseLibBinary()
+		releaseLibBinary(false)
 	}
 
 	// create a tmp dir and copy the python script
