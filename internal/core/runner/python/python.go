@@ -99,7 +99,7 @@ func (p *PythonRunner) Run(
 func (p *PythonRunner) InitializeEnvironment(code string, preload string, options *types.RunnerOptions) (string, string, error) {
 	if !checkLibAvaliable() {
 		// ensure environment is reversed
-		releaseLibBinary()
+		releaseLibBinary(false)
 	}
 
 	// create a tmp dir and copy the python script
