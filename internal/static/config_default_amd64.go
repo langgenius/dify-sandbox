@@ -14,4 +14,7 @@ var DEFAULT_PYTHON_LIB_REQUIREMENTS = []string{
 	"/etc/resolv.conf",
 	"/run/systemd/resolve/stub-resolv.conf",
 	"/run/resolvconf/resolv.conf",
+	"/etc/localtime",
+	"/usr/share/zoneinfo",
+	"/etc/timezone",
 }

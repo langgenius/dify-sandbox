@@ -14,4 +14,7 @@ var DEFAULT_PYTHON_LIB_REQUIREMENTS = []string{
 	"/usr/lib/aarch64-linux-gnu/libssl.so.3",
 	"/usr/lib/aarch64-linux-gnu/libcrypto.so.3",
 	"/etc/hosts",
+	"/etc/localtime",
+	"/usr/share/zoneinfo",
+	"/etc/timezone",
 }

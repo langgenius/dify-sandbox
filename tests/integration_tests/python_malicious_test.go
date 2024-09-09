@@ -14,7 +14,9 @@ func TestSysFork(t *testing.T) {
 import os
 print(os.fork())
 print(123)
-	`, "", &types.RunnerOptions{})
+	`, "", &types.RunnerOptions{
+		EnableNetwork: true,
+	})
 
 	if resp.Code != 0 {
 		t.Error(resp)
@@ -30,7 +32,9 @@ func TestExec(t *testing.T) {
 	resp := service.RunPython3Code(`
 import os
 os.execl("/bin/ls", "ls")
-	`, "", &types.RunnerOptions{})
+	`, "", &types.RunnerOptions{
+		EnableNetwork: true,
+	})
 	if resp.Code != 0 {
 		t.Error(resp)
 	}
@@ -45,12 +49,29 @@ func TestRunCommand(t *testing.T) {
 	resp := service.RunPython3Code(`
 import subprocess
 subprocess.run(["ls", "-l"])
-	`, "", &types.RunnerOptions{})
+	`, "", &types.RunnerOptions{
+		EnableNetwork: true,
+	})
 	if resp.Code != 0 {
 		t.Error(resp)
 	}
 
 	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "operation not permitted") {
+		t.Error(resp.Data.(*service.RunCodeResponse).Stderr)
+	}
+}
+
+func TestReadEtcPasswd(t *testing.T) {
+	resp := service.RunPython3Code(`
+print(open("/etc/passwd").read())
+	`, "", &types.RunnerOptions{
+		EnableNetwork: true,
+	})
+	if resp.Code != 0 {
+		t.Error(resp)
+	}
+
+	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "No such file or directory") {
 		t.Error(resp.Data.(*service.RunCodeResponse).Stderr)
 	}
 }

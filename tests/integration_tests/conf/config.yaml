@@ -4,7 +4,7 @@ app:
   key: dify-sandbox
 max_workers: 4
 max_requests: 50
-worker_timeout: 5
+worker_timeout: 30
 python_path: /usr/bin/python3
 enable_network: True # please make sure there is no network risk in your environment
 allowed_syscalls: # please leave it empty if you have no idea how seccomp works
