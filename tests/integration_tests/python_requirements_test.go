@@ -15,7 +15,6 @@ func TestPyModuleAutoImport(t *testing.T) {
 # declare main function
 
 def main(arg1: int, arg2: int) -> dict:
-        print(pandas.__version__)
         print(os.environ)
         print(sys.path)
         return {
