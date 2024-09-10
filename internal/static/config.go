@@ -82,6 +82,10 @@ func InitConfig(path string) error {
 	if python_pip_mirror_url != "" {
 		difySandboxGlobalConfigurations.PythonPipMirrorURL = python_pip_mirror_url
 	}
+	python_module_auto_import := os.Getenv("PY_MODULE_AUTO_IMPORT")
+	if python_module_auto_import != "" {
+		difySandboxGlobalConfigurations.PythonModuleAutoImport, _ = strconv.ParseBool(python_module_auto_import)
+	}
 	nodejs_path := os.Getenv("NODEJS_PATH")
 	if nodejs_path != "" {
 		difySandboxGlobalConfigurations.NodejsPath = nodejs_path

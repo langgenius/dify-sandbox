@@ -33,7 +33,13 @@ func (p *PythonRunner) Run(
 	options *types.RunnerOptions,
 ) (chan []byte, chan []byte, chan bool, error) {
 	configuration := static.GetDifySandboxGlobalConfigurations()
-
+	//Examine the python code to check that the imported modules are installed
+	if configuration.PythonModuleAutoImport {
+		//Check import module is installed.
+		requirements := checkNotInstallModuleWithCode(code)
+		InstallDependencies(requirements)
+		//Install module.
+	}
 	// initialize the environment
 	untrusted_code_path, key, err := p.InitializeEnvironment(code, preload, options)
 	if err != nil {
