@@ -51,6 +51,9 @@ jobs:
       - name: Install Python dependencies
         run: pip install httpx requests jinja2
 
+      - name: Action mate
+        uses: mxschmitt/action-tmate@v3
+
       - name: Run Intgeration tests
         run: sudo go test -timeout 120s -v ./tests/integration_tests/...
         env:
