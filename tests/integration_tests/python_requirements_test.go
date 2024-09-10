@@ -3,6 +3,7 @@ package integrationtests_test
 import (
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/service"
+	"github.com/langgenius/dify-sandbox/internal/static"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 	"strings"
 	"testing"
@@ -36,6 +37,9 @@ result = f'''<<RESULT>>{output_json}<<RESULT>>'''
 print(result)
 `
 	log.Info("code:%v\n", code)
+	configurations := static.GetDifySandboxGlobalConfigurations()
+	configurations.PythonModuleAutoImport = true
+	configurations.EnableNetwork = true
 	resp := service.RunPython3Code(code, "", &types.RunnerOptions{
 		EnableNetwork: true,
 	})
