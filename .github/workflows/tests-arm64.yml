@@ -51,6 +51,9 @@ jobs:
       - name: Install Python dependencies
         run: pip install httpx requests jinja2
 
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+
       - name: Link Go
         run: sudo ln -s "$(which go)" /usr/local/bin/go
 
