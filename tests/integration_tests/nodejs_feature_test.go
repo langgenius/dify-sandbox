@@ -8,6 +8,33 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/service"
 )
 
+func TestNodejsBasicTemplate(t *testing.T) {
+	const code = `// declare main function
+function main({a}) {
+	return {b: a}
+}
+
+// decode and prepare input object
+var inputs_obj = JSON.parse(Buffer.from('eyJhIjoiYSJ9', 'base64').toString('utf-8'))
+
+// execute main function
+var output_obj = main(inputs_obj)
+
+// convert output to json and print
+var output_json = JSON.stringify(output_obj)
+var result = ` + "`<<RESULT>>${output_json}<<RESULT>>`" + `
+console.log(result)`
+
+	runMultipleTestings(t, 30, func(t *testing.T) {
+		resp := service.RunNodeJsCode(code, "", &types.RunnerOptions{
+			EnableNetwork: true,
+		})
+		if resp.Code != 0 {
+			t.Fatal(resp)
+		}
+	})
+}
+
 func TestNodejsBase64(t *testing.T) {
 	// Test case for base64
 	runMultipleTestings(t, 30, func(t *testing.T) {
