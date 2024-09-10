@@ -41,7 +41,12 @@ jobs:
           node-version: '20.11.1'
 
       - name: Setup Python3.10
-        run: sudo apt-get install -y python3.10 python3-pip
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+
+      - name: Link Python3.10
+        run: sudo ln -sf "$(which python3.10)" /usr/local/bin/python3
 
       - name: Install Python dependencies
         run: pip install httpx requests jinja2
