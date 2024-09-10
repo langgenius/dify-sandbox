@@ -49,7 +49,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install Python dependencies
-        run: pip install httpx requests jinja2
+        run: pip install --upgrade httpx requests jinja2
 
       - name: Run Intgeration tests
         run: sudo go test -timeout 120s -v ./tests/integration_tests/...

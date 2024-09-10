@@ -44,7 +44,7 @@ jobs:
         run: sudo apt-get install -y python3.10 python3-pip
 
       - name: Install Python dependencies
-        run: pip install httpx requests jinja2
+        run: pip install --upgrade httpx requests jinja2
 
       - name: Link Go
         run: sudo ln -s "$(which go)" /usr/local/bin/go
