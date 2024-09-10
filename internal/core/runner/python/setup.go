@@ -138,7 +138,6 @@ func InstallDependencies(requirements string) error {
 			}
 			log.Info(string(buf[:n]))
 		}
-
 		status := cmd.Wait()
 
 		if status != nil {

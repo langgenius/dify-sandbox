@@ -2,6 +2,7 @@ package python
 
 import (
 	"fmt"
+	"github.com/langgenius/dify-sandbox/internal/static"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 	"os/exec"
 	"regexp"
@@ -40,7 +41,7 @@ func checkNotInstallModuleWithCode(code string) string {
 			modules[i].isImported = true
 		}
 	}
-	log.Info("")
+	log.Info("%v\n", modules)
 	return concatModules(modules)
 }
 
@@ -57,7 +58,8 @@ func concatModules(modules []PyModules) string {
 
 // checkModuleExists 函数调用 Python 脚本检查模块是否存在
 func checkModuleExists(module string) bool {
-	cmd := exec.Command("python3", "-c", fmt.Sprintf("import %s", module))
+	configuration := static.GetDifySandboxGlobalConfigurations()
+	cmd := exec.Command(configuration.PythonPath, "-c", fmt.Sprintf("import %s", module))
 	err := cmd.Run()
 	return err == nil
 }

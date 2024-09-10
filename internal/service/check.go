@@ -13,7 +13,6 @@ var (
 
 func checkOptions(options *types.RunnerOptions) error {
 	configuration := static.GetDifySandboxGlobalConfigurations()
-
 	if options.EnableNetwork && !configuration.EnableNetwork {
 		return ErrNetworkDisabled
 	}

@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/base64"
 	"fmt"
+	"github.com/langgenius/dify-sandbox/internal/utils/log"
 	"os"
 	"os/exec"
 	"path"
@@ -37,6 +38,7 @@ func (p *PythonRunner) Run(
 	if configuration.PythonModuleAutoImport {
 		//Check import module is installed.
 		requirements := checkNotInstallModuleWithCode(code)
+		log.Info("Auto install :%s \n", requirements)
 		InstallDependencies(requirements)
 		//Install module.
 	}
