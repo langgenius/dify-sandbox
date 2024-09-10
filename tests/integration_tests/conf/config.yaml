@@ -5,7 +5,24 @@ app:
 max_workers: 4
 max_requests: 50
 worker_timeout: 30
-python_path: /usr/bin/python3
+python_path: /usr/local/bin/python3
+python_lib_path:
+  - "/usr/local/lib/python3.10"
+  - "/usr/lib/python3.10"
+  - "/usr/lib/python3"
+  - "/opt/hostedtoolcache/Python/3.10.14/x64/lib/python3.10"
+  - "/opt/hostedtoolcache/Python/3.10.15/arm64/lib/python3.10"
+  - "/usr/lib/x86_64-linux-gnu"
+  - "/usr/lib/aarch64-linux-gnu"
+  - "/etc/ssl/certs/ca-certificates.crt"
+  - "/etc/nsswitch.conf"
+  - "/etc/hosts"
+  - "/etc/resolv.conf"
+  - "/run/systemd/resolve/stub-resolv.conf"
+  - "/run/resolvconf/resolv.conf"
+  - "/etc/localtime"
+  - "/usr/share/zoneinfo"
+  - "/etc/timezone"
 enable_network: True # please make sure there is no network risk in your environment
 allowed_syscalls: # please leave it empty if you have no idea how seccomp works
 proxy:

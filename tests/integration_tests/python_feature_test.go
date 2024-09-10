@@ -55,12 +55,35 @@ print(json.dumps({"hello": "world"}))
 	})
 }
 
-func TestPythonHttp(t *testing.T) {
+func TestPythonRequests(t *testing.T) {
 	// Test case for http
 	runMultipleTestings(t, 1, func(t *testing.T) {
 		resp := service.RunPython3Code(`
 import requests
 print(requests.get("https://www.bilibili.com").content)
+	`, "", &types.RunnerOptions{
+			EnableNetwork: true,
+		})
+		if resp.Code != 0 {
+			t.Fatal(resp)
+		}
+
+		if resp.Data.(*service.RunCodeResponse).Stderr != "" {
+			t.Fatalf("unexpected error: %s\n", resp.Data.(*service.RunCodeResponse).Stderr)
+		}
+
+		if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, "bilibili") {
+			t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
+		}
+	})
+}
+
+func TestPythonHttpx(t *testing.T) {
+	// Test case for http
+	runMultipleTestings(t, 1, func(t *testing.T) {
+		resp := service.RunPython3Code(`
+import httpx
+print(httpx.get("https://www.bilibili.com").content)
 	`, "", &types.RunnerOptions{
 			EnableNetwork: true,
 		})
