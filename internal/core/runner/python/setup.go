@@ -120,14 +120,15 @@ func InstallDependencies(requirements string) error {
 		cmd := exec.Command("pip3", args...)
 		reader, err := cmd.StdoutPipe()
 		if err != nil {
-			log.Panic("failed to get stdout pipe of pip3")
+			log.Error("failed to get stdout pipe of pip3")
+			return err
 		}
 		defer reader.Close()
 
 		err = cmd.Start()
 		if err != nil {
 			log.Error("failed to start pip3")
-			return nil
+			return err
 		}
 
 		for {
@@ -139,11 +140,11 @@ func InstallDependencies(requirements string) error {
 			log.Info(string(buf[:n]))
 		}
 
-		status := cmd.Wait()
+		err = cmd.Wait()
 
-		if status != nil {
-			log.Error("failed to install dependencies")
-			return nil
+		if err != nil {
+			log.Error("failed to wait for the command to complete")
+			return err
 		}
 
 		// split the requirements
@@ -151,13 +152,13 @@ func InstallDependencies(requirements string) error {
 		requirements = strings.ReplaceAll(requirements, "\r", "\n")
 		lines := strings.Split(requirements, "\n")
 		for _, line := range lines {
-			package_name, version := ExtractOnelineDepency(line)
-			if package_name == "" {
+			packageName, version := ExtractOnelineDepency(line)
+			if packageName == "" {
 				continue
 			}
 
-			python_dependencies.SetupDependency(package_name, version)
-			log.Info("Python dependency installed: %s %s", package_name, version)
+			python_dependencies.SetupDependency(packageName, version)
+			log.Info("Python dependency installed: %s %s", packageName, version)
 		}
 
 		return nil
@@ -173,7 +174,8 @@ func RefreshDependencies() []types.Dependency {
 	dependencies := static.GetRunnerDependencies()
 	err := InstallDependencies(dependencies.PythonRequirements)
 	if err != nil {
-		log.Error("failed to update python dependencies: %v", err)
+		log.Error("failed to install python dependencies: %v", err)
+		return nil
 	}
 	log.Info("python dependencies updated")
 	return python_dependencies.ListDependencies()
