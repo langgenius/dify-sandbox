@@ -21,11 +21,11 @@ func run(allowed_syscalls []int) {
 		nums = append(nums, strconv.Itoa(syscall))
 	}
 	os.Setenv("ALLOWED_SYSCALLS", strings.Join(nums, ","))
-	p, err := exec.Command("python3", "cmd/test/fuzz_python/test.py").Output()
+	_, err := exec.Command("python3", "cmd/test/fuzz_python/test.py").Output()
 	if err == nil {
-		fmt.Println(string(p))
+		//fmt.Println(string(p))
 	} else {
-		fmt.Println("failed")
+		fmt.Println(err)
 	}
 }
 
@@ -52,11 +52,11 @@ func main() {
 			list[i] = append(list[i], i)
 		}
 
-		// for j := 499; j < 500; j++ {
-		// 	if find_syscall(j, list[i]) == -1 {
-		// 		list[i] = append(list[i], j)
-		// 	}
-		// }
+		for j := 49; j < 50; j++ {
+			if find_syscall(j, list[i]) == -1 {
+				list[i] = append(list[i], j)
+			}
+		}
 
 		// for j := 293; j < 294; j++ {
 		// 	if find_syscall(j, list[i]) == -1 {
