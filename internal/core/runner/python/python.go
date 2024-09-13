@@ -43,6 +43,10 @@ func (p *PythonRunner) Run(
 	// capture the output
 	output_handler := runner.NewOutputCaptureRunner()
 	output_handler.SetTimeout(timeout)
+	output_handler.SetAfterExitHook(func() {
+		// remove untrusted code
+		os.Remove(untrusted_code_path)
+	})
 
 	// create a new process
 	cmd := exec.Command(
