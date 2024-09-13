@@ -41,6 +41,7 @@ var ALLOW_SYSCALLS = []int{
 var ALLOW_ERROR_SYSCALLS = []int{
 	syscall.SYS_CLONE,
 	syscall.SYS_MKDIRAT,
+	syscall.SYS_MKDIR,
 }
 
 var ALLOW_NETWORK_SYSCALLS = []int{
