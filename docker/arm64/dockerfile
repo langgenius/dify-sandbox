@@ -4,7 +4,7 @@ FROM python:3.10-slim-bookworm
 # && echo "deb http://mirrors.aliyun.com/debian testing main" > /etc/apt/sources.list
 RUN echo "deb http://deb.debian.org/debian testing main" > /etc/apt/sources.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends
+    && apt-get install -y --no-install-recommends \
        pkg-config \
        libseccomp-dev \
        wget \
@@ -14,7 +14,7 @@ RUN echo "deb http://deb.debian.org/debian testing main" > /etc/apt/sources.list
        expat=2.6.3-1 \
        perl=5.38.2-5 \
        libsqlite3-0=3.46.0-1 \
-    && apt-get clean
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # copy main binary to /main
