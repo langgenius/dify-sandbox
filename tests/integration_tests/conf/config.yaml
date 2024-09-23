@@ -1,12 +1,12 @@
 app:
-  port: 8194
-  debug: True
-  key: dify-sandbox
-max_workers: 4
-max_requests: 50
-worker_timeout: 30
-python_path: /usr/local/bin/python3
-python_lib_path:
+  port: 8194 # Application port
+  debug: True # Debug mode
+  key: dify-sandbox # Application key
+max_workers: 4 # Maximum number of worker threads
+max_requests: 50 # Maximum number of requests
+worker_timeout: 30 # Worker thread timeout
+python_path: /usr/local/bin/python3 # Python path
+python_lib_path: # Python library path
   - "/usr/local/lib/python3.10"
   - "/usr/lib/python3.10"
   - "/usr/lib/python3"
@@ -23,9 +23,31 @@ python_lib_path:
   - "/etc/localtime"
   - "/usr/share/zoneinfo"
   - "/etc/timezone"
-enable_network: True # please make sure there is no network risk in your environment
-allowed_syscalls: # please leave it empty if you have no idea how seccomp works
+enable_network: True # Please ensure there are no network risks in your environment
+allowed_syscalls: # If you do not understand how seccomp works, please leave it empty, this will allow all syscalls
+  # - 0  # __NR_read: Read file
+  # - 1  # __NR_write: Write file
+  # - 2  # __NR_open: Open file
+  # - 3  # __NR_close: Close file
+  # - 4  # __NR_stat: Get file status
+  # - 5  # __NR_fstat: Get file status (file descriptor)
+  # - 6  # __NR_lstat: Get file status (symbolic link)
+  # - 7  # __NR_poll: Poll I/O events
+  # - 8  # __NR_lseek: Move file pointer
+  # - 9  # __NR_mmap: Memory mapping
+  # - 10 # __NR_mprotect: Set memory protection
+  # - 11 # __NR_munmap: Unmap memory
+  # - 12 # __NR_brk: Adjust data segment size
+  # - 13 # __NR_rt_sigaction: Set signal handler
+  # - 14 # __NR_rt_sigprocmask: Check and modify signal mask
+  # - 15 # __NR_rt_sigreturn: Return from signal handler
+  # - 16 # __NR_ioctl: I/O control operation
+  # - 17 # __NR_pread64: Read from file offset
+  # - 18 # __NR_pwrite64: Write to file offset
+  # - 19 # __NR_readv: Read multiple buffers
+  # - 20 # __NR_writev: Write multiple buffers
+  # Use this at your own RISK, fail to allow some of the calls can make sandbox unfunctional
 proxy:
-  socks5: ''
-  http: ''
-  https: ''
+  socks5: '' # SOCKS5 proxy
+  http: '' # HTTP proxy
+  https: '' # HTTPS proxy
