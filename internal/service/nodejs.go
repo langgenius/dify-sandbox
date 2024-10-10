@@ -13,9 +13,11 @@ func RunNodeJsCode(code string, preload string, options *runner_types.RunnerOpti
 	if err := checkOptions(options); err != nil {
 		return types.ErrorResponse(-400, err.Error())
 	}
+	
 	if !static.GetDifySandboxGlobalConfigurations().EnablePreload {
 	    preload = ""
 	}
+	
 	timeout := time.Duration(
 		static.GetDifySandboxGlobalConfigurations().WorkerTimeout * int(time.Second),
 	)
