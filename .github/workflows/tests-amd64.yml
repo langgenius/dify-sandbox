@@ -52,7 +52,7 @@ jobs:
         run: sudo ln -sf "$(which python3.10)" /usr/local/bin/python3
 
       - name: Install Python dependencies
-        run: pip install httpx requests jinja2
+        run: pip install httpx==0.27.2 requests==2.32.3 jinja2==3.0.3
 
       - name: Run Intgeration tests
         run: sudo go test -timeout 120s -v ./tests/integration_tests/...

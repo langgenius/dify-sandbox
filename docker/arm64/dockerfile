@@ -28,7 +28,7 @@ COPY conf/config.yaml /conf/config.yaml
 COPY dependencies/python-requirements.txt /dependencies/python-requirements.txt
 
 RUN chmod +x /main /env \
-    && pip3 install --no-cache-dir jinja2 requests httpx PySocks httpx[socks] \
+    && pip3 install --no-cache-dir httpx==0.27.2 requests==2.32.3 jinja2==3.0.3 PySocks httpx[socks] \
     && wget -O /opt/node-v20.11.1-linux-arm64.tar.xz https://npmmirror.com/mirrors/node/v20.11.1/node-v20.11.1-linux-arm64.tar.xz \
     && tar -xvf /opt/node-v20.11.1-linux-arm64.tar.xz -C /opt \
     && ln -s /opt/node-v20.11.1-linux-arm64/bin/node /usr/local/bin/node \
