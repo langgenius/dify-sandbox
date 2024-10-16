@@ -51,6 +51,9 @@ jobs:
       - name: Link Python3.10
         run: sudo ln -sf "$(which python3.10)" /usr/local/bin/python3
 
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+
       - name: Install Python dependencies
         run: pip install httpx requests jinja2
 
