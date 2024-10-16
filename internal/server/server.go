@@ -59,9 +59,15 @@ func initDependencies() {
 	}
 	log.Info("python dependencies sandbox initialized")
 
-	// start a ticker to update python dependencies every 30 minutes to keep the sandbox up-to-date
+	// start a ticker to update python dependencies to keep the sandbox up-to-date
 	go func() {
-		ticker := time.NewTicker(30 * time.Minute)
+		updateInterval := static.GetDifySandboxGlobalConfigurations().PythonDepsUpdateInterval
+		tickerDuration, err := time.ParseDuration(updateInterval)
+		if err != nil {
+			log.Error("failed to parse python dependencies update interval, skip periodic updates: %v", err)
+			return
+		}
+		ticker := time.NewTicker(tickerDuration)
 		for range ticker.C {
 			if err:=updatePythonDependencies(dependencies);err!=nil{
 				log.Error("Failed to update Python dependencies: %v", err)

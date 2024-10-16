@@ -15,7 +15,7 @@ type DifySandboxGlobalConfigurations struct {
 	PythonDepsUpdateInterval string   `yaml:"python_deps_update_interval"`
 	NodejsPath               string   `yaml:"nodejs_path"`
 	EnableNetwork            bool     `yaml:"enable_network"`
-	EnablePreload      	     bool     `yaml:"enable_preload"`
+	EnablePreload            bool     `yaml:"enable_preload"`
 	AllowedSyscalls          []int    `yaml:"allowed_syscalls"`
 	Proxy                    struct {
 		Socks5 string `yaml:"socks5"`
