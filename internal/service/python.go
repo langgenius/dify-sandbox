@@ -19,6 +19,10 @@ func RunPython3Code(code string, preload string, options *runner_types.RunnerOpt
 		return types.ErrorResponse(-400, err.Error())
 	}
 
+	if !static.GetDifySandboxGlobalConfigurations().EnablePreload {
+	    preload = ""
+	}
+	
 	timeout := time.Duration(
 		static.GetDifySandboxGlobalConfigurations().WorkerTimeout * int(time.Second),
 	)

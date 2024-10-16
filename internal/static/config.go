@@ -107,6 +107,11 @@ func InitConfig(path string) error {
 		difySandboxGlobalConfigurations.EnableNetwork, _ = strconv.ParseBool(enable_network)
 	}
 
+	enable_preload := os.Getenv("ENABLE_PRELOAD")
+	if enable_preload != "" {
+		difySandboxGlobalConfigurations.EnablePreload, _ = strconv.ParseBool(enable_preload)
+	}
+
 	allowed_syscalls := os.Getenv("ALLOWED_SYSCALLS")
 	if allowed_syscalls != "" {
 		strs := strings.Split(allowed_syscalls, ",")
