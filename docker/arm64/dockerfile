@@ -4,7 +4,7 @@ FROM python:3.10-slim-bookworm
 # && echo "deb http://mirrors.aliyun.com/debian testing main" > /etc/apt/sources.list
 RUN echo "deb http://deb.debian.org/debian testing main" > /etc/apt/sources.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends
+    && apt-get install -y --no-install-recommends \
        pkg-config \
        libseccomp-dev \
        wget \
@@ -14,7 +14,7 @@ RUN echo "deb http://deb.debian.org/debian testing main" > /etc/apt/sources.list
        expat=2.6.3-1 \
        perl=5.38.2-5 \
        libsqlite3-0=3.46.0-1 \
-    && apt-get clean
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # copy main binary to /main
@@ -28,7 +28,7 @@ COPY conf/config.yaml /conf/config.yaml
 COPY dependencies/python-requirements.txt /dependencies/python-requirements.txt
 
 RUN chmod +x /main /env \
-    && pip3 install --no-cache-dir jinja2 requests httpx PySocks httpx[socks] \
+    && pip3 install --no-cache-dir httpx==0.27.2 requests==2.32.3 jinja2==3.0.3 PySocks httpx[socks] \
     && wget -O /opt/node-v20.11.1-linux-arm64.tar.xz https://npmmirror.com/mirrors/node/v20.11.1/node-v20.11.1-linux-arm64.tar.xz \
     && tar -xvf /opt/node-v20.11.1-linux-arm64.tar.xz -C /opt \
     && ln -s /opt/node-v20.11.1-linux-arm64/bin/node /usr/local/bin/node \
