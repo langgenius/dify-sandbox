@@ -54,5 +54,8 @@ jobs:
       - name: Install Python dependencies
         run: pip install httpx==0.27.2 requests==2.32.3 jinja2==3.0.3
 
+      - name: Debug
+      - uses: mxschmitt/action-tmate@v3
+
       - name: Run Intgeration tests
         run: sudo go test -timeout 120s -v ./tests/integration_tests/...
