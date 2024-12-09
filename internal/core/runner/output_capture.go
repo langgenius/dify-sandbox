@@ -1,3 +1,4 @@
+
 package runner
 
 import (
@@ -55,8 +56,11 @@ func (s *OutputCaptureRunner) CaptureOutput(cmd *exec.Cmd) error {
 	if timeout == 0 {
 		timeout = 5 * time.Second
 	}
+	wgTimer := sync.WaitGroup{}
+	wgTimer.Add(1)
 
 	timer := time.AfterFunc(timeout, func() {
+		defer wgTimer.Done()
 		if cmd != nil && cmd.Process != nil {
 			// write the error
 			s.WriteError([]byte("error: timeout\n"))
@@ -154,7 +158,10 @@ func (s *OutputCaptureRunner) CaptureOutput(cmd *exec.Cmd) error {
 		}
 
 		// stop the timer
-		timer.Stop()
+		if !timer.Stop(){
+			// timer already triggered
+			wgTimer.Wait()
+		}
 
 		s.done <- true
 	}()
