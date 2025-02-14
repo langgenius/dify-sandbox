@@ -29,9 +29,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Login to AliyunDocker Hub
-        run: docker login -u $ALIYUN_REGISTRY_USER -p $ALIYUN_REGISTRY_PASSWORD $ALIYUN_REGISTRY
-
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -45,6 +42,9 @@ jobs:
 
       - name: Install System Dependencies
         run: sudo apt-get install -y pkg-config gcc libseccomp-dev
+
+      - name: Login to AliyunDocker Hub
+        run: echo $ALIYUN_REGISTRY_PASSWORD  | docker login -u $ALIYUN_REGISTRY_USER -p $ALIYUN_REGISTRY --password-stdin
 
       - name: Set up Go
         uses: actions/setup-go@v4
