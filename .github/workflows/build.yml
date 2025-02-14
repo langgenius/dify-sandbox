@@ -56,7 +56,7 @@ jobs:
 
       - name: Run Build Docker Image
         run:
-          docker login -u $ALIYUN_REGISTRY_USER -p $ALIYUN_REGISTRY_PASSWORD $ALIYUN_REGISTRY && \
+          docker login -u ${{ secrets.ALIYUN_REGISTRY_USER }} -p ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}  ${{ secrets.ALIYUN_REGISTRY }} && \
           docker build -t dify-sandbox -f ./docker/${{ inputs.arch }}/dockerfile .
 
       - name: Tag Docker Images
