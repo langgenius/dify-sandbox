@@ -56,11 +56,11 @@ jobs:
 
       - name: Run Build Docker Image
         run:
-          docker login -u $ALIYUN_REGISTRY_USER -p $ALIYUN_REGISTRY_PASSWORD $ALIYUN_REGISTRY --password-stdin
+          docker login -u $ALIYUN_REGISTRY_USER -p $ALIYUN_REGISTRY_PASSWORD $ALIYUN_REGISTRY --password-stdin && \
           docker build -t dify-sandbox -f ./docker/${{ inputs.arch }}/dockerfile .
 
       - name: Tag Docker Images
-        run: 
+        run:
           for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n');
           do
             docker tag dify-sandbox "$tag-${{ inputs.arch }}";
