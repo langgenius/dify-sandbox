@@ -43,9 +43,6 @@ jobs:
       - name: Install System Dependencies
         run: sudo apt-get install -y pkg-config gcc libseccomp-dev
 
-      - name: Login to AliyunDocker Hub
-        run: echo $ALIYUN_REGISTRY_PASSWORD  | docker login -u $ALIYUN_REGISTRY_USER -p $ALIYUN_REGISTRY --password-stdin
-
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -58,7 +55,9 @@ jobs:
         run: bash ./build/build_${{ inputs.arch }}.sh
 
       - name: Run Build Docker Image
-        run: docker build -t dify-sandbox -f ./docker/${{ inputs.arch }}/dockerfile .
+        run:
+          docker login -u $ALIYUN_REGISTRY_USER -p $ALIYUN_REGISTRY_PASSWORD $ALIYUN_REGISTRY --password-stdin
+          docker build -t dify-sandbox -f ./docker/${{ inputs.arch }}/dockerfile .
 
       - name: Tag Docker Images
         run: 
