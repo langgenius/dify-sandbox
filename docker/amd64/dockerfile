@@ -2,7 +2,7 @@ FROM python:3.10-slim-bookworm
 
 # if you located in China, you can use aliyun mirror to speed up
 # && echo "deb http://mirrors.aliyun.com/debian testing main" > /etc/apt/sources.list
-RUN echo "deb http://deb.debian.org/debian testing main" > /etc/apt/sources.list \
+RUN echo "deb http://mirrors.aliyun.com/debian testing main" > /etc/apt/sources.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
        pkg-config \
