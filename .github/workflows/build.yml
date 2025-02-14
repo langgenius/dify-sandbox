@@ -13,9 +13,11 @@ on:
         required: true
         type: string
     secrets:
-      DOCKERHUB_USER:
+      ALIYUN_REGISTRY_USER:
         required: true
-      DOCKERHUB_TOKEN:
+      ALIYUN_REGISTRY_PASSWORD:
+        required: true
+      ALIYUN_REGISTRY:
         required: true
 
 jobs:
@@ -27,11 +29,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USER }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to AliyunDocker Hub
+        run: docker login -u $ALIYUN_REGISTRY_USER -p $ALIYUN_REGISTRY_PASSWORD $ALIYUN_REGISTRY
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
