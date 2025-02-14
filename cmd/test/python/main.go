@@ -12,7 +12,7 @@ import (
 func main() {
 	static.InitConfig("conf/config.yaml")
 	python.PreparePythonDependenciesEnv()
-	resp := service.RunPython3Code(`import json;print(json.dumps({"hello": "world"}))`,
+	resp := service.RunPython3Code(`import oss2;import json;print(json.dumps({"hello": "world"}))`,
 		``,
 		&types.RunnerOptions{
 			EnableNetwork: true,
