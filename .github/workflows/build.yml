@@ -55,7 +55,7 @@ jobs:
         run: bash ./build/build_${{ inputs.arch }}.sh
 
       - name: Run Build Docker Image
-        run:
+        run : |
           docker login -u ${{ secrets.ALIYUN_REGISTRY_USER }} -p ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}  ${{ secrets.ALIYUN_REGISTRY }} && \
           docker build -t dify-sandbox -f ./docker/${{ inputs.arch }}/dockerfile .
 
