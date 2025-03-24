@@ -45,8 +45,9 @@ function Builder(config = {}) {
     app_dir = app_dir.replace(/\\/g, '/');
     project_dir = project_dir.replace(/\\/g, '/');
     if (package_dir == null)
-        package_dir = project_dir;
-    package_dir = package_dir.replace(/\\/g, '/');
+        package_dir = find_parent_directory(project_dir, 'package.json');
+    if (package_dir != null)
+        package_dir = package_dir.replace(/\\/g, '/');
 
     let runtime_version = config.runtime_version;
     let arch = config.arch;
@@ -64,27 +65,29 @@ function Builder(config = {}) {
     if (arch == null)
         arch = tools.determine_arch();
 
+    let options = null;
+
     let cache_dir = get_cache_directory();
     let build_dir = config.build_dir;
     let work_dir = null;
 
     if (build_dir == null) {
-        let pkg = read_package_json();
+        let options = read_cnoke_options();
 
-        if (pkg.cnoke.output != null) {
-            build_dir = expand_path(pkg.cnoke.output);
-
-            if (!tools.path_is_absolute(build_dir))
-                build_dir = package_dir + '/' + build_dir;
+        if (options.output != null) {
+            build_dir = expand_path(options.output, options.directory);
         } else {
             build_dir = project_dir + '/build';
         }
     }
+    build_dir = build_dir.replace(/\\/g, '/');
     work_dir = build_dir + `/v${runtime_version}_${arch}`;
 
     let cmake_bin = null;
 
     this.configure = async function(retry = true) {
+        let options = read_cnoke_options();
+
         let args = [project_dir];
 
         check_cmake();
@@ -94,55 +97,60 @@ function Builder(config = {}) {
         console.log(`>> Target: ${process.platform}_${arch}`);
 
         // Prepare build directory
-        fs.mkdirSync(cache_dir, { recursive: true, mode: 0o755 });
         fs.mkdirSync(build_dir, { recursive: true, mode: 0o755 });
         fs.mkdirSync(work_dir, { recursive: true, mode: 0o755 });
 
         retry &= fs.existsSync(work_dir + '/CMakeCache.txt');
 
-        // Download Node headers
-        {
-            let basename = `node-v${runtime_version}-headers.tar.gz`;
-            let urls = [
-                `https://nodejs.org/dist/v${runtime_version}/${basename}`,
-                // `https://unofficial-builds.nodejs.org/download/release/v${runtime_version}/${basename}`
-            ];
-            let destname = `${cache_dir}/${basename}`;
-
-            if (!fs.existsSync(destname))
-                await tools.download_http(urls, destname);
-            await tools.extract_targz(destname, work_dir + '/headers', 1);
-        }
-
-        // Download Node import library (Windows)
-        if (process.platform === 'win32') {
-            let dirname;
-            switch (arch) {
-                case 'ia32': { dirname = 'win-x86'; } break;
-                case 'x64': { dirname = 'win-x64'; } break;
-                case 'arm64': { dirname = 'win-arm64'; } break;
-
-                default: {
-                    throw new Error(`Unsupported architecture '${arch}' for Node on Windows`);
-                } break;
-            }
-
-            let destname = `${cache_dir}/node_v${runtime_version}_${arch}.lib`;
+        // Download or use Node headers
+        if (options.api == null) {
+            let destname = `${cache_dir}/node-v${runtime_version}-headers.tar.gz`;
 
             if (!fs.existsSync(destname)) {
-                let urls = [
-                    `https://nodejs.org/dist/v${runtime_version}/${dirname}/node.lib`,
-                    // `https://unofficial-builds.nodejs.org/download/release/v${runtime_version}/${dirname}/node.lib`
-                ];
-                await tools.download_http(urls, destname);
+                fs.mkdirSync(cache_dir, { recursive: true, mode: 0o755 });
+
+                let url = `https://nodejs.org/dist/v${runtime_version}/node-v${runtime_version}-headers.tar.gz`;
+                await tools.download_http(url, destname);
             }
 
-            fs.copyFileSync(destname, work_dir + '/node.lib');
+            await tools.extract_targz(destname, work_dir + '/headers', 1);
+
+            args.push(`-DNODE_JS_INCLUDE_DIRS=${work_dir}/headers/include/node`);
+        } else {
+            console.log(`>> Using local node-api headers`);
+            args.push(`-DNODE_JS_INCLUDE_DIRS=${options.api}/include`);
+        }
+
+        // Download or create Node import library (Windows)
+        if (process.platform == 'win32') {
+            if (options.api == null) {
+                let dirname;
+                switch (arch) {
+                    case 'ia32': { dirname = 'win-x86'; } break;
+                    case 'x64': { dirname = 'win-x64'; } break;
+                    case 'arm64': { dirname = 'win-arm64'; } break;
+
+                    default: {
+                        throw new Error(`Unsupported architecture '${arch}' for Node on Windows`);
+                    } break;
+                }
+
+                let destname = `${cache_dir}/node_v${runtime_version}_${arch}.lib`;
+
+                if (!fs.existsSync(destname)) {
+                    fs.mkdirSync(cache_dir, { recursive: true, mode: 0o755 });
+
+                    let url = `https://nodejs.org/dist/v${runtime_version}/${dirname}/node.lib`;
+                    await tools.download_http(url, destname);
+                }
+
+                fs.copyFileSync(destname, work_dir + '/node.lib');
+            } else {
+                args.push(`-DNODE_JS_LINK_DEF=${options.api}/def/node_api.def`);
+            }
         }
 
         args.push(`-DCMAKE_MODULE_PATH=${app_dir}/assets`);
-
-        args.push(`-DNODE_JS_INCLUDE_DIRS=${work_dir}/headers/include/node`);
 
         // Set platform flags
         switch (process.platform) {
@@ -150,7 +158,7 @@ function Builder(config = {}) {
                 fs.copyFileSync(`${app_dir}/assets/win_delay_hook.c`, work_dir + '/win_delay_hook.c');
 
                 args.push(`-DNODE_JS_SOURCES=${work_dir}/win_delay_hook.c`);
-                args.push(`-DNODE_JS_LIBRARIES=${work_dir}/node.lib`);
+                args.push(`-DNODE_JS_LINK_LIB=${work_dir}/node.lib`);
 
                 switch (arch) {
                     case 'ia32': {
@@ -256,56 +264,27 @@ function Builder(config = {}) {
     };
 
     async function check_prebuild() {
-        let pkg = read_package_json();
+        let options = read_cnoke_options();
 
-        if (pkg.cnoke.prebuild != null) {
+        if (options.prebuild != null) {
             fs.mkdirSync(build_dir, { recursive: true, mode: 0o755 });
 
-            let url = expand_path(pkg.cnoke.prebuild);
-            let basename = path.basename(url);
+            let archive_filename = expand_path(options.prebuild, options.directory);
 
-            try {
-                let archive_filename = null;
-
-                if (url.startsWith('file:/')) {
-                    if (url.startsWith('file://localhost/')) {
-                        url = url.substr(16);
-                    } else {
-                        let offset = 6;
-                        while (offset < 9 && url[offset] == '/')
-                            offset++;
-                        url = url.substr(offset - 1);
-                    }
-
-                    if (process.platform == 'win32' && url.match(/^\/[a-zA-Z]+:[\\\/]/))
-                        url = url.substr(1);
+            if (fs.existsSync(archive_filename)) {
+                try {
+                    console.log('>> Extracting prebuilt binaries...');
+                    await tools.extract_targz(archive_filename, build_dir, 1);
+                } catch (err) {
+                    console.error('Failed to find prebuilt binary for your platform, building manually');
                 }
-
-                if (url.match(/^[a-z]+:\/\//)) {
-                    archive_filename = build_dir + '/' + basename;
-                    await tools.download_http(url, archive_filename);
-                } else {
-                    archive_filename = url;
-
-                    if (!tools.path_is_absolute(archive_filename))
-                        archive_filename = path.join(package_dir, archive_filename);
-
-                    if (!fs.existsSync(archive_filename))
-                        throw new Error('Cannot find local prebuilt archive');
-                }
-
-                console.log('>> Extracting prebuilt binaries...');
-                await tools.extract_targz(archive_filename, build_dir, 1);
-            } catch (err) {
-                console.error('Failed to find prebuilt binary for your platform, building manually');
+            } else {
+                console.error('Cannot find local prebuilt archive');
             }
         }
 
-        if (pkg.cnoke.require != null) {
-            let require_filename = expand_path(pkg.cnoke.require);
-
-            if (!tools.path_is_absolute(require_filename))
-                require_filename = path.join(package_dir, require_filename);
+        if (options.require != null) {
+            let require_filename = expand_path(options.require, options.directory);
 
             if (fs.existsSync(require_filename)) {
                 let proc = spawnSync(process.execPath, ['-e', 'require(process.argv[1])', require_filename]);
@@ -403,47 +382,72 @@ function Builder(config = {}) {
     }
 
     function check_compatibility() {
-        let pkg = read_package_json();
+        let options = read_cnoke_options();
 
-        if (pkg.cnoke.node != null && tools.cmp_version(runtime_version, pkg.cnoke.node) < 0)
-            throw new Error(`Project ${pkg.name} requires Node.js >= ${pkg.cnoke.node}`);
+        if (options.node != null && tools.cmp_version(runtime_version, options.node) < 0)
+            throw new Error(`Project ${options.name} requires Node.js >= ${options.node}`);
 
-        if (pkg.cnoke.napi != null) {
+        if (options.napi != null) {
             let major = parseInt(runtime_version, 10);
-            let required = tools.get_napi_version(pkg.cnoke.napi, major);
+            let required = tools.get_napi_version(options.napi, major);
 
             if (required == null)
-                throw new Error(`Project ${pkg.name} does not support the Node ${major}.x branch (old or missing N-API)`);
+                throw new Error(`Project ${options.name} does not support the Node ${major}.x branch (old or missing N-API)`);
             if (tools.cmp_version(runtime_version, required) < 0)
-                throw new Error(`Project ${pkg.name} requires Node >= ${required} in the Node ${major}.x branch (with N-API >= ${pkg.engines.napi})`);
+                throw new Error(`Project ${options.name} requires Node >= ${required} in the Node ${major}.x branch (with N-API >= ${options.napi})`);
         }
     }
 
-    function read_package_json() {
-        let pkg = {};
+    function read_cnoke_options() {
+        if (options != null)
+            return options;
+
+        let directory = project_dir;
+        let pkg = null;
+        let cnoke = null;
 
         if (package_dir != null) {
             try {
                 let json = fs.readFileSync(package_dir + '/package.json', { encoding: 'utf-8' });
+
                 pkg = JSON.parse(json);
+                directory = package_dir;
             } catch (err) {
                 if (err.code != 'ENOENT')
                     throw err;
             }
         }
 
-        if (pkg.cnoke == null)
-            pkg.cnoke = {};
+        try {
+            let json = fs.readFileSync(project_dir + '/CNoke.json', { encoding: 'utf-8' });
 
-        return pkg;
+            cnoke = JSON.parse(json);
+            directory = project_dir;
+        } catch (err) {
+            if (err.code != 'ENOENT')
+                throw err;
+        }
+
+        if (cnoke == null)
+            cnoke = pkg?.cnoke ?? {};
+
+        options = {
+            name: pkg?.name ?? path.basename(project_dir),
+            version: pkg?.version ?? null,
+
+            directory: directory,
+            ...cnoke
+        };
+
+        return options;
     }
 
-    function expand_path(str) {
-        let ret = str.replace(/{{ *([a-zA-Z_][a-zA-Z_0-9]*) *}}/g, (match, p1) => {
+    function expand_path(str, root_dir) {
+        let expanded = str.replace(/{{ *([a-zA-Z_][a-zA-Z_0-9]*) *}}/g, (match, p1) => {
             switch (p1) {
                 case 'version': {
-                    let pkg = read_package_json();
-                    return pkg.version || '';
+                    let options = read_cnoke_options();
+                    return options.version || '';
                 } break;
                 case 'platform': return process.platform;
                 case 'arch': return arch;
@@ -452,7 +456,10 @@ function Builder(config = {}) {
             }
         });
 
-        return ret;
+        if (!tools.path_is_absolute(expanded))
+            expanded = path.join(root_dir, expanded);
+
+        return expanded;
     }
 }
 

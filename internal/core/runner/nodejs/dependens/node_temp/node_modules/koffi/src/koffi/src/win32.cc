@@ -74,8 +74,10 @@ HANDLE LoadWindowsLibrary(Napi::Env env, Span<const char> path)
 
     Span<wchar_t> filename_w = AllocateSpan<wchar_t>(&temp_alloc, path.len + 1);
 
-    if (ConvertUtf8ToWin32Wide(path, filename_w) < 0)
+    if (ConvertUtf8ToWin32Wide(path, filename_w) < 0) {
+        ThrowError<Napi::Error>(env, "Invalid path string");
         return nullptr;
+    }
 
     HMODULE module = LoadLibraryW(filename_w.ptr);
 
@@ -85,8 +87,10 @@ HANDLE LoadWindowsLibrary(Napi::Env env, Span<const char> path)
         Span<const char> filename = NormalizePath(path, GetWorkingDirectory(), &temp_alloc);
         Span<wchar_t> filename_w = AllocateSpan<wchar_t>(&temp_alloc, filename.len + 1);
 
-        if (ConvertUtf8ToWin32Wide(filename, filename_w) < 0)
+        if (ConvertUtf8ToWin32Wide(filename, filename_w) < 0) {
+            ThrowError<Napi::Error>(env, "Invalid path string");
             return nullptr;
+        }
 
         module = LoadLibraryExW(filename_w.ptr, nullptr, flags);
     }

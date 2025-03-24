@@ -29,6 +29,12 @@ You can consult the [changelog](https://koffi.dev/changelog) on the official web
 
 Major version increments can include breaking API changes, use the [migration guide](https://koffi.dev/changelog#migration-guide) for more information.
 
+# Build manually
+
+Koffi is built with a custom CMake-wrapper called CNoke, which also lives in this repository. Don't try to run CMake manually because it will fail.
+
+Follow the [documented build instructions](https://koffi.dev/contribute#build-from-source) to build Koffi from source.
+
 # License
 
 This program is free software: you can redistribute it and/or modify it under the terms of the **MIT License**.

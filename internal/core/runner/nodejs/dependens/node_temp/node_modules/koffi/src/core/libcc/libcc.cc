@@ -1935,7 +1935,7 @@ bool GetDebugFlag(const char *name)
 #ifndef NDEBUG
 const char *DebugLogContext(const char *filename, int line)
 {
-    static RG_THREAD_LOCAL LocalArray<char, 1024> buf;
+    static thread_local LocalArray<char, 1024> buf;
 
     buf.len = Fmt(buf.data, "  [%1:%2] ", filename, line).len;
 

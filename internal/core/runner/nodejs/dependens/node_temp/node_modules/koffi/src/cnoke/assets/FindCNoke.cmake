@@ -26,9 +26,17 @@ else()
     set(USE_UNITY_BUILDS OFF CACHE BOOL "Use single-TU builds (aka. Unity builds)")
 endif()
 
+if(NODE_JS_LINK_DEF)
+    add_custom_command(OUTPUT ${NODE_JS_LINK_LIB}
+                       COMMAND ${CMAKE_AR} ${CMAKE_STATIC_LINKER_FLAGS}
+                               /def:${NODE_JS_LINK_DEF} /out:${NODE_JS_LINK_LIB}
+                       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                       MAIN_DEPENDENCY ${NODE_JS_LINK_DEF})
+    add_custom_target(node.lib DEPENDS ${NODE_JS_LINK_LIB})
+endif()
+
 function(add_node_addon)
     cmake_parse_arguments(ARG "" "NAME" "SOURCES" ${ARGN})
-
     add_library(${ARG_NAME} SHARED ${ARG_SOURCES} ${NODE_JS_SOURCES})
     target_link_node(${ARG_NAME})
     set_target_properties(${ARG_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
@@ -36,9 +44,14 @@ endfunction()
 
 function(target_link_node TARGET)
     target_include_directories(${TARGET} PRIVATE ${NODE_JS_INCLUDE_DIRS})
-    target_link_libraries(${TARGET} PRIVATE ${NODE_JS_LIBRARIES})
+    if(NODE_JS_LINK_LIB)
+        if(TARGET node.lib)
+            add_dependencies(${TARGET} node.lib)
+        endif()
+        target_link_libraries(${TARGET} PRIVATE ${NODE_JS_LINK_LIB})
+    endif()
     target_compile_options(${TARGET} PRIVATE ${NODE_JS_COMPILE_FLAGS})
-    if (NODE_JS_LINK_FLAGS)
+    if(NODE_JS_LINK_FLAGS)
         target_link_options(${TARGET} PRIVATE ${NODE_JS_LINK_FLAGS})
     endif()
 endfunction()
