@@ -2,6 +2,7 @@ package nodejs
 
 import (
 	_ "embed"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -105,7 +106,11 @@ func (p *NodeJsRunner) InitializeEnvironment(code string, preload string, root_p
 	}
 
 	// join nodejs_sandbox_fs and code
-	code = node_sandbox_file + code
+	// encode code with base64
+	code = base64.StdEncoding.EncodeToString([]byte(code))
+	// FIXE: redeclared function causes code injection
+	evalCode := fmt.Sprintf("eval(Buffer.from('%s', 'base64').toString('utf-8'))", code)
+	code = node_sandbox_file + evalCode
 
 	// override root_path/tmp/sandbox-nodejs-project/prescript.js
 	script_path := path.Join(root_path, LIB_PATH, PROJECT_NAME, "node_temp/node_temp/test.js")
