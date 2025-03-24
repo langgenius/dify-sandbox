@@ -1,4 +1,4 @@
-FROM golang:1.20.6 AS builder
+FROM golang:1.24.0 AS builder
 
 COPY . /app
 WORKDIR /app
@@ -54,11 +54,11 @@ RUN wget -O /opt/node-v20.11.1-linux-x64.tar.xz https://npmmirror.com/mirrors/no
     && ln -s /opt/node-v20.11.1-linux-x64/bin/node /usr/local/bin/node \
     && rm -f /opt/node-v20.11.1-linux-x64.tar.xz
 
-# install golang 1.20.6
-RUN wget https://golang.org/dl/go1.20.6.linux-amd64.tar.gz \
-    && tar -C /usr/local -xzf go1.20.6.linux-amd64.tar.gz \
+# install golang 1.24.0
+RUN wget https://golang.org/dl/go1.24.0.linux-amd64.tar.gz \
+    && tar -C /usr/local -xzf go1.24.0.linux-amd64.tar.gz \
     && ln -s /usr/local/go/bin/go /usr/local/bin/go \
-    && rm -f go1.20.6.linux-amd64.tar.gz
+    && rm -f go1.24.0.linux-amd64.tar.gz
 
 # run test
 RUN go test -timeout 120s -v ./tests/integration_tests/...
