@@ -55,7 +55,8 @@ console.log(main());
 		t.Error(resp)
 	}
 
-	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "operation not permitted") {
-		t.Error(resp.Data.(*service.RunCodeResponse).Stderr)
+	// parseInt should not be executed as it has been fixed
+	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, "result: undefined") {
+		t.Error(resp.Data.(*service.RunCodeResponse).Stdout)
 	}
 }
