@@ -58,6 +58,8 @@ To quickly identify the system calls your Python code depends on, here is the re
 
 2. Run `go run cmd/test/syscall_dig/main.go`, the output will like this:
 ```shell
+~/dify-sandbox$ # make sure you already build this project, there should be a file `internal/core/runner/python/python.so`
+~/dify-sandbox$ mkdir -p /var/sandbox/sandbox-python && cp internal/core/runner/python/python.so /var/sandbox/sandbox-python/
 ~/dify-sandbox$ go run cmd/test/syscall_dig/main.go
 failed with signal: bad system call
 ...
@@ -65,6 +67,32 @@ failed with signal: bad system call
 Following syscalls are required: 0,1,3,5,8,9,10,11,12,13,14,15,16,17,24,28,35,39,60,63,105,106,131,186,202,204,217,231,233,234,237,257,262,273,281,291,318,334,435
 ```
 If you haven't got output like this format, maybe it's your permission problem, try run it with `sudo` again.
+
+Incase you get an output saying **Failed to get the needed syscalls**, here is another way you may try:
+```shell
+# install the `strace` command by yourself
+strace -c python cmd/test/syscall_dig/test.py
+```
+Make sure the Python script runs successfully. Then copy the output of the `strace` command. It looks like the following format:
+```
+% time     seconds  usecs/call     calls    errors syscall 
+------ ----------- ----------- --------- --------- ---------------- 
+26.37    0.023713          11      2010       216 stat 
+14.65    0.013177          13       996           read 
+10.42    0.009376           8      1076           fstat
+...           ...         ...       ...             ...
+------ ----------- ----------- --------- --------- ---------------- 
+100.00    0.089940                  8002       690 total 
+```
+Also copy the `ALLOW_SYSCALLS` variable in the `internal/static/python_syscall/syscalls_amd64.go` file. Feed these copies into LLM (such as gpt-4o, gemini-2.0-flash, etc.). Let the LLM help you decide how to edit the `ALLOW_SYSCALLS` variable.
+A prompt example:
+```
+Here is the output of `strace -c` which show all the system calls during execution:
+${strace_output}
+
+Edit the following `ALLOW_SYSCALLS` variable, Add all the above system calls to this variable. Note that do not remove the existing values in it. Only add new ones at the end.
+var ALLOW_SYSCALLS = ${ALLOW_SYSCALLS_LIST}
+```
 
 3. These syscalls is the sandbox already added: `0,1,3,8,9,10,11,12,13,14,15,16,16,24,25,35,39,60,96,102,105,106,110,131,186,201,202,217,228,230,231,233,234,257,262,270,273,291,318,334`. You need to compare what is the extras syscall numbers of previous step. You can use a simple script or ask LLM to archive that. In this case, it's `5, 17, 28, 63, 204, 237, 281, 435`
 
