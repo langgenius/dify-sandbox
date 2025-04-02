@@ -74,7 +74,7 @@ func initDependencies() {
 				log.Error("failed to setup runner dependencies: %v", err)
 				continue
 			}
-			dependencies = static.GetRunnerDependencies()
+			latestDependencies := static.GetRunnerDependencies()
 			if err := updatePythonDependencies(latestDependencies); err != nil {
 				log.Error("Failed to update Python dependencies: %v", err)
 			}
