@@ -1,0 +1,15 @@
+httpx==0.27.2
+requests==2.32.3
+jinja2==3.0.3
+PySocks==1.7.1
+httpx[socks]==0.27.2
+numpy==1.26.3
+beautifulsoup4==4.13.0
+pandas==2.1.4
+matplotlib==3.8.2
+scikit-learn==1.4.0
+scipy==1.11.4
+seaborn==0.13.1
+openpyxl==3.1.2
+xlrd==2.0.1
+opencv-python==4.5.4
