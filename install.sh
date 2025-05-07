@@ -10,8 +10,8 @@ elif [ -f /etc/arch-release ]; then
 # check if alpine
 elif [ -f /etc/alpine-release ]; then
     sudo apk add pkgconfig gcc libseccomp-dev
-# check if centos
-elif [ -f /etc/centos-release ]; then
+# check if centos/rhel/rocky
+elif [ -f /etc/centos-release ] || [ -f /etc/redhat-release ] || [ -f /etc/rocky-release ]; then
     sudo yum install pkgconfig gcc libseccomp-devel
 else
     echo "Unsupported distribution"
