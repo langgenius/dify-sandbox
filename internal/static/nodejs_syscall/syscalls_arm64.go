@@ -42,3 +42,5 @@ var ALLOW_NETWORK_SYSCALLS = []int{
 	syscall.SYS_FSTATAT, syscall.SYS_LSEEK,
 	syscall.SYS_FSTATFS,
 }
+
+var ALLOW_NETWORK_SYSCALL_VALUES = map[int]uint64{}
