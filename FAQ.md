@@ -110,6 +110,6 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_SCHED_GETAFFINITY, syscall.SYS_MBIND, syscall.SYS_EPOLL_PWAIT, 435,
 }
 ```
-If the syscall alias not defined in golang, you can direcly use the number instead.
+If the syscall alias not defined in golang, you can directly use the number instead.
 
 5. Build and Run the whole project again.
