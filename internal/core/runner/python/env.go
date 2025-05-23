@@ -44,7 +44,6 @@ func PreparePythonDependenciesEnv() error {
 		}
 
 		os.RemoveAll(root_path)
-		os.Remove(root_path)
 		return nil
 	})
 
