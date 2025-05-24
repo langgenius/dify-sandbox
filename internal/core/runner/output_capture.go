@@ -70,20 +70,19 @@ func (s *OutputCaptureRunner) CaptureOutput(cmd *exec.Cmd) error {
 	if err != nil {
 		return err
 	}
+	defer stdout_reader.Close() // 确保最终会关闭
 
 	// create a pipe for the stderr
 	stderr_reader, err := cmd.StderrPipe()
 	if err != nil {
-		stdout_reader.Close()
 		return err
 	}
+	defer stderr_reader.Close() // 确保最终会关闭
 
 	// start the process
 	err = cmd.Start()
 	if err != nil {
-		stdout_reader.Close()
-		stderr_reader.Close()
-		return err
+		return err // 两个 reader 都会被 defer 关闭
 	}
 
 	wg := sync.WaitGroup{}
