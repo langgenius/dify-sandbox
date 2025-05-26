@@ -12,6 +12,7 @@ type DifySandboxGlobalConfigurations struct {
 	PythonPath               string   `yaml:"python_path"`
 	PythonLibPaths           []string `yaml:"python_lib_path"`
 	PythonPipMirrorURL       string   `yaml:"python_pip_mirror_url"`
+	PythonDepsPath           string   `yaml:"python_deps_path"`
 	PythonDepsUpdateInterval string   `yaml:"python_deps_update_interval"`
 	NodejsPath               string   `yaml:"nodejs_path"`
 	EnableNetwork            bool     `yaml:"enable_network"`
