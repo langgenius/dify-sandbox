@@ -28,7 +28,6 @@ func init() {
 func releaseLibBinary() {
 	log.Info("initializing nodejs runner environment...")
 	os.RemoveAll(LIB_PATH)
-	os.Remove(LIB_PATH)
 
 	err := os.MkdirAll(LIB_PATH, 0755)
 	if err != nil {

@@ -51,7 +51,6 @@ func (p *NodeJsRunner) Run(
 	err := p.WithTempDir("/", REQUIRED_FS, func(root_path string) error {
 		output_handler.SetAfterExitHook(func() {
 			os.RemoveAll(root_path)
-			os.Remove(root_path)
 		})
 
 		// initialize the environment
