@@ -26,14 +26,17 @@ COPY env /env
 COPY conf/config.yaml /conf/config.yaml
 # copy python dependencies
 COPY dependencies/python-requirements.txt /dependencies/python-requirements.txt
+# copy entrypoint
+COPY docker/entrypoint.sh /entrypoint.sh
 
-RUN chmod +x /main /env \
-    && pip3 install --no-cache-dir httpx==0.27.2 requests==2.32.3 jinja2==3.0.3 PySocks httpx[socks] \
+RUN chmod +x /main /env /entrypoint.sh \
+    && pip3 install --no-cache-dir httpx==0.27.2 requests==2.32.3 jinja2==3.1.6 PySocks httpx[socks] \
     && wget -O /opt/node-v20.11.1-linux-x64.tar.xz https://npmmirror.com/mirrors/node/v20.11.1/node-v20.11.1-linux-x64.tar.xz \
-    && tar -xvf /opt/node-v20.11.1-linux-x64.tar.xz -C /opt \
-    && ln -s /opt/node-v20.11.1-linux-x64/bin/node /usr/local/bin/node \
-    && rm -f /opt/node-v20.11.1-linux-x64.tar.xz \
     && /env \
     && rm -f /env
 
-ENTRYPOINT ["/main"]
+ENTRYPOINT [
+    "NODE_TAR_XZ=/opt/node-v20.11.1-linux-x64.tar.xz", 
+    "NODE_DIR=/opt/node-v20.11.1-linux-x64", 
+    "/entrypoint.sh"
+]
