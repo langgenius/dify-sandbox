@@ -15,6 +15,7 @@ jobs:
       arch: amd64
       arch_label: AMD64
     secrets:
+      # 若 build.yml 需要用到 DockerHub，可删去或改用 GitHub Container Registry 相关 secrets
       DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
@@ -35,17 +36,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Login to Docker Hub
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKERHUB_USER }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ vars.DIFY_SANDBOX_IMAGE_NAME || 'langgenius/dify-sandbox' }}
+          images: ghcr.io/dolphi-ai/dify-sandbox
           tags: |
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
             type=ref,event=branch
@@ -53,14 +55,14 @@ jobs:
             type=raw,value=${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
 
       - name: Build Universal Docker Images
-        run:
+        run: |
           for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n');
           do
             docker manifest create $tag $tag-amd64 $tag-arm64;
           done
 
       - name: Push Universal Docker Image
-        run: 
+        run: |
           for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n');
           do
             docker manifest push $tag;
