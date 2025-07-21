@@ -69,7 +69,7 @@ func initDependencies() {
 		}
 		ticker := time.NewTicker(tickerDuration)
 		for range ticker.C {
-			if err:=updatePythonDependencies(dependencies);err!=nil{
+			if err := updatePythonDependencies(static.GetRunnerDependencies()); err != nil {
 				log.Error("Failed to update Python dependencies: %v", err)
 			}
 		}
