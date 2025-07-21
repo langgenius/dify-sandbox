@@ -24,12 +24,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install yq for Dockerfile generation
+        run: |
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "x86_64" ]; then
+            YQ_ARCH="amd64"
+          elif [ "$ARCH" = "aarch64" ]; then
+            YQ_ARCH="arm64"
+          else
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+          fi
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${YQ_ARCH}
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Generate Dockerfiles
+        run: |
+          cd docker
+          ./generate.sh test ${{ matrix.arch }}
+
       - name: Build and run tests
         run: |
-          if [ "${{ matrix.arch }}" == "amd64" ]; then
-            docker build -t test -f docker/amd64-test/dockerfile .
-            docker run --rm test
-          elif [ "${{ matrix.arch }}" == "arm64" ]; then
-            docker build -t test -f docker/arm64-test/dockerfile .
-            docker run --rm test
-          fi
+          docker build -t test -f docker/${{ matrix.arch }}-test.gen.dockerfile .
+          docker run --rm test

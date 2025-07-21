@@ -52,14 +52,33 @@ jobs:
         with:
           go-version: 1.23.0
 
+      - name: Install yq for Dockerfile generation
+        run: |
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "x86_64" ]; then
+            YQ_ARCH="amd64"
+          elif [ "$ARCH" = "aarch64" ]; then
+            YQ_ARCH="arm64"
+          else
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+          fi
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${YQ_ARCH}
+          sudo chmod +x /usr/local/bin/yq
+
       - name: Install dependencies
         run: go mod tidy
 
       - name: Run Build Binary
         run: bash ./build/build_${{ inputs.arch }}.sh
 
+      - name: Generate Dockerfiles
+        run: |
+          cd docker
+          ./generate.sh production ${{ inputs.arch }}
+
       - name: Run Build Docker Image
-        run: docker build -t dify-sandbox -f ./docker/${{ inputs.arch }}/dockerfile .
+        run: docker build -t dify-sandbox -f ./docker/${{ inputs.arch }}-production.gen.dockerfile .
 
       - name: Tag Docker Images
         run: 
