@@ -9,3 +9,5 @@ logs/
 # compiled product
 env
 main
+
+*.gen.dockerfile

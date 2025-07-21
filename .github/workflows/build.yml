@@ -47,10 +47,30 @@ jobs:
       - name: Install System Dependencies
         run: sudo apt-get install -y pkg-config gcc libseccomp-dev
 
+      - name: Install yq for version configuration
+        run: |
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "x86_64" ]; then
+            YQ_ARCH="amd64"
+          elif [ "$ARCH" = "aarch64" ]; then
+            YQ_ARCH="arm64"
+          else
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+          fi
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${YQ_ARCH}
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Read Go version from configuration
+        id: go-version
+        run: |
+          GO_VERSION=$(yq eval '.versions.golang' docker/versions.yaml)
+          echo "go-version=${GO_VERSION}" >> $GITHUB_OUTPUT
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.23.0
+          go-version: ${{ steps.go-version.outputs.go-version }}
 
       - name: Install dependencies
         run: go mod tidy
@@ -58,8 +78,13 @@ jobs:
       - name: Run Build Binary
         run: bash ./build/build_${{ inputs.arch }}.sh
 
+      - name: Generate Dockerfiles
+        run: |
+          cd docker
+          ./generate.sh production ${{ inputs.arch }}
+
       - name: Run Build Docker Image
-        run: docker build -t dify-sandbox -f ./docker/${{ inputs.arch }}/dockerfile .
+        run: docker build -t dify-sandbox -f ./docker/${{ inputs.arch }}-production.gen.dockerfile .
 
       - name: Tag Docker Images
         run: 
