@@ -1,0 +1,42 @@
+# Version configuration file - centralized management of all software versions
+versions:
+  # Base images
+  python: "3.10-slim-bookworm"
+  golang: "1.23.9"
+  nodejs: "v20.11.1"
+  
+  # Python packages (unified configuration)
+  python_packages: "httpx==0.27.2 requests==2.32.3 jinja2==3.1.6 PySocks httpx[socks]"
+  
+  # System packages
+  system_packages:
+    - pkg-config
+    - libseccomp-dev
+    - wget
+    - curl
+    - xz-utils
+    - zlib1g
+    - expat
+    - perl
+    - libsqlite3-0
+  
+  # Build dependencies
+  build_packages:
+    - pkg-config
+    - gcc
+    - libseccomp-dev
+
+# Mirror configuration
+mirrors:
+  debian: "http://deb.debian.org/debian testing main"
+  nodejs: "https://npmmirror.com/mirrors/node"
+  golang: "https://golang.org/dl"
+  
+# Architecture-specific configuration
+architectures:
+  amd64:
+    golang_arch: "linux-amd64"
+    nodejs_arch: "linux-x64"
+  arm64:
+    golang_arch: "linux-arm64"
+    nodejs_arch: "linux-arm64" 
