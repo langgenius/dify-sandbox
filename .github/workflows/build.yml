@@ -47,12 +47,7 @@ jobs:
       - name: Install System Dependencies
         run: sudo apt-get install -y pkg-config gcc libseccomp-dev
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.23.0
-
-      - name: Install yq for Dockerfile generation
+      - name: Install yq for version configuration
         run: |
           ARCH=$(uname -m)
           if [ "$ARCH" = "x86_64" ]; then
@@ -65,6 +60,17 @@ jobs:
           fi
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${YQ_ARCH}
           sudo chmod +x /usr/local/bin/yq
+
+      - name: Read Go version from configuration
+        id: go-version
+        run: |
+          GO_VERSION=$(yq eval '.versions.golang' docker/versions.yaml)
+          echo "go-version=${GO_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ steps.go-version.outputs.go-version }}
 
       - name: Install dependencies
         run: go mod tidy
