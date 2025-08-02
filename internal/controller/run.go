@@ -9,10 +9,11 @@ import (
 
 func RunSandboxController(c *gin.Context) {
 	BindRequest(c, func(req struct {
-		Language      string `json:"language" form:"language" binding:"required"`
-		Code          string `json:"code" form:"code" binding:"required"`
-		Preload       string `json:"preload" form:"preload"`
-		EnableNetwork bool   `json:"enable_network" form:"enable_network"`
+		Language      string                    `json:"language" form:"language" binding:"required"`
+		Code          string                    `json:"code" form:"code" binding:"required"`
+		Preload       string                    `json:"preload" form:"preload"`
+		EnableNetwork bool                      `json:"enable_network" form:"enable_network"`
+		Dependenchies []runner_types.Dependency `json:"dependencies" form:"dependencies"`
 	}) {
 		switch req.Language {
 		case "python3":
@@ -22,6 +23,11 @@ func RunSandboxController(c *gin.Context) {
 		case "nodejs":
 			c.JSON(200, service.RunNodeJsCode(req.Code, req.Preload, &runner_types.RunnerOptions{
 				EnableNetwork: req.EnableNetwork,
+			}))
+		case "uv":
+			c.JSON(200, service.RunUvCode(req.Code, req.Preload, &runner_types.RunnerOptions{
+				EnableNetwork: req.EnableNetwork,
+				Dependenchies: req.Dependenchies,
 			}))
 		default:
 			c.JSON(400, types.ErrorResponse(-400, "unsupported language"))

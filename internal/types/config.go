@@ -14,6 +14,10 @@ type DifySandboxGlobalConfigurations struct {
 	PythonPipMirrorURL       string   `yaml:"python_pip_mirror_url"`
 	PythonDepsUpdateInterval string   `yaml:"python_deps_update_interval"`
 	NodejsPath               string   `yaml:"nodejs_path"`
+	UvPath                   string   `yaml:"uv_path"`
+	UvLibPaths               []string `yaml:"uv_lib_path"`
+	UvCachePath              string   `yaml:"uv_cache_path"`
+	UvMirrorURL              string   `yaml:"uv_mirror_url"`
 	EnableNetwork            bool     `yaml:"enable_network"`
 	EnablePreload            bool     `yaml:"enable_preload"`
 	AllowedSyscalls          []int    `yaml:"allowed_syscalls"`

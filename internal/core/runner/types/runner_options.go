@@ -8,7 +8,8 @@ type Dependency struct {
 }
 
 type RunnerOptions struct {
-	EnableNetwork bool `json:"enable_network"`
+	EnableNetwork bool         `json:"enable_network"`
+	Dependenchies []Dependency `json:"dependencies"`
 }
 
 func (r *RunnerOptions) Json() string {

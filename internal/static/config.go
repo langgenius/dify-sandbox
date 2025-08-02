@@ -102,6 +102,32 @@ func InitConfig(path string) error {
 		difySandboxGlobalConfigurations.NodejsPath = "/usr/local/bin/node"
 	}
 
+	uv_path := os.Getenv("UV_PATH")
+	if uv_path != "" {
+		difySandboxGlobalConfigurations.UvPath = uv_path
+	}
+	if difySandboxGlobalConfigurations.UvPath == "" {
+		difySandboxGlobalConfigurations.UvPath = "/usr/local/bin/uv"
+	}
+	uv_lib_path := os.Getenv("UV_LIB_PATH")
+	if uv_lib_path != "" {
+		difySandboxGlobalConfigurations.UvLibPaths = strings.Split(uv_lib_path, ",")
+	}
+	if len(difySandboxGlobalConfigurations.UvLibPaths) == 0 {
+		difySandboxGlobalConfigurations.UvLibPaths = DEFAULT_UV_LIB_REQUIREMENTS
+	}
+	uv_cache_path := os.Getenv("UV_CACHE_PATH")
+	if uv_cache_path != "" {
+		difySandboxGlobalConfigurations.UvCachePath = uv_cache_path
+	}
+	if difySandboxGlobalConfigurations.UvCachePath == "" {
+		difySandboxGlobalConfigurations.UvCachePath = "/usr/.cache/uv"
+	}
+	uv_mirror_url := os.Getenv("UV_MIRROR_URL")
+	if uv_mirror_url != "" {
+		difySandboxGlobalConfigurations.UvMirrorURL = uv_mirror_url
+	}
+
 	enable_network := os.Getenv("ENABLE_NETWORK")
 	if enable_network != "" {
 		difySandboxGlobalConfigurations.EnableNetwork, _ = strconv.ParseBool(enable_network)

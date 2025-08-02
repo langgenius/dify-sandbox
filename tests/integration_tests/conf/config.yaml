@@ -21,6 +21,7 @@ python_lib_path:
   - "/etc/localtime"
   - "/usr/share/zoneinfo"
   - "/etc/timezone"
+uv_path: /usr/local/bin/uv
 enable_network: True # please make sure there is no network risk in your environment
 allowed_syscalls: # please leave it empty if you have no idea how seccomp works
 proxy:
