@@ -4,6 +4,7 @@ ARG DEBIAN_MIRROR="http://deb.debian.org/debian testing main"
 ARG PYTHON_PACKAGES="httpx==0.27.2 requests==2.32.3 jinja2==3.1.6 PySocks httpx[socks]"
 ARG NODEJS_VERSION=v20.11.1
 ARG NODEJS_MIRROR="https://npmmirror.com/mirrors/node"
+ARG UV_VERSION=0.8.3
 ARG TARGETARCH
 
 FROM python:${PYTHON_VERSION}
@@ -27,6 +28,7 @@ RUN echo "deb ${DEBIAN_MIRROR}" > /etc/apt/sources.list \
 # Copy binary files
 COPY main /main
 COPY env /env
+COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /uvx /usr/local/bin/
 
 # Copy configuration files
 COPY conf/config.yaml /conf/config.yaml

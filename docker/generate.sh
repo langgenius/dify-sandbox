@@ -44,6 +44,7 @@ echo "Reading version configuration..."
 PYTHON_VERSION=$(yq eval '.versions.python' "$VERSIONS_FILE")
 GOLANG_VERSION=$(yq eval '.versions.golang' "$VERSIONS_FILE")
 NODEJS_VERSION=$(yq eval '.versions.nodejs' "$VERSIONS_FILE")
+UV_VERSION=$(yq eval '.versions.uv' "$VERSIONS_FILE")
 PYTHON_PACKAGES=$(yq eval '.versions.python_packages' "$VERSIONS_FILE")
 DEBIAN_MIRROR=$(yq eval '.mirrors.debian' "$VERSIONS_FILE")
 NODEJS_MIRROR=$(yq eval '.mirrors.nodejs' "$VERSIONS_FILE")
@@ -79,6 +80,7 @@ esac
 sed -e "s/\${PYTHON_VERSION}/${PYTHON_VERSION}/g" \
     -e "s/\${GOLANG_VERSION}/${GOLANG_VERSION}/g" \
     -e "s/\${NODEJS_VERSION}/${NODEJS_VERSION}/g" \
+    -e "s|\${UV_VERSION}|${UV_VERSION}|g" \
     -e "s|\${PYTHON_PACKAGES}|${PYTHON_PACKAGES}|g" \
     -e "s|\${DEBIAN_MIRROR}|${DEBIAN_MIRROR}|g" \
     -e "s|\${NODEJS_MIRROR}|${NODEJS_MIRROR}|g" \
