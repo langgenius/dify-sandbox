@@ -20,7 +20,6 @@ var DEFAULT_PYTHON_LIB_REQUIREMENTS = []string{
 
 var DEFAULT_UV_LIB_REQUIREMENTS = []string{
 	"/root/.local/share/uv/python",
-	"/usr/lib/aarch64-linux-gnu",
 	"/etc/ssl/certs/ca-certificates.crt",
 	"/etc/nsswitch.conf",
 	"/etc/hosts",
