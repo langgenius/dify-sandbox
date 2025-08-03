@@ -70,7 +70,9 @@ func (p *UvRunner) Run(
 		if configuration.Proxy.Http != "" {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Http))
 		}
-	} else if configuration.UvMirrorURL != "" {
+	}
+
+	if configuration.UvMirrorURL != "" {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("UV_INDEX_URL=%s", configuration.UvMirrorURL))
 	}
 
