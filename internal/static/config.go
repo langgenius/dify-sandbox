@@ -5,9 +5,10 @@ import (
 	"strconv"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/langgenius/dify-sandbox/internal/types"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
-	"gopkg.in/yaml.v3"
 )
 
 var difySandboxGlobalConfigurations types.DifySandboxGlobalConfigurations
@@ -148,6 +149,11 @@ func InitConfig(path string) error {
 		http_proxy := os.Getenv("HTTP_PROXY")
 		if http_proxy != "" {
 			difySandboxGlobalConfigurations.Proxy.Http = http_proxy
+		}
+
+		no_proxy := os.Getenv("NO_PROXY")
+		if no_proxy != "" {
+			difySandboxGlobalConfigurations.Proxy.NoProxy = no_proxy
 		}
 
 		if difySandboxGlobalConfigurations.Proxy.Http != "" {

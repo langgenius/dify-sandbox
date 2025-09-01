@@ -13,3 +13,4 @@ proxy:
   socks5: ''
   http: ''
   https: ''
+  no_proxy: ''
