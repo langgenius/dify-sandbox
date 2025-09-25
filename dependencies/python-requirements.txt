@@ -7,7 +7,6 @@ bcrypt
 celery
 chardet
 configparser
-crawl4ai
 cryptography
 dashscope
 decorator
@@ -60,11 +59,9 @@ tenacity
 typing-extensions
 tqdm
 uvicorn
-utils
 xlrd
 xlutils
 xlwings
 xlwt
 XlsxWriter
 weaviate-client
-
