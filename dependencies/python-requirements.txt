@@ -49,7 +49,6 @@ python-multipart
 python-pptx
 pyodbc
 pytest
-qwen-agent[gui,rag,code_interpreter,mcp]
 redis
 requests
 Relatorio
@@ -68,3 +67,4 @@ xlwings
 xlwt
 XlsxWriter
 weaviate-client
+
