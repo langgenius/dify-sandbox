@@ -65,3 +65,5 @@ xlwings
 xlwt
 XlsxWriter
 weaviate-client
+minio
+
