@@ -22,6 +22,7 @@ python_lib_path:
   - "/usr/share/zoneinfo"
   - "/etc/timezone"
 enable_network: True # please make sure there is no network risk in your environment
+enable_custom_dependencies: True # allow installing custom dependencies from http requests, please make sure there is no risk
 allowed_syscalls: # please leave it empty if you have no idea how seccomp works
 proxy:
   socks5: ''

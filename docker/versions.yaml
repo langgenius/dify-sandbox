@@ -6,7 +6,7 @@ versions:
   nodejs: "v20.11.1"
   
   # Python packages (unified configuration)
-  python_packages: "httpx==0.27.2 requests==2.32.3 jinja2==3.1.6 PySocks httpx[socks]"
+  python_packages: "httpx==0.27.2 requests==2.32.3 jinja2==3.1.6 PySocks httpx[socks] uv==0.9.4"
   
   # System packages
   system_packages:
