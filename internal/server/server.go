@@ -29,6 +29,10 @@ func initConfig() {
 func initServer() {
 	config := static.GetDifySandboxGlobalConfigurations()
 
+	if !config.App.Debug {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	r := gin.Default()
 	controller.Setup(r)
 
