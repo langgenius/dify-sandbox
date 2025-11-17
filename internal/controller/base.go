@@ -11,7 +11,7 @@ func BindRequest[T any](r *gin.Context, success func(T)) {
 
 	context_type := r.GetHeader("Content-Type")
 	if context_type == "application/json" {
-		err = r.BindJSON(&request)
+		err = r.ShouldBindJSON(&request)
 	} else {
 		err = r.ShouldBind(&request)
 	}
