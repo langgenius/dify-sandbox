@@ -28,16 +28,12 @@ func initConfig() {
 
 func initServer() {
 	config := static.GetDifySandboxGlobalConfigurations()
+
 	if !config.App.Debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	r := gin.Default()
-	r.Use(gin.Recovery())
-	if gin.Mode() == gin.DebugMode {
-		r.Use(gin.Logger())
-	}
-
 	controller.Setup(r)
 
 	r.Run(fmt.Sprintf(":%d", config.App.Port))
@@ -69,7 +65,7 @@ func initDependencies() {
 		}
 		ticker := time.NewTicker(tickerDuration)
 		for range ticker.C {
-			if err:=updatePythonDependencies(dependencies);err!=nil{
+			if err := updatePythonDependencies(dependencies); err != nil {
 				log.Error("Failed to update Python dependencies: %v", err)
 			}
 		}
