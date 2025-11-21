@@ -45,7 +45,7 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 		}
 	}
 
-	err = lib.Seccomp(allowed_syscalls, allowed_not_kill_syscalls)
+	err = lib.Seccomp(allowed_syscalls, allowed_not_kill_syscalls, nil)
 	if err != nil {
 		return err
 	}
