@@ -8,6 +8,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/langgenius/dify-sandbox/internal/static"
 
@@ -19,6 +20,8 @@ import (
 
 //go:embed python.so
 var python_lib []byte
+var libAvailableOnce sync.Once
+var libAvailableResult bool
 
 const (
 	LIB_PATH = "/var/sandbox/sandbox-python"
@@ -63,11 +66,14 @@ func releaseLibBinary(force_remove_old_lib bool) {
 }
 
 func checkLibAvaliable() bool {
-	if _, err := os.Stat(path.Join(LIB_PATH, LIB_NAME)); err != nil {
-		return false
-	}
-
-	return true
+	libAvailableOnce.Do(func() {
+		if _, err := os.Stat(path.Join(LIB_PATH, LIB_NAME)); err != nil {
+			libAvailableResult = false
+			return
+		}
+		libAvailableResult = true
+	})
+	return libAvailableResult
 }
 
 func ExtractOnelineDepency(dependency string) (string, string) {
