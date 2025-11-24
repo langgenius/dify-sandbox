@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sync"
 
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
@@ -17,6 +18,8 @@ const (
 
 //go:embed nodejs.so
 var nodejs_lib []byte
+var libAvailableOnce sync.Once
+var libAvailableResult bool
 
 //go:embed dependens
 var nodejs_dependens embed.FS // it's a directory
@@ -85,9 +88,12 @@ func releaseLibBinary() {
 }
 
 func checkLibAvaliable() bool {
-	if _, err := os.Stat(path.Join(LIB_PATH, LIB_NAME)); err != nil {
-		return false
-	}
-
-	return true
+	libAvailableOnce.Do(func() {
+		if _, err := os.Stat(path.Join(LIB_PATH, LIB_NAME)); err != nil {
+			libAvailableResult = false
+			return
+		}
+		libAvailableResult = true
+	})
+	return libAvailableResult
 }
