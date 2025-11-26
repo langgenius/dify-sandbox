@@ -29,36 +29,44 @@ func init() {
 	releaseLibBinary(true)
 }
 
-func releaseLibBinary(force_remove_old_lib bool) {
+func releaseLibBinary(forceRemoveOldLib bool) {
 	log.Info("initializing python runner environment...")
-	// remove the old lib
-	if _, err := os.Stat(path.Join(LIB_PATH, LIB_NAME)); err == nil {
-		if force_remove_old_lib {
-			err := os.Remove(path.Join(LIB_PATH, LIB_NAME))
-			if err != nil {
-				log.Panic(fmt.Sprintf("failed to remove %s", path.Join(LIB_PATH, LIB_NAME)))
-			}
 
-			// write the new lib
-			err = os.MkdirAll(LIB_PATH, 0755)
-			if err != nil {
-				log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
-			}
-			err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755)
-			if err != nil {
-				log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
-			}
-		}
-	} else {
-		err = os.MkdirAll(LIB_PATH, 0755)
-		if err != nil {
-			log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
-		}
-		err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755)
-		if err != nil {
-			log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
-		}
-		log.Info("python runner environment initialized")
+	libExists := pythonLibExists()
+	if libExists && !forceRemoveOldLib {
+		log.Info("python runner environment already initialized")
+		return
+	}
+
+	if libExists && forceRemoveOldLib {
+		removePythonLib()
+	}
+
+	ensurePythonLibDir()
+	writePythonLib()
+	log.Info("python runner environment initialized")
+}
+
+func pythonLibExists() bool {
+	_, err := os.Stat(path.Join(LIB_PATH, LIB_NAME))
+	return err == nil
+}
+
+func removePythonLib() {
+	if err := os.Remove(path.Join(LIB_PATH, LIB_NAME)); err != nil {
+		log.Panic(fmt.Sprintf("failed to remove %s", path.Join(LIB_PATH, LIB_NAME)))
+	}
+}
+
+func ensurePythonLibDir() {
+	if err := os.MkdirAll(LIB_PATH, 0755); err != nil {
+		log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
+	}
+}
+
+func writePythonLib() {
+	if err := os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755); err != nil {
+		log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
 	}
 }
 
