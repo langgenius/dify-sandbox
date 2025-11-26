@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -50,116 +51,131 @@ func (s *OutputCaptureRunner) SetTimeout(timeout time.Duration) {
 }
 
 func (s *OutputCaptureRunner) CaptureOutput(cmd *exec.Cmd) error {
-	// start a timer for the timeout
-	timeout := s.timeout
-	if timeout == 0 {
-		timeout = 5 * time.Second
+	timeout := s.getTimeout()
+	timer := s.setupTimeoutTimer(cmd, timeout)
+
+	stdoutReader, stderrReader, err := s.setupPipes(cmd)
+	if err != nil {
+		return err
 	}
 
-	timer := time.AfterFunc(timeout, func() {
+	if err := cmd.Start(); err != nil {
+		s.closePipes(stdoutReader, stderrReader)
+		return err
+	}
+
+	s.startOutputReaders(stdoutReader, stderrReader, timer, cmd)
+
+	return nil
+}
+
+func (s *OutputCaptureRunner) getTimeout() time.Duration {
+	if s.timeout == 0 {
+		return 5 * time.Second
+	}
+	return s.timeout
+}
+
+func (s *OutputCaptureRunner) setupTimeoutTimer(cmd *exec.Cmd, timeout time.Duration) *time.Timer {
+	return time.AfterFunc(timeout, func() {
 		if cmd != nil && cmd.Process != nil {
-			// write the error
 			s.WriteError([]byte("error: timeout\n"))
-			// send a signal to the process
 			cmd.Process.Kill()
 		}
 	})
+}
 
-	// create a pipe for the stdout
-	stdout_reader, err := cmd.StdoutPipe()
+func (s *OutputCaptureRunner) setupPipes(cmd *exec.Cmd) (io.ReadCloser, io.ReadCloser, error) {
+	stdoutReader, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
-	// create a pipe for the stderr
-	stderr_reader, err := cmd.StderrPipe()
+	stderrReader, err := cmd.StderrPipe()
 	if err != nil {
-		stdout_reader.Close()
-		return err
+		stdoutReader.Close()
+		return nil, nil, err
 	}
 
-	// start the process
-	err = cmd.Start()
-	if err != nil {
-		stdout_reader.Close()
-		stderr_reader.Close()
-		return err
-	}
+	return stdoutReader, stderrReader, nil
+}
 
+func (s *OutputCaptureRunner) closePipes(stdoutReader, stderrReader io.ReadCloser) {
+	if stdoutReader != nil {
+		stdoutReader.Close()
+	}
+	if stderrReader != nil {
+		stderrReader.Close()
+	}
+}
+
+func (s *OutputCaptureRunner) startOutputReaders(stdoutReader, stderrReader io.ReadCloser, timer *time.Timer, cmd *exec.Cmd) {
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 
-	written := 0
+	go s.readStdout(stdoutReader, &wg)
+	go s.readStderr(stderrReader, &wg)
+	go s.waitForProcess(&wg, timer, cmd)
+}
 
-	// read the output
-	go func() {
-		defer wg.Done()
-		for {
-			buf := make([]byte, 1024)
-			n, err := stdout_reader.Read(buf)
-			// exit if EOF
-			if err != nil {
-				if err == io.EOF {
-					break
-				} else {
-					s.WriteError([]byte(fmt.Sprintf("error: %v\n", err)))
-					break
-				}
-			}
-			written += n
-			s.WriteOutput(buf[:n])
-		}
-	}()
+func (s *OutputCaptureRunner) readStdout(reader io.ReadCloser, wg *sync.WaitGroup) {
+	defer wg.Done()
+	s.readStream(reader, s.WriteOutput)
+}
 
-	// read the error
-	go func() {
-		buf := make([]byte, 1024)
-		defer wg.Done()
-		for {
-			n, err := stderr_reader.Read(buf)
-			// exit if EOF
-			if err != nil {
-				if err == io.EOF {
-					break
-				} else {
-					s.WriteError([]byte(fmt.Sprintf("error: %v\n", err)))
-					break
-				}
-			}
-			s.WriteError(buf[:n])
-		}
-	}()
+func (s *OutputCaptureRunner) readStderr(reader io.ReadCloser, wg *sync.WaitGroup) {
+	defer wg.Done()
+	s.readStream(reader, s.WriteError)
+}
 
-	// wait for the process to finish
-	go func() {
-		// wait for the stdout and stderr to finish
-		wg.Wait()
-
-		// wait for the process to finish
-		status, err := cmd.Process.Wait()
+func (s *OutputCaptureRunner) readStream(reader io.ReadCloser, writer func([]byte)) {
+	buf := make([]byte, 1024)
+	for {
+		n, err := reader.Read(buf)
 		if err != nil {
-			log.Error("process finished with status: %v", status.String())
-			s.WriteError([]byte(fmt.Sprintf("error: %v\n", err)))
-		} else if status.ExitCode() != 0 {
-			exit_string := status.String()
-			if strings.Contains(exit_string, "bad system call") {
-				s.WriteError([]byte("error: operation not permitted\n"))
-			} else {
-				s.WriteError([]byte(fmt.Sprintf("error: %v\n", exit_string)))
+			if err != io.EOF {
+				s.WriteError([]byte(fmt.Sprintf("error: %v\n", err)))
 			}
+			break
 		}
+		writer(buf[:n])
+	}
+}
 
-		if s.after_exit_hook != nil {
-			s.after_exit_hook()
-		}
+func (s *OutputCaptureRunner) waitForProcess(wg *sync.WaitGroup, timer *time.Timer, cmd *exec.Cmd) {
+	wg.Wait()
+	s.handleProcessStatus(cmd)
+	s.executeAfterExitHook()
+	timer.Stop()
+	s.done <- true
+}
 
-		// stop the timer
-		timer.Stop()
+func (s *OutputCaptureRunner) handleProcessStatus(cmd *exec.Cmd) {
+	status, err := cmd.Process.Wait()
+	if err != nil {
+		log.Error("process finished with status: %v", status.String())
+		s.WriteError([]byte(fmt.Sprintf("error: %v\n", err)))
+		return
+	}
 
-		s.done <- true
-	}()
+	if status.ExitCode() != 0 {
+		s.handleNonZeroExit(status)
+	}
+}
 
-	return nil
+func (s *OutputCaptureRunner) handleNonZeroExit(status *os.ProcessState) {
+	exitString := status.String()
+	if strings.Contains(exitString, "bad system call") {
+		s.WriteError([]byte("error: operation not permitted\n"))
+	} else {
+		s.WriteError([]byte(fmt.Sprintf("error: %v\n", exitString)))
+	}
+}
+
+func (s *OutputCaptureRunner) executeAfterExitHook() {
+	if s.after_exit_hook != nil {
+		s.after_exit_hook()
+	}
 }
 
 func (s *OutputCaptureRunner) GetStdout() chan []byte {
