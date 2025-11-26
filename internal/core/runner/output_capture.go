@@ -12,6 +12,10 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
+const (
+	errorFormat = "error: %v\n"
+)
+
 type OutputCaptureRunner struct {
 	stdout chan []byte
 	stderr chan []byte
@@ -134,7 +138,7 @@ func (s *OutputCaptureRunner) readStream(reader io.ReadCloser, writer func([]byt
 		n, err := reader.Read(buf)
 		if err != nil {
 			if err != io.EOF {
-				s.WriteError([]byte(fmt.Sprintf("error: %v\n", err)))
+				s.WriteError([]byte(fmt.Sprintf(errorFormat, err)))
 			}
 			break
 		}
@@ -154,7 +158,7 @@ func (s *OutputCaptureRunner) handleProcessStatus(cmd *exec.Cmd) {
 	status, err := cmd.Process.Wait()
 	if err != nil {
 		log.Error("process finished with status: %v", status.String())
-		s.WriteError([]byte(fmt.Sprintf("error: %v\n", err)))
+		s.WriteError([]byte(fmt.Sprintf(errorFormat, err)))
 		return
 	}
 
@@ -168,7 +172,7 @@ func (s *OutputCaptureRunner) handleNonZeroExit(status *os.ProcessState) {
 	if strings.Contains(exitString, "bad system call") {
 		s.WriteError([]byte("error: operation not permitted\n"))
 	} else {
-		s.WriteError([]byte(fmt.Sprintf("error: %v\n", exitString)))
+		s.WriteError([]byte(fmt.Sprintf(errorFormat, exitString)))
 	}
 }
 
