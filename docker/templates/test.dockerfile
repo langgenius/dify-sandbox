@@ -16,6 +16,8 @@ WORKDIR /app
 
 # Install build dependencies and build
 RUN apt-get update && apt-get install -y pkg-config gcc libseccomp-dev \
+    && touch internal/core/runner/python/python.so \
+    && touch internal/core/runner/nodejs/nodejs.so \
     && go mod tidy \
     && case "${TARGETARCH}" in \
        "amd64") bash ./build/build_amd64.sh ;; \
@@ -96,4 +98,4 @@ RUN case "${TARGETARCH}" in \
     && rm -f go${GOLANG_VERSION}.${GOLANG_ARCH}.tar.gz
 
 # Run tests
-RUN go test -timeout 120s -v ./tests/integration_tests/... 
+RUN go test -timeout 120s -v ./tests/integration_tests/...

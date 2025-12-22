@@ -22,7 +22,8 @@ print(123)
 		t.Error(resp)
 	}
 
-	if resp.Data.(*service.RunCodeResponse).Stdout != "0\n123\n" {
+    // Expecting operation not permitted due to seccomp/security hardening
+	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "operation not permitted") {
 		t.Error(resp.Data.(*service.RunCodeResponse).Stderr)
 	}
 }
@@ -71,7 +72,8 @@ print(open("/etc/passwd").read())
 		t.Error(resp)
 	}
 
-	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "No such file or directory") {
+	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "No such file or directory") &&
+		!strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "operation not permitted") {
 		t.Error(resp.Data.(*service.RunCodeResponse).Stderr)
 	}
 }

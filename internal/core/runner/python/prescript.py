@@ -24,6 +24,12 @@ key = sys.argv[2]
 if not key:
     exit(-1)
 
+
+# get optional working directory
+work_dir = None
+if len(sys.argv) > 3:
+    work_dir = sys.argv[3]
+
 from base64 import b64decode
 key = b64decode(key)
 
@@ -32,6 +38,9 @@ os.chdir(running_path)
 {{preload}}
 
 lib.DifySeccomp({{uid}}, {{gid}}, {{enable_network}})
+
+if work_dir:
+    os.chdir(work_dir)
 
 code = b64decode("{{code}}")
 

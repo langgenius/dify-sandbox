@@ -9,15 +9,17 @@ import (
 
 func RunSandboxController(c *gin.Context) {
 	BindRequest(c, func(req struct {
-		Language      string `json:"language" form:"language" binding:"required"`
-		Code          string `json:"code" form:"code" binding:"required"`
-		Preload       string `json:"preload" form:"preload"`
-		EnableNetwork bool   `json:"enable_network" form:"enable_network"`
+		Language      string            `json:"language" form:"language" binding:"required"`
+		Code          string            `json:"code" form:"code" binding:"required"`
+		Preload       string            `json:"preload" form:"preload"`
+		EnableNetwork bool              `json:"enable_network" form:"enable_network"`
+		Files         map[string]string `json:"files" form:"files"`
 	}) {
 		switch req.Language {
 		case "python3":
 			c.JSON(200, service.RunPython3Code(req.Code, req.Preload, &runner_types.RunnerOptions{
 				EnableNetwork: req.EnableNetwork,
+				Files:         req.Files,
 			}))
 		case "nodejs":
 			c.JSON(200, service.RunNodeJsCode(req.Code, req.Preload, &runner_types.RunnerOptions{

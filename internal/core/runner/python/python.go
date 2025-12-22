@@ -44,9 +44,16 @@ func (p *PythonRunner) Run(
 	output_handler := runner.NewOutputCaptureRunner()
 	output_handler.SetTimeout(timeout)
 	output_handler.SetAfterExitHook(func() {
-		// remove untrusted code
-		os.Remove(untrusted_code_path)
+		// remove the entire run directory
+		os.RemoveAll(path.Dir(untrusted_code_path))
 	})
+
+    // calculate runDir from untrusted_code_path
+    runDir := path.Dir(untrusted_code_path)
+    // untrusted_code_path is .../tmp/<uuid>/<uuid>.py
+    // runDir is .../tmp/<uuid>
+    runID := path.Base(runDir)
+    relRunDir := path.Join("tmp", runID)
 
 	// create a new process
 	cmd := exec.Command(
@@ -54,6 +61,7 @@ func (p *PythonRunner) Run(
 		untrusted_code_path,
 		LIB_PATH,
 		key,
+        relRunDir,
 	)
 	cmd.Env = []string{}
 	cmd.Dir = LIB_PATH
@@ -96,6 +104,27 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 	temp_code_name := strings.ReplaceAll(uuid.New().String(), "-", "_")
 	temp_code_name = strings.ReplaceAll(temp_code_name, "/", ".")
 
+	// Create a unique directory for this run
+	runDir := path.Join(LIB_PATH, "tmp", temp_code_name)
+	err := os.MkdirAll(runDir, 0755)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Write uploaded files
+    if options.Files != nil {
+        for filename, content := range options.Files {
+            filePath := path.Join(runDir, filename)
+             // ensure strict path safety to prevent directory traversal
+             if !strings.HasPrefix(path.Clean(filePath), runDir) {
+                 continue
+             }
+             // Ensure parent dir exists
+             os.MkdirAll(path.Dir(filePath), 0755)
+             os.WriteFile(filePath, []byte(content), 0644)
+        }
+    }
+
 	script := strings.Replace(
 		string(sandbox_fs),
 		"{{uid}}", strconv.Itoa(static.SANDBOX_USER_UID), 1,
@@ -128,7 +157,7 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 	// generate a random 512 bit key
 	key_len := 64
 	key := make([]byte, key_len)
-	_, err := rand.Read(key)
+	_, err = rand.Read(key)
 	if err != nil {
 		return "", "", err
 	}
@@ -151,11 +180,8 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 		1,
 	)
 
-	untrusted_code_path := fmt.Sprintf("%s/tmp/%s.py", LIB_PATH, temp_code_name)
-	err = os.MkdirAll(path.Dir(untrusted_code_path), 0755)
-	if err != nil {
-		return "", "", err
-	}
+    // Write the prescript (untrusted code) to the run directory
+	untrusted_code_path := path.Join(runDir, fmt.Sprintf("%s.py", temp_code_name))
 	err = os.WriteFile(untrusted_code_path, []byte(code), 0755)
 	if err != nil {
 		return "", "", err
