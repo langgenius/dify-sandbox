@@ -4,8 +4,24 @@ app:
   key: dify-sandbox
 max_workers: 4
 max_requests: 50
-worker_timeout: 5
+worker_timeout: 60
 python_path: /usr/local/bin/python3
+python_lib_path: # 重要 python 依赖所在安装路径
+  - "/usr/local/lib/python3.10"
+  - "/usr/lib/python3.10"
+  - "/usr/lib/python3"
+  - "/usr/lib/x86_64-linux-gnu"
+  - "/usr/lib/aarch64-linux-gnu"
+  - "/etc/ssl/certs/ca-certificates.crt"
+  - "/etc/nsswitch.conf"
+  - "/etc/hosts"
+  - "/etc/resolv.conf"
+  - "/run/systemd/resolve/stub-resolv.conf"
+  - "/run/resolvconf/resolv.conf"
+  - "/etc/localtime"
+  - "/usr/share/zoneinfo"
+  - "/etc/timezone"
+  - "/usr/local/lib/python3.10/site-packages/pandas"
 enable_network: True # please make sure there is no network risk in your environment
 enable_preload: False # please keep it as False for security purposes
 allowed_syscalls: # please leave it empty if you have no idea how seccomp works
