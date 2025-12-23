@@ -37,10 +37,12 @@ os.chdir(running_path)
 
 {{preload}}
 
-lib.DifySeccomp({{uid}}, {{gid}}, {{enable_network}})
-
+# change work dir
 if work_dir:
     os.chdir(work_dir)
+
+# init seccomp
+lib.DifySeccomp({{uid}}, {{gid}}, {{enable_network}})
 
 code = b64decode("{{code}}")
 

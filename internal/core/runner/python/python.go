@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	_ "embed"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -61,7 +62,7 @@ func (p *PythonRunner) Run(
 		untrusted_code_path,
 		LIB_PATH,
 		key,
-        relRunDir,
+		relRunDir,
 	)
 	cmd.Env = []string{}
 	cmd.Dir = LIB_PATH
@@ -79,11 +80,16 @@ func (p *PythonRunner) Run(
 	}
 
 	if len(configuration.AllowedSyscalls) > 0 {
-		cmd.Env = append(cmd.Env,
-			fmt.Sprintf("ALLOWED_SYSCALLS=%s",
-				strings.Trim(strings.Join(strings.Fields(fmt.Sprint(configuration.AllowedSyscalls)), ","), "[]"),
-			),
-		)
+		jsonBytes, err := json.Marshal(configuration.AllowedSyscalls)
+		if err != nil {
+			// Log the error but proceed, as the original code would have just used fmt.Sprint
+			fmt.Printf("ERROR: Failed to marshal AllowedSyscalls to JSON: %v\n", err)
+			// Fallback to original string representation if JSON marshaling fails
+			jsonBytes = []byte(strings.Trim(strings.Join(strings.Fields(fmt.Sprint(configuration.AllowedSyscalls)), ","), "[]"))
+		}
+		jsonString := string(jsonBytes)
+
+		cmd.Env = append(cmd.Env, fmt.Sprintf("ALLOWED_SYSCALLS=%s", jsonString))
 	}
 
 	err = output_handler.CaptureOutput(cmd)

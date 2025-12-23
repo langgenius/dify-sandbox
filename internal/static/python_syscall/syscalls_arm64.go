@@ -7,24 +7,34 @@ import (
 )
 
 const (
-	SYS_RSEQ = 293
+	SYS_GETRANDOM = 278 // arm64 number
+	SYS_RSEQ      = 293
+	SYS_SENDMMSG  = 269 // arm64 number
+	SYS_GETCWD    = 17
+	SYS_READLINKAT = 78
+	SYS_STATX     = 291
+	SYS_CLONE3    = 435
+	SYS_FACCESSAT2 = 439
+	SYS_EPOLL_PWAIT2 = 441
+	SYS_EVENTFD2  = 19
+	SYS_RESTART_SYSCALL = 128
 )
 
 var ALLOW_SYSCALLS = []int{
 	// file io
 	syscall.SYS_WRITE, syscall.SYS_CLOSE, syscall.SYS_OPENAT, syscall.SYS_READ, syscall.SYS_LSEEK, syscall.SYS_GETDENTS64, syscall.SYS_WRITEV,
 	syscall.SYS_CHDIR, syscall.SYS_FSTAT, syscall.SYS_FCNTL, syscall.SYS_PIPE2,
-	syscall.SYS_DUP, syscall.SYS_DUP2, syscall.SYS_DUP3,
+	syscall.SYS_DUP, syscall.SYS_DUP2, syscall.SYS_DUP3, SYS_GETCWD, SYS_READLINKAT, SYS_STATX, SYS_FACCESSAT2, SYS_EVENTFD2,
 
 	// thread
-	syscall.SYS_FUTEX,
+	syscall.SYS_FUTEX, SYS_CLONE3, SYS_RESTART_SYSCALL,
 
 	// memory
 	syscall.SYS_MMAP, syscall.SYS_BRK, syscall.SYS_MPROTECT, syscall.SYS_MUNMAP, syscall.SYS_RT_SIGRETURN, syscall.SYS_RT_SIGPROCMASK,
 	syscall.SYS_SIGALTSTACK, syscall.SYS_MREMAP, syscall.SYS_MADVISE,
 
 	// user/group
-	syscall.SYS_SETUID, syscall.SYS_SETGID, syscall.SYS_GETUID,
+	syscall.SYS_SETUID, syscall.SYS_SETGID, syscall.SYS_GETUID, syscall.SYS_CAPGET, syscall.SYS_CAPSET,
 
 	// process
 	syscall.SYS_GETPID, syscall.SYS_GETPPID, syscall.SYS_GETTID,
@@ -46,7 +56,7 @@ var ALLOW_SYSCALLS = []int{
 
 	// get random
 	syscall.SYS_GETRANDOM,
-	syscall.SYS_PPOLL, syscall.SYS_EPOLL_PWAIT,
+	syscall.SYS_PPOLL, syscall.SYS_EPOLL_PWAIT, SYS_EPOLL_PWAIT2,
 }
 
 var ALLOW_ERROR_SYSCALLS = []int{

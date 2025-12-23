@@ -20,7 +20,7 @@ print(open("test.txt").read())
 	})
 
 	if resp.Code != 0 {
-		t.Fatalf("Run failed with code %d. Stdout: %s, Stderr: %s", resp.Code, resp.Data.(*service.RunCodeResponse).Stdout, resp.Data.(*service.RunCodeResponse).Stderr)
+		t.Fatalf("Run failed with code %d. Message: %s", resp.Code, resp.Message)
 	}
 
 	if resp.Data.(*service.RunCodeResponse).Stderr != "" {
