@@ -30,8 +30,8 @@ jobs:
     runs-on: ${{ inputs.runner }}
     env:
       DOCKERHUB_IMAGE: ${{ vars.DIFY_SANDBOX_IMAGE_NAME || 'langgenius/dify-sandbox' }}
-      ECR_REGISTRY: ${{ env.AWS_ECR_REGISTRY }}
-      ECR_REPOSITORY: ${{ env.AWS_ECR_REPOSITORY }}
+      ECR_REGISTRY: ${{ vars.AWS_ECR_REGISTRY }}
+      ECR_REPOSITORY: ${{ vars.AWS_ECR_REPOSITORY }}
 
     steps:
       - name: Checkout code
