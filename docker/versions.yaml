@@ -4,6 +4,7 @@ versions:
   python: "3.10-slim-bookworm"
   golang: "1.24.9"
   nodejs: "v20.11.1"
+  uv: "0.8.3"
   
   # Python packages (unified configuration)
   python_packages: "httpx==0.27.2 requests==2.32.3 jinja2==3.1.6 PySocks httpx[socks]"

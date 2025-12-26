@@ -6,6 +6,7 @@ ARG PYTHON_PACKAGES="httpx==0.27.2 requests==2.32.3 jinja2==3.1.6 PySocks httpx[
 ARG NODEJS_VERSION=v20.11.1
 ARG NODEJS_MIRROR="https://npmmirror.com/mirrors/node"
 ARG GOLANG_MIRROR="https://golang.org/dl"
+ARG UV_VERSION=0.8.3
 ARG TARGETARCH
 
 # Build stage
@@ -55,9 +56,13 @@ WORKDIR /app
 # Copy source code
 COPY . /app
 
+# Copy uv binary files
+COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /uvx /usr/local/bin/
+
 # Copy binary files from build stage
 COPY --from=builder /app/internal/core/runner/python/python.so /app/internal/core/runner/python/python.so
 COPY --from=builder /app/internal/core/runner/nodejs/nodejs.so /app/internal/core/runner/nodejs/nodejs.so
+COPY --from=builder /app/internal/core/runner/uv/uv.so /app/internal/core/runner/uv/uv.so
 
 # Copy configuration files
 COPY conf/config.yaml /conf/config.yaml
@@ -65,6 +70,8 @@ COPY dependencies/python-requirements.txt /dependencies/python-requirements.txt
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir ${PYTHON_PACKAGES}
+
+RUN uv python install 3.10.18
 
 # Install Node.js based on architecture
 RUN case "${TARGETARCH}" in \
