@@ -21,8 +21,6 @@ on:
         required: true
       AWS_SECRET_ACCESS_KEY:
         required: true
-      AWS_ACCOUNT_ID:
-        required: true
       AWS_REGION:
         required: true
 
@@ -32,8 +30,8 @@ jobs:
     runs-on: ${{ inputs.runner }}
     env:
       DOCKERHUB_IMAGE: ${{ vars.DIFY_SANDBOX_IMAGE_NAME || 'langgenius/dify-sandbox' }}
-      ECR_REGISTRY: ${{ format('{0}.dkr.ecr.{1}.amazonaws.com', secrets.AWS_ACCOUNT_ID, secrets.AWS_REGION) }}
-      ECR_REPOSITORY: ${{ vars.DIFY_SANDBOX_ECR_REPOSITORY || 'dify-sandbox' }}
+      ECR_REGISTRY: public.ecr.aws/e2r4a9l2/dify
+      ECR_REPOSITORY: sandbox
 
     steps:
       - name: Checkout code
