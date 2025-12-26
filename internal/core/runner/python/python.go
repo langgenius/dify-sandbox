@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
@@ -67,6 +68,9 @@ func (p *PythonRunner) Run(
 		}
 		if configuration.Proxy.Http != "" {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Http))
+		}
+		if configuration.Proxy.NoProxy != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("NO_PROXY=%s", configuration.Proxy.NoProxy))
 		}
 	}
 
