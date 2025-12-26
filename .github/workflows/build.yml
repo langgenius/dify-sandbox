@@ -54,6 +54,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
         with:
           registry: ${{ env.ECR_REGISTRY }}
+          registry-type: public
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
