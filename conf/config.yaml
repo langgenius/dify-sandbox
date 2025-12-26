@@ -8,6 +8,7 @@ worker_timeout: 5
 python_path: /usr/local/bin/python3
 enable_network: True # please make sure there is no network risk in your environment
 enable_preload: False # please keep it as False for security purposes
+enable_custom_dependencies: False # allow installing custom dependencies from http requests, please make sure there is no risk
 allowed_syscalls: # please leave it empty if you have no idea how seccomp works
 proxy:
   socks5: ''
