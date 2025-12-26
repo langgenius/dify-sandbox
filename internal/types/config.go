@@ -22,4 +22,9 @@ type DifySandboxGlobalConfigurations struct {
 		Https  string `yaml:"https"`
 		Http   string `yaml:"http"`
 	} `yaml:"proxy"`
+	SandboxBackend string `yaml:"sandbox_backend"` // "native" or "microsandbox"
+	Sandbox        struct {
+		Enabled       bool   `yaml:"enabled"`
+		ServerAddress string `yaml:"server_address"` // microsandbox server address
+	} `yaml:"microsandbox"`
 }

@@ -1,6 +1,7 @@
 package integrationtests_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
@@ -10,7 +11,7 @@ import (
 func TestPythonLargeOutput(t *testing.T) {
 	// Test case for base64
 	runMultipleTestings(t, 5, func(t *testing.T) {
-		resp := service.RunPython3Code(`# declare main function here
+		resp := service.RunPython3Code(context.TODO(), `# declare main function here
 def main() -> dict:
     original_strings_with_empty = ["apple", "", "cherry", "date", "", "fig", "grape", "honeydew", "kiwi", "", "mango", "nectarine", "orange", "papaya", "quince", "raspberry", "strawberry", "tangerine", "ugli fruit", "vanilla bean", "watermelon", "xigua", "yellow passionfruit", "zucchini"] * 5
 

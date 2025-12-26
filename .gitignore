@@ -1,5 +1,6 @@
 # log
 logs/
+log/
 # editor config
 .idea/
 .vscode/
@@ -11,3 +12,5 @@ env
 main
 
 *.gen.dockerfile
+.menv/
+coverage.out

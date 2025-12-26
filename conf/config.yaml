@@ -13,3 +13,15 @@ proxy:
   socks5: ''
   http: ''
   https: ''
+
+# Sandbox backend configuration
+# Available backends: "native" (default) or "microsandbox"
+# - native: Uses Linux chroot + seccomp for isolation (Linux only)
+# - microsandbox: Uses microsandbox for cross-platform isolation
+sandbox_backend: "microsandbox"
+
+# Microsandbox configuration (only used when sandbox_backend is "microsandbox")
+microsandbox:
+  enabled: true  # Set to true to enable microsandbox backend
+  server_address: "http://127.0.0.1:10000"  # Optional: microsandbox server address (if using remote server)
+

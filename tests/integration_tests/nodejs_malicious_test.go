@@ -1,6 +1,7 @@
 package integrationtests_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 
 func TestNodejsRunCommand(t *testing.T) {
 	// Test case for run_command
-	resp := service.RunNodeJsCode(`
+	resp := service.RunNodeJsCode(context.TODO(), `
 const { spawn } = require( 'child_process' );
 const ls = spawn( 'ls', [ '-lh', '/usr' ] );
 
@@ -37,7 +38,7 @@ ls.on( 'close', ( code ) => {
 
 func TestNodejsRunRedeclareFunctionCommand(t *testing.T) {
 	// Test case for run_command
-	resp := service.RunNodeJsCode(`
+	resp := service.RunNodeJsCode(context.TODO(), `
 var data;
 function main()
 {

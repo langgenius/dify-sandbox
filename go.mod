@@ -1,10 +1,12 @@
 module github.com/langgenius/dify-sandbox
 
-go 1.24.11
+go 1.25.4
 
 require (
+	github.com/agent-infra/sandbox-sdk-go v0.0.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0
+	github.com/microsandbox/microsandbox/sdk/go v0.0.0-20260105133323-6f13543feae0
 	github.com/seccomp/libseccomp-golang v0.11.0
 	gopkg.in/yaml.v3 v3.0.1
 )

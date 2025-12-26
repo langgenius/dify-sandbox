@@ -1,3 +1,5 @@
+github.com/agent-infra/sandbox-sdk-go v0.0.2 h1:excmpAxpVup0oQG3NyBBV1ZVMSODyS04Arm6fyo5NYs=
+github.com/agent-infra/sandbox-sdk-go v0.0.2/go.mod h1:LcR1ZvwCSafPmNj1+RA6myQRMHWs1DZL7HoPMFJGSDo=
 github.com/bytedance/sonic v1.13.2 h1:8/H1FempDZqC4VqjptGo14QQlJx8VdZJegxs6wwfqpQ=
 github.com/bytedance/sonic v1.13.2/go.mod h1:o68xyaF9u2gvVBuGHPlUVCy+ZfmNNO5ETf1+KgkJhz4=
 github.com/bytedance/sonic/loader v0.1.1/go.mod h1:ncP89zfokxS5LZrJxl5z0UJcsk4M4yY2JpfqGeCtNLU=
@@ -40,6 +42,8 @@ github.com/leodido/go-urn v1.4.0 h1:WT9HwE9SGECu3lg4d/dIA+jxlljEa1/ffXKmRjqdmIQ=
 github.com/leodido/go-urn v1.4.0/go.mod h1:bvxc+MVxLKB4z00jd1z+Dvzr47oO32F/QSNjSBOlFxI=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
+github.com/microsandbox/microsandbox/sdk/go v0.0.0-20260105133323-6f13543feae0 h1:I/t88dcssSrsh3F/BED9rjeS0mlRf+lleg8g3szuIJg=
+github.com/microsandbox/microsandbox/sdk/go v0.0.0-20260105133323-6f13543feae0/go.mod h1:Dr+SHwunRAGqJgTrqraUD8kqgv9+hi51d5Rly/V/ljs=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd h1:TRLaZ9cD/w8PVh93nsPXa1VrQ6jlwL5oN8l14QlcNfg=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=

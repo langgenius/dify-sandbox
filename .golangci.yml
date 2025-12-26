@@ -1,0 +1,102 @@
+version: 2
+
+run:
+  timeout: 5m
+  tests: true
+  skip-dirs:
+    - vendor
+    - tests
+    - testdata
+
+linters:
+  default: none
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - ineffassign
+    - misspell
+    - gocyclo
+    - goconst
+    - unconvert
+    - prealloc
+    - gocritic
+    - revive
+    - copyloopvar
+    - nilerr
+    - noctx
+    - gosec
+
+formatters:
+  enable:
+    - goimports
+
+linters-settings:
+  govet:
+    check-shadowing: true
+
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+
+  gocyclo:
+    min-complexity: 15
+
+  goconst:
+    min-len: 2
+    min-occurrences: 3
+
+  goimports:
+    local-prefixes: github.com/langgenius/dify-sandbox
+
+  revive:
+    confidence: 0.8
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude:
+    - "cmd/test/"
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - goconst
+        - govet
+
