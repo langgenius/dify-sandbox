@@ -30,7 +30,7 @@ ls.on( 'close', ( code ) => {
 		t.Error(resp)
 	}
 
-	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "operation not permitted") {
+	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "EPERM") {
 		t.Error(resp.Data.(*service.RunCodeResponse).Stderr)
 	}
 }

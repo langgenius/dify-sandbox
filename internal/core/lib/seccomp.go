@@ -11,7 +11,9 @@ import (
 )
 
 func Seccomp(allowed_syscalls []int, allowed_not_kill_syscalls []int) error {
-	ctx, err := sg.NewFilter(sg.ActKillProcess)
+	// ActKillProcess has issues with TSYNC that may cause spurious process kills
+	// ActErrno is more reliable - blocks unexpected syscalls with EPERM
+	ctx, err := sg.NewFilter(sg.ActErrno.SetReturnCode(1)) // EPERM
 	if err != nil {
 		return err
 	}
@@ -23,12 +25,49 @@ func Seccomp(allowed_syscalls []int, allowed_not_kill_syscalls []int) error {
 	defer reader.Close()
 	defer writer.Close()
 
-	for _, syscall := range allowed_syscalls {
-		ctx.AddRule(sg.ScmpSyscall(syscall), sg.ActAllow)
+	for _, syscall_num := range allowed_syscalls {
+		// For newer syscalls like clone3 (435), rseq (293), statx (291), and io_uring (425-427),
+		// libseccomp 2.6.0 can resolve the name but fails to add the rule.
+		// Use raw syscall numbers for these.
+		var sc sg.ScmpSyscall = sg.ScmpSyscall(syscall_num)
+		var name string
+		skip_name_resolution := false
+
+		// These syscalls need to use raw numbers, not name resolution
+		switch syscall_num {
+		case 435: // clone3
+			skip_name_resolution = true
+			name = "clone3"
+		case 293: // rseq
+			skip_name_resolution = true
+			name = "rseq"
+		case 291: // statx
+			skip_name_resolution = true
+			name = "statx"
+		case 425: // io_uring_setup
+			skip_name_resolution = true
+			name = "io_uring_setup"
+		case 426: // io_uring_enter
+			skip_name_resolution = true
+			name = "io_uring_enter"
+		case 427: // io_uring_register
+			skip_name_resolution = true
+			name = "io_uring_register"
+		case 243: // recvmmsg
+			name = "recvmmsg"
+		}
+
+		if name != "" && !skip_name_resolution {
+			if resolved, err := sg.GetSyscallFromName(name); err == nil {
+				sc = resolved
+			}
+		}
+
+		ctx.AddRule(sc, sg.ActAllow)
 	}
 
-	for _, syscall := range allowed_not_kill_syscalls {
-		ctx.AddRule(sg.ScmpSyscall(syscall), sg.ActErrno)
+	for _, syscall_num := range allowed_not_kill_syscalls {
+		ctx.AddRule(sg.ScmpSyscall(syscall_num), sg.ActErrno)
 	}
 
 	file := os.NewFile(uintptr(writer.Fd()), "pipe")

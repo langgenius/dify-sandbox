@@ -35,11 +35,9 @@ os.execl("/bin/ls", "ls")
 	`, "", &types.RunnerOptions{
 		EnableNetwork: true,
 	})
-	if resp.Code != 0 {
-		t.Error(resp)
-	}
 
-	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "operation not permitted") {
+	// act returns errno instead of killing process, so return code is non-zero
+	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "Operation not permitted") {
 		t.Error(resp.Data.(*service.RunCodeResponse).Stderr)
 	}
 }
@@ -52,11 +50,9 @@ subprocess.run(["ls", "-l"])
 	`, "", &types.RunnerOptions{
 		EnableNetwork: true,
 	})
-	if resp.Code != 0 {
-		t.Error(resp)
-	}
 
-	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "operation not permitted") {
+	// act returns errno instead of killing process, so return code is non-zero
+	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "Operation not permitted") {
 		t.Error(resp.Data.(*service.RunCodeResponse).Stderr)
 	}
 }

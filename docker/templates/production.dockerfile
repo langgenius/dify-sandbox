@@ -57,4 +57,6 @@ RUN case "${TARGETARCH}" in \
 ENV NODE_TAR_XZ=/opt/node-${NODEJS_VERSION}-linux-__ARCH__.tar.xz
 ENV NODE_DIR=/opt/node-${NODEJS_VERSION}-linux-__ARCH__
 
+EXPOSE 8194
+
 ENTRYPOINT ["/entrypoint.sh"] 
