@@ -69,6 +69,10 @@ func (p *NodeJsRunner) Run(
 		)
 		cmd.Env = []string{}
 
+		// Set NODE_EXTRA_CA_CERTS to help Node.js find CA certificates in chroot
+		// This is needed for fetch (undici) to verify TLS certificates
+		cmd.Env = append(cmd.Env, "NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt")
+
 		if len(configuration.AllowedSyscalls) > 0 {
 			cmd.Env = append(
 				cmd.Env,

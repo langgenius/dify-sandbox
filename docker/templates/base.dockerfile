@@ -11,6 +11,7 @@ RUN echo "deb ${DEBIAN_MIRROR}" > /etc/apt/sources.list \
     && apt-get install -y --no-install-recommends \
        pkg-config \
        libseccomp-dev \
+       ca-certificates \
        wget \
        curl \
        xz-utils \
