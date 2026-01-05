@@ -10,8 +10,9 @@ import (
 )
 
 type RunCodeResponse struct {
-	Stderr string `json:"error"`
-	Stdout string `json:"stdout"`
+	Stderr string            `json:"error"`
+	Stdout string            `json:"stdout"`
+	Files  map[string][]byte `json:"files"`
 }
 
 func RunPython3Code(code string, preload string, options *runner_types.RunnerOptions) *types.DifySandboxResponse {
@@ -22,13 +23,14 @@ func RunPython3Code(code string, preload string, options *runner_types.RunnerOpt
 	if !static.GetDifySandboxGlobalConfigurations().EnablePreload {
 	    preload = ""
 	}
-	
+
 	timeout := time.Duration(
 		static.GetDifySandboxGlobalConfigurations().WorkerTimeout * int(time.Second),
 	)
 
+	// ... inside RunPython3Code ...
 	runner := python.PythonRunner{}
-	stdout, stderr, done, err := runner.Run(
+	stdout, stderr, done, filesChan, err := runner.Run(
 		code, timeout, nil, preload, options,
 	)
 	if err != nil {
@@ -37,22 +39,40 @@ func RunPython3Code(code string, preload string, options *runner_types.RunnerOpt
 
 	stdout_str := ""
 	stderr_str := ""
+    var files map[string][]byte
 
 	defer close(done)
 	defer close(stdout)
 	defer close(stderr)
+    // filesChan is closed by runner
 
 	for {
 		select {
 		case <-done:
+			// Attempt to read files if available and not yet read
+			if files == nil && filesChan != nil {
+				select {
+				case f, ok := <-filesChan:
+					if ok {
+						files = f
+					}
+				default:
+				}
+			}
 			return types.SuccessResponse(&RunCodeResponse{
 				Stdout: stdout_str,
 				Stderr: stderr_str,
+				Files:  files,
 			})
 		case out := <-stdout:
 			stdout_str += string(out)
 		case err := <-stderr:
 			stderr_str += string(err)
+		case f, ok := <-filesChan:
+			if ok {
+				files = f
+			}
+			filesChan = nil // Stop listening to avoid busy loop on closed channel
 		}
 	}
 }

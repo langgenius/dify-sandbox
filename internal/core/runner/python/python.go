@@ -32,27 +32,50 @@ func (p *PythonRunner) Run(
 	stdin []byte,
 	preload string,
 	options *types.RunnerOptions,
-) (chan []byte, chan []byte, chan bool, error) {
+) (chan []byte, chan []byte, chan bool, chan map[string][]byte, error) {
 	configuration := static.GetDifySandboxGlobalConfigurations()
 
 	// initialize the environment
 	untrusted_code_path, key, err := p.InitializeEnvironment(code, preload, options)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
+
+    filesChan := make(chan map[string][]byte, 1)
 
 	// capture the output
 	output_handler := runner.NewOutputCaptureRunner()
 	output_handler.SetTimeout(timeout)
 	output_handler.SetAfterExitHook(func() {
+        // Read requested files before cleanup
+        files := make(map[string][]byte)
+        if options != nil && len(options.FetchFiles) > 0 {
+            runDir := path.Dir(untrusted_code_path)
+            for _, filename := range options.FetchFiles {
+                filePath := path.Join(runDir, filename)
+                // ensure strict path safety
+                if !strings.HasPrefix(path.Clean(filePath), runDir) {
+                    continue
+                }
+                content, err := os.ReadFile(filePath)
+                if err == nil {
+                    files[filename] = content
+                }
+            }
+        }
+        filesChan <- files
+        close(filesChan)
+
 		// remove the entire run directory
 		os.RemoveAll(path.Dir(untrusted_code_path))
 	})
 
+     // ... (rest is unchanged essentially, just returning the channel)
+    // but the rest of the function needs to be checked for `return` statements that need update.
+
     // calculate runDir from untrusted_code_path
     runDir := path.Dir(untrusted_code_path)
-    // untrusted_code_path is .../tmp/<uuid>/<uuid>.py
-    // runDir is .../tmp/<uuid>
+    // ...
     runID := path.Base(runDir)
     relRunDir := path.Join("tmp", runID)
 
@@ -94,10 +117,10 @@ func (p *PythonRunner) Run(
 
 	err = output_handler.CaptureOutput(cmd)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	return output_handler.GetStdout(), output_handler.GetStderr(), output_handler.GetDone(), nil
+	return output_handler.GetStdout(), output_handler.GetStderr(), output_handler.GetDone(), filesChan, nil
 }
 
 func (p *PythonRunner) InitializeEnvironment(code string, preload string, options *types.RunnerOptions) (string, string, error) {
@@ -117,6 +140,12 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 		return "", "", err
 	}
 
+    // Change ownership of the run directory to the sandbox user so they can write files
+    err = os.Chown(runDir, static.SANDBOX_USER_UID, static.SANDBOX_GROUP_ID)
+    if err != nil {
+        return "", "", err
+    }
+
 	// Write uploaded files
     if options.Files != nil {
         for filename, content := range options.Files {
@@ -128,8 +157,14 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
              // Ensure parent dir exists
              os.MkdirAll(path.Dir(filePath), 0755)
              os.WriteFile(filePath, []byte(content), 0644)
+             // Also chown the file
+             os.Chown(filePath, static.SANDBOX_USER_UID, static.SANDBOX_GROUP_ID)
         }
     }
+
+    // ... (rest of InitializeEnvironment)
+
+
 
 	script := strings.Replace(
 		string(sandbox_fs),

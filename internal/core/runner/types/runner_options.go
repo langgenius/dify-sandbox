@@ -10,6 +10,7 @@ type Dependency struct {
 type RunnerOptions struct {
 	EnableNetwork bool              `json:"enable_network"`
 	Files         map[string]string `json:"files"`
+	FetchFiles    []string          `json:"fetch_files"`
 }
 
 func (r *RunnerOptions) Json() string {
