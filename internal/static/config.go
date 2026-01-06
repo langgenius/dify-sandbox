@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/langgenius/dify-sandbox/internal/types"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 	"gopkg.in/yaml.v3"
@@ -81,6 +82,14 @@ func InitConfig(path string) error {
 	python_pip_mirror_url := os.Getenv("PIP_MIRROR_URL")
 	if python_pip_mirror_url != "" {
 		difySandboxGlobalConfigurations.PythonPipMirrorURL = python_pip_mirror_url
+	}
+
+	python_deps_path := os.Getenv("PYTHON_DEPS_PATH")
+	if python_deps_path != "" {
+		difySandboxGlobalConfigurations.PythonDepsPath = python_deps_path
+	}
+	if difySandboxGlobalConfigurations.PythonDepsPath == "" {
+		difySandboxGlobalConfigurations.PythonDepsPath = "/dependencies/python-requirements.txt"
 	}
 
 	python_deps_update_interval := os.Getenv("PYTHON_DEPS_UPDATE_INTERVAL")
@@ -173,7 +182,7 @@ func GetRunnerDependencies() RunnerDependencies {
 }
 
 func SetupRunnerDependencies() error {
-	file, err := os.ReadFile("dependencies/python-requirements.txt")
+	file, err := os.ReadFile(difySandboxGlobalConfigurations.PythonDepsPath)
 	if err != nil {
 		if err == os.ErrNotExist {
 			return nil
@@ -183,5 +192,49 @@ func SetupRunnerDependencies() error {
 
 	runnerDependencies.PythonRequirements = string(file)
 
+	go watch()
 	return nil
+}
+
+func watch() {
+	//使用fsnotify监听文件变化
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Error("watch python dependencies failed, new_watch error: %v", err)
+	}
+	defer watcher.Close()
+	err = watcher.Add(difySandboxGlobalConfigurations.PythonDepsPath)
+	if err != nil {
+		log.Error("watch python dependencies failed, add_watch error: %v", err)
+		return
+	}
+
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) {
+				log.Info("python dependencies changed, reloading...")
+				file, err := os.ReadFile(difySandboxGlobalConfigurations.PythonDepsPath)
+				if err != nil {
+					log.Error("watch python dependencies failed, read_file error: %v", err)
+					continue
+				}
+				log.Debug("python dependencies changed, reloading..., new content: %s", string(file))
+				runnerDependencies.PythonRequirements = string(file)
+			} else if event.Has(fsnotify.Remove) || event.Has(fsnotify.Rename) {
+				if err := watcher.Add(difySandboxGlobalConfigurations.PythonDepsPath); err != nil {
+					log.Error("watch python dependencies failed, readd_watch error: %v", err)
+					continue
+				}
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			log.Error("watch python dependencies failed, event error: %v", err)
+		}
+	}
 }
