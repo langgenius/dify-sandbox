@@ -18,7 +18,7 @@ func (s *TempDirRunner) WithTempDir(basedir string, paths []string, closures fun
 
 	// create a tmp dir
 	tmp_dir := path.Join(basedir, "tmp", "sandbox-"+uuid.String())
-	err = os.Mkdir(tmp_dir, 0755)
+	err = os.MkdirAll(tmp_dir, 0755)
 	if err != nil {
 		return err
 	}
