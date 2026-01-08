@@ -67,7 +67,7 @@ console.log(JSON.stringify({"hello": "world"}));
 			EnableNetwork: true,
 		})
 		if resp.Code != 0 {
-			t.Error(resp)
+			t.Fatal(resp)
 		}
 
 		if resp.Data.(*service.RunCodeResponse).Stderr != "" {
@@ -75,6 +75,82 @@ console.log(JSON.stringify({"hello": "world"}));
 		}
 
 		if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, `{"hello":"world"}`) {
+			t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
+		}
+	})
+}
+
+func TestNodejsAsyncTemplate(t *testing.T) {
+	const code = `// declare main function
+function main({a}) {
+	return {b: a}
+}
+
+async function wrap() {
+    // decode and prepare input object
+    var inputs_obj = JSON.parse(Buffer.from('eyJhIjoiYSJ9', 'base64').toString('utf-8'))
+
+    // execute main function
+    var output_obj = await main(inputs_obj)
+    
+    // convert output to json and print
+    var output_json = JSON.stringify(output_obj)
+    var result = ` + "`<<RESULT>>${output_json}<<RESULT>>`" + `
+    console.log(result)
+}
+wrap()
+`
+
+	runMultipleTestings(t, 30, func(t *testing.T) {
+		resp := service.RunNodeJsCode(code, "", &types.RunnerOptions{
+			EnableNetwork: false,
+		})
+		if resp.Code != 0 {
+			t.Error(resp)
+		}
+		if resp.Data.(*service.RunCodeResponse).Stderr != "" {
+			t.Fatalf("unexpected error: %s\n", resp.Data.(*service.RunCodeResponse).Stderr)
+		}
+		if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, `{"b":"a"}`) {
+			t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
+		}
+	})
+}
+
+func TestNodejsAsyncFetch(t *testing.T) {
+	// Test case for json
+	runMultipleTestings(t, 30, func(t *testing.T) {
+		const code = `// declare main function
+async function main({a}) {
+	return {b: await (await fetch("https://www.bilibili.com")).text()}
+}
+
+// decode and prepare input object
+var inputs_obj = JSON.parse(Buffer.from('eyJhIjoiYSJ9', 'base64').toString('utf-8'))
+
+async function wrap() {
+    // execute main function
+    var output_obj = await main(inputs_obj)
+
+    // convert output to json and print
+    var output_json = JSON.stringify(output_obj)
+    var result = ` + "`<<RESULT>>${output_json}<<RESULT>>`" + `
+    console.log(result)
+}
+wrap()
+`
+		resp := service.RunNodeJsCode(code, "", &types.RunnerOptions{
+			EnableNetwork: true,
+		})
+		if resp.Code != 0 {
+			t.Error(resp)
+		}
+
+		if resp.Data.(*service.RunCodeResponse).Stderr != "" {
+			t.Fatalf("unexpected error: %s\n", resp.Data.(*service.RunCodeResponse).Stderr)
+		}
+
+		if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, `bilibili`) {
 			t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
 		}
 	})
