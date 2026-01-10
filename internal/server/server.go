@@ -9,6 +9,7 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/core/runner/python"
 	"github.com/langgenius/dify-sandbox/internal/static"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func initConfig() {
@@ -37,6 +38,9 @@ func initServer() {
 	if gin.Mode() == gin.DebugMode {
 		r.Use(gin.Logger())
 	}
+
+	// Expose Prometheus metrics at /metrics
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	controller.Setup(r)
 
