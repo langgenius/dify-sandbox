@@ -6,7 +6,7 @@ import (
 	"strings"
 	"syscall"
 
-	// "github.com/langgenius/dify-sandbox/internal/core/lib"
+	"github.com/langgenius/dify-sandbox/internal/core/lib"
 	"github.com/langgenius/dify-sandbox/internal/static/python_syscall"
 )
 
@@ -14,7 +14,7 @@ import (
 
 func InitSeccomp(uid int, gid int, enable_network bool) error {
 	var err error
-	// err := syscall.Chroot(".")
+	// err = syscall.Chroot(".")
 	// if err != nil {
 	// 	// return err
 	// }
@@ -23,7 +23,7 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 	// 	// return err
 	// }
 
-	// lib.SetNoNewPrivs()
+	lib.SetNoNewPrivs()
 
 	allowed_syscalls := []int{}
 	allowed_not_kill_syscalls := []int{}
@@ -46,10 +46,10 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 		}
 	}
 
-	// err = lib.Seccomp(allowed_syscalls, allowed_not_kill_syscalls)
-	// if err != nil {
-	// 	// return err
-	// }
+	err = lib.Seccomp(allowed_syscalls, allowed_not_kill_syscalls)
+	if err != nil {
+		return err
+	}
 
 	// setgid
 	err = syscall.Setgid(gid)
