@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	LIB_PATH     = "/var/sandbox/sandbox-nodejs"
+	LIB_PATH     = "/tmp/sandbox-nodejs"
 	LIB_NAME     = "nodejs.so"
 	PROJECT_NAME = "nodejs-project"
 )
@@ -31,17 +31,20 @@ func releaseLibBinary() {
 
 	err := os.MkdirAll(LIB_PATH, 0755)
 	if err != nil {
-		log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
+		log.Error(fmt.Sprintf("failed to create %s (proceeding anyway)", LIB_PATH))
+		return
 	}
 	err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), nodejs_lib, 0755)
 	if err != nil {
-		log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, PROJECT_NAME)))
+		log.Error(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, PROJECT_NAME)))
+		return
 	}
 
 	// copy the nodejs project into /tmp/sandbox-nodejs-project
 	err = os.MkdirAll(path.Join(LIB_PATH, PROJECT_NAME), 0755)
 	if err != nil {
-		log.Panic(fmt.Sprintf("failed to create %s", path.Join(LIB_PATH, PROJECT_NAME)))
+		log.Error(fmt.Sprintf("failed to create %s", path.Join(LIB_PATH, PROJECT_NAME)))
+		return
 	}
 
 	// copy the nodejs project into /tmp/sandbox-nodejs-project
@@ -79,7 +82,7 @@ func releaseLibBinary() {
 
 	err = recursively_copy("dependens", path.Join(LIB_PATH, PROJECT_NAME))
 	if err != nil {
-		log.Panic("failed to copy nodejs project")
+		log.Error("failed to copy nodejs project")
 	}
 	log.Info("nodejs runner environment initialized")
 }

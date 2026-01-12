@@ -21,7 +21,7 @@ import (
 var python_lib []byte
 
 const (
-	LIB_PATH = "/var/sandbox/sandbox-python"
+	LIB_PATH = "/tmp/sandbox-python"
 	LIB_NAME = "python.so"
 )
 
@@ -36,27 +36,32 @@ func releaseLibBinary(force_remove_old_lib bool) {
 		if force_remove_old_lib {
 			err := os.Remove(path.Join(LIB_PATH, LIB_NAME))
 			if err != nil {
-				log.Panic(fmt.Sprintf("failed to remove %s", path.Join(LIB_PATH, LIB_NAME)))
+				log.Error(fmt.Sprintf("failed to remove %s", path.Join(LIB_PATH, LIB_NAME)))
+				return
 			}
 
 			// write the new lib
 			err = os.MkdirAll(LIB_PATH, 0755)
 			if err != nil {
-				log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
+				log.Error(fmt.Sprintf("failed to create %s (proceeding anyway)", LIB_PATH))
+				return
 			}
 			err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755)
 			if err != nil {
-				log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
+				log.Error(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
+				return
 			}
 		}
 	} else {
 		err = os.MkdirAll(LIB_PATH, 0755)
 		if err != nil {
-			log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
+			log.Error(fmt.Sprintf("failed to create %s (proceeding anyway)", LIB_PATH))
+			return
 		}
 		err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755)
 		if err != nil {
-			log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
+			log.Error(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
+			return
 		}
 		log.Info("python runner environment initialized")
 	}

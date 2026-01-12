@@ -8,6 +8,7 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/controller"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/python"
 	"github.com/langgenius/dify-sandbox/internal/static"
+	"github.com/langgenius/dify-sandbox/internal/storage"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
@@ -24,6 +25,14 @@ func initConfig() {
 		log.Error("failed to setup runner dependencies: %v", err)
 	}
 	log.Info("runner dependencies init success")
+
+	// Init storage
+	storageBaseDir := static.GetDifySandboxGlobalConfigurations().StoragePath
+	if storageBaseDir == "" {
+		storageBaseDir = "data/sandbox"
+	}
+	storage.InitStorage(storageBaseDir)
+	log.Info("storage init success")
 }
 
 func initServer() {
