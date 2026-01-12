@@ -1,23 +1,66 @@
 package service
 
 import (
+	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner/python"
 	runner_types "github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
+	"github.com/langgenius/dify-sandbox/internal/storage"
 	"github.com/langgenius/dify-sandbox/internal/types"
 )
 
 type RunCodeResponse struct {
 	Stderr string            `json:"error"`
 	Stdout string            `json:"stdout"`
-	Files  map[string][]byte `json:"files"`
+	Files  map[string]string `json:"files"`
 }
 
-func RunPython3Code(code string, preload string, options *runner_types.RunnerOptions) *types.DifySandboxResponse {
+// inputFiles is map[filename]file_id
+func RunPython3Code(code string, preload string, enableNetwork bool, inputFiles map[string]string, fetchFiles []string) *types.DifySandboxResponse {
+	// Reconstruct options
+	// Note: We are creating RunnerOptions here now, instead of receiving it
+	options := &runner_types.RunnerOptions{
+		EnableNetwork: enableNetwork,
+		FetchFiles:    fetchFiles,
+		InputFiles:    make(map[string]io.Reader),
+	}
+
 	if err := checkOptions(options); err != nil {
 		return types.ErrorResponse(-400, err.Error())
+	}
+
+	// Prepare Input Files
+	store := storage.GetStorage()
+	var readersToClose []io.ReadCloser
+	defer func() {
+		for _, r := range readersToClose {
+			r.Close()
+		}
+	}()
+
+	for filename, fileId := range inputFiles {
+		reader, err := store.Get(fileId)
+		if err != nil {
+			return types.ErrorResponse(-400, fmt.Sprintf("failed to get input file %s: %v", filename, err))
+		}
+		options.InputFiles[filename] = reader
+		readersToClose = append(readersToClose, reader)
+	}
+
+	// Prepare Output Handler
+	options.OutputHandler = func(filename, localPath string) (string, error) {
+		f, err := os.Open(localPath)
+		if err != nil {
+			return "", err
+		}
+		defer f.Close()
+		// Upload to storage
+		// We can return the path/id
+		return store.Put(f, filename)
 	}
 
 	if !static.GetDifySandboxGlobalConfigurations().EnablePreload {
@@ -39,7 +82,7 @@ func RunPython3Code(code string, preload string, options *runner_types.RunnerOpt
 
 	stdout_str := ""
 	stderr_str := ""
-    var files map[string][]byte
+    var files map[string]string
 
 	defer close(done)
 	defer close(stdout)

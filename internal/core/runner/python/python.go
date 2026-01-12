@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -32,7 +33,7 @@ func (p *PythonRunner) Run(
 	stdin []byte,
 	preload string,
 	options *types.RunnerOptions,
-) (chan []byte, chan []byte, chan bool, chan map[string][]byte, error) {
+) (chan []byte, chan []byte, chan bool, chan map[string]string, error) {
 	configuration := static.GetDifySandboxGlobalConfigurations()
 
 	// initialize the environment
@@ -41,30 +42,34 @@ func (p *PythonRunner) Run(
 		return nil, nil, nil, nil, err
 	}
 
-    filesChan := make(chan map[string][]byte, 1)
+	filesChan := make(chan map[string]string, 1)
 
 	// capture the output
 	output_handler := runner.NewOutputCaptureRunner()
 	output_handler.SetTimeout(timeout)
 	output_handler.SetAfterExitHook(func() {
-        // Read requested files before cleanup
-        files := make(map[string][]byte)
-        if options != nil && len(options.FetchFiles) > 0 {
-            runDir := path.Dir(untrusted_code_path)
-            for _, filename := range options.FetchFiles {
-                filePath := path.Join(runDir, filename)
-                // ensure strict path safety
-                if !strings.HasPrefix(path.Clean(filePath), runDir) {
-                    continue
-                }
-                content, err := os.ReadFile(filePath)
-                if err == nil {
-                    files[filename] = content
-                }
-            }
-        }
-        filesChan <- files
-        close(filesChan)
+		// Read requested files before cleanup
+		files := make(map[string]string)
+		if options != nil && len(options.FetchFiles) > 0 {
+			runDir := path.Dir(untrusted_code_path)
+			for _, filename := range options.FetchFiles {
+				filePath := path.Join(runDir, filename)
+				// ensure strict path safety
+				if !strings.HasPrefix(path.Clean(filePath), runDir) {
+					continue
+				}
+
+				// Call OutputHandler if present
+				if options.OutputHandler != nil {
+					fileId, err := options.OutputHandler(filename, filePath)
+					if err == nil {
+						files[filename] = fileId
+					}
+				}
+			}
+		}
+		filesChan <- files
+		close(filesChan)
 
 		// remove the entire run directory
 		os.RemoveAll(path.Dir(untrusted_code_path))
@@ -143,24 +148,34 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
     // Change ownership of the run directory to the sandbox user so they can write files
     err = os.Chown(runDir, static.SANDBOX_USER_UID, static.SANDBOX_GROUP_ID)
     if err != nil {
-        return "", "", err
+        // return "", "", err
     }
 
 	// Write uploaded files
-    if options.Files != nil {
-        for filename, content := range options.Files {
-            filePath := path.Join(runDir, filename)
-             // ensure strict path safety to prevent directory traversal
-             if !strings.HasPrefix(path.Clean(filePath), runDir) {
-                 continue
-             }
-             // Ensure parent dir exists
-             os.MkdirAll(path.Dir(filePath), 0755)
-             os.WriteFile(filePath, []byte(content), 0644)
-             // Also chown the file
-             os.Chown(filePath, static.SANDBOX_USER_UID, static.SANDBOX_GROUP_ID)
-        }
-    }
+	if options.InputFiles != nil {
+		for filename, reader := range options.InputFiles {
+			filePath := path.Join(runDir, filename)
+			// ensure strict path safety to prevent directory traversal
+			if !strings.HasPrefix(path.Clean(filePath), runDir) {
+				continue
+			}
+			// Ensure parent dir exists
+			os.MkdirAll(path.Dir(filePath), 0755)
+
+			f, err := os.Create(filePath)
+			if err != nil {
+				return "", "", err
+			}
+			_, err = io.Copy(f, reader)
+			f.Close()
+			if err != nil {
+				return "", "", err
+			}
+
+			// Also chown the file
+			os.Chown(filePath, static.SANDBOX_USER_UID, static.SANDBOX_GROUP_ID)
+		}
+	}
 
     // ... (rest of InitializeEnvironment)
 
