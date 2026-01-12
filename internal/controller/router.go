@@ -22,6 +22,7 @@ func Setup(Router *gin.Engine) {
 
 	InitRunRouter(PrivateGroup)
 	InitDependencyRouter(PrivateGroup)
+	InitFileRouter(PrivateGroup)
 }
 
 func InitDependencyRouter(Router *gin.RouterGroup) {
@@ -42,5 +43,13 @@ func InitRunRouter(Router *gin.RouterGroup) {
 			middleware.MaxWorker(static.GetDifySandboxGlobalConfigurations().MaxWorkers),
 			RunSandboxController,
 		)
+	}
+}
+
+func InitFileRouter(Router *gin.RouterGroup) {
+	fileRouter := Router.Group("files")
+	{
+		fileRouter.POST("", UploadFile)
+		fileRouter.GET("/*file_id", DownloadFile)
 	}
 }

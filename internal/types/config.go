@@ -14,6 +14,7 @@ type DifySandboxGlobalConfigurations struct {
 	PythonPipMirrorURL       string   `yaml:"python_pip_mirror_url"`
 	PythonDepsUpdateInterval string   `yaml:"python_deps_update_interval"`
 	NodejsPath               string   `yaml:"nodejs_path"`
+	StoragePath              string   `yaml:"storage_path"`
 	EnableNetwork            bool     `yaml:"enable_network"`
 	EnablePreload            bool     `yaml:"enable_preload"`
 	AllowedSyscalls          []int    `yaml:"allowed_syscalls"`
