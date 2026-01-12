@@ -1,0 +1,27 @@
+{
+  "name": "sandbox-client",
+  "version": "0.1.0",
+  "description": "TypeScript client for Dify Sandbox",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "ts-node src/tests/integration.test.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "dify",
+    "sandbox",
+    "client"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0"
+  }
+}
