@@ -4,20 +4,26 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/service"
+	"github.com/langgenius/dify-sandbox/internal/storage"
 )
 
 func TestFileUpload(t *testing.T) {
-	// Test case for file upload
+	// 1. Upload file to storage
+	store := storage.GetStorage()
+	content := "hello verification"
+	reader := strings.NewReader(content)
+	fileId, err := store.Put(reader, "test.txt")
+	if err != nil {
+		t.Fatalf("failed to put file: %v", err)
+	}
+
+	// 2. Run code with file_id
 	resp := service.RunPython3Code(`
 print(open("test.txt").read())
-	`, "", &types.RunnerOptions{
-		EnableNetwork: false,
-		Files: map[string]string{
-			"test.txt": "hello verification",
-		},
-	})
+	`, "", false, map[string]string{
+		"test.txt": fileId,
+	}, nil)
 
 	if resp.Code != 0 {
 		t.Fatalf("Run failed with code %d. Message: %s", resp.Code, resp.Message)

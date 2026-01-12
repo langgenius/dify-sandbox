@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/service"
 )
 
@@ -15,9 +14,7 @@ func TestPythonBase64(t *testing.T) {
 		resp := service.RunPython3Code(`
 import base64
 print(base64.b64decode(base64.b64encode(b"hello world")).decode())
-		`, "", &types.RunnerOptions{
-			EnableNetwork: true,
-		})
+		`, "", true, nil, nil)
 		if resp.Code != 0 {
 			t.Fatal(resp)
 		}
@@ -38,9 +35,7 @@ func TestPythonJSON(t *testing.T) {
 		resp := service.RunPython3Code(`
 import json
 print(json.dumps({"hello": "world"}))
-		`, "", &types.RunnerOptions{
-			EnableNetwork: true,
-		})
+		`, "", true, nil, nil)
 		if resp.Code != 0 {
 			t.Fatal(resp)
 		}
@@ -61,9 +56,7 @@ func TestPythonRequests(t *testing.T) {
 		resp := service.RunPython3Code(`
 import requests
 print(requests.get("https://www.bilibili.com").content)
-	`, "", &types.RunnerOptions{
-			EnableNetwork: true,
-		})
+	`, "", true, nil, nil)
 		if resp.Code != 0 {
 			t.Fatal(resp)
 		}
@@ -84,9 +77,7 @@ func TestPythonHttpx(t *testing.T) {
 		resp := service.RunPython3Code(`
 import httpx
 print(httpx.get("https://www.bilibili.com").content)
-	`, "", &types.RunnerOptions{
-			EnableNetwork: true,
-		})
+	`, "", true, nil, nil)
 		if resp.Code != 0 {
 			t.Fatal(resp)
 		}
@@ -109,9 +100,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 print(datetime.now(ZoneInfo("Asia/Shanghai")).isoformat())
-		`, "", &types.RunnerOptions{
-			EnableNetwork: true,
-		})
+		`, "", true, nil, nil)
 		if resp.Code != 0 {
 			t.Fatal(resp)
 		}

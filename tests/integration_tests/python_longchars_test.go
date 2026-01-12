@@ -3,7 +3,6 @@ package integrationtests_test
 import (
 	"testing"
 
-	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/service"
 )
 
@@ -45,9 +44,7 @@ result = f'''<<RESULT>>
 <<RESULT>>'''
 
 print(result)
-		`, "", &types.RunnerOptions{
-			EnableNetwork: true,
-		})
+		`, "", true, nil, nil)
 		if resp.Code != 0 {
 			t.Fatal(resp)
 		}

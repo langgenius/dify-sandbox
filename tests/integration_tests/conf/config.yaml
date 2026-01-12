@@ -7,7 +7,7 @@ proxy:
 #  socks5: "socks5://127.0.0.1:2333"
 
 # sandbox
-python_path: "/usr/local/bin/python3"
+python_path: "/usr/bin/python3"
 python_lib_path: ""
 # nodejs_path: "/usr/local/bin/node"
 

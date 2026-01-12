@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/service"
 )
 
@@ -14,9 +13,7 @@ func TestSysFork(t *testing.T) {
 import os
 print(os.fork())
 print(123)
-	`, "", &types.RunnerOptions{
-		EnableNetwork: true,
-	})
+	`, "", true, nil, nil)
 
 	if resp.Code != 0 {
 		t.Error(resp)
@@ -33,9 +30,7 @@ func TestExec(t *testing.T) {
 	resp := service.RunPython3Code(`
 import os
 os.execl("/bin/ls", "ls")
-	`, "", &types.RunnerOptions{
-		EnableNetwork: true,
-	})
+	`, "", true, nil, nil)
 	if resp.Code != 0 {
 		t.Error(resp)
 	}
@@ -50,9 +45,7 @@ func TestRunCommand(t *testing.T) {
 	resp := service.RunPython3Code(`
 import subprocess
 subprocess.run(["ls", "-l"])
-	`, "", &types.RunnerOptions{
-		EnableNetwork: true,
-	})
+	`, "", true, nil, nil)
 	if resp.Code != 0 {
 		t.Error(resp)
 	}
@@ -65,9 +58,7 @@ subprocess.run(["ls", "-l"])
 func TestReadEtcPasswd(t *testing.T) {
 	resp := service.RunPython3Code(`
 print(open("/etc/passwd").read())
-	`, "", &types.RunnerOptions{
-		EnableNetwork: true,
-	})
+	`, "", true, nil, nil)
 	if resp.Code != 0 {
 		t.Error(resp)
 	}
