@@ -19,6 +19,9 @@ jobs:
     strategy:
       matrix:
         arch: [amd64, arm64]
+    secrets:
+      DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -42,6 +45,13 @@ jobs:
         run: |
           cd docker
           ./generate.sh test ${{ matrix.arch }}
+
+      - name: Login to Docker Hardened Images
+        uses: docker/login-action@v2
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and run tests
         run: |
