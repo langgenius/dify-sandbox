@@ -1,6 +1,6 @@
 # Base Dockerfile template - shared system dependencies installation logic
-ARG PYTHON_VERSION=3.10-slim-bookworm
-FROM python:${PYTHON_VERSION}
+ARG PYTHON_VERSION=dhi.io/python:3-debian13-sfw-ent-dev
+FROM ${PYTHON_VERSION}
 
 # Build arguments
 ARG DEBIAN_MIRROR="http://deb.debian.org/debian testing main"
@@ -18,6 +18,7 @@ RUN echo "deb ${DEBIAN_MIRROR}" > /etc/apt/sources.list \
        expat \
        perl \
        libsqlite3-0 \
+       passwd \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

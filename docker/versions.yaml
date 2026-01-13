@@ -1,8 +1,8 @@
 # Version configuration file - centralized management of all software versions
 versions:
   # Base images
-  python: "3.10-slim-bookworm"
-  golang: "1.24.9"
+  python: "dhi.io/python:3-debian13-sfw-ent-dev"
+  golang: "1.24.11"
   nodejs: "v20.11.1"
   
   # Python packages (unified configuration)

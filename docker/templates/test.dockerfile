@@ -1,6 +1,6 @@
 # Test environment Dockerfile template
 ARG GOLANG_VERSION=1.23.9
-ARG PYTHON_VERSION=3.10-slim-bookworm
+ARG PYTHON_VERSION=dhi.io/python:3-debian13-sfw-ent-dev
 ARG DEBIAN_MIRROR="http://deb.debian.org/debian testing main"
 ARG PYTHON_PACKAGES="httpx==0.27.2 requests==2.32.3 jinja2==3.1.6 PySocks httpx[socks]"
 ARG NODEJS_VERSION=v20.11.1
@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y pkg-config gcc libseccomp-dev \
        esac
 
 # Test stage
-FROM python:${PYTHON_VERSION} as tester
+FROM ${PYTHON_VERSION} as tester
 
 ARG DEBIAN_MIRROR
 ARG PYTHON_PACKAGES
@@ -47,6 +47,7 @@ RUN echo "deb ${DEBIAN_MIRROR}" > /etc/apt/sources.list \
        expat \
        perl \
        libsqlite3-0 \
+       passwd \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
