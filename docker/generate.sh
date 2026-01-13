@@ -76,7 +76,7 @@ case "$ARCHITECTURE" in
 esac
 
 # Generate Dockerfile
-sed -e "s/\${PYTHON_VERSION}/${PYTHON_VERSION}/g" \
+sed -e "s#\${PYTHON_VERSION}#${PYTHON_VERSION}#g" \
     -e "s/\${GOLANG_VERSION}/${GOLANG_VERSION}/g" \
     -e "s/\${NODEJS_VERSION}/${NODEJS_VERSION}/g" \
     -e "s|\${PYTHON_PACKAGES}|${PYTHON_PACKAGES}|g" \
