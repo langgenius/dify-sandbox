@@ -3,6 +3,7 @@ package python
 import (
 	_ "embed"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -116,6 +117,24 @@ func InstallDependencies(requirements string) error {
 		if pipMirrorURL != "" {
 			// If a mirror URL is provided, include it in the command arguments
 			args = append(args, "-i", pipMirrorURL)
+
+			// Check if the URL is not using HTTPS
+			if !strings.HasPrefix(pipMirrorURL, "https://") {
+			    // Parse the URL to extract host and port
+			    parsedURL, err := url.Parse(pipMirrorURL)
+			    if err != nil {
+			        // Handle error if URL is invalid
+			        log.Error("Invalid pip mirror URL: %v", err)
+		            return err
+			    }
+
+			    // Extract host (include port if present)
+			    host := parsedURL.Host
+			    if host != "" {
+			        // Add --trusted-host argument
+			        args = append(args, "--trusted-host", host)
+			    }
+			}
 		}
 		cmd := exec.Command("pip3", args...)
 		reader, err := cmd.StdoutPipe()
