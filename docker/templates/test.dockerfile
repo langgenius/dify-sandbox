@@ -79,6 +79,7 @@ RUN case "${TARGETARCH}" in \
     && wget -O /opt/node-${NODEJS_VERSION}-${NODEJS_ARCH}.tar.xz \
        ${NODEJS_MIRROR}/${NODEJS_VERSION}/node-${NODEJS_VERSION}-${NODEJS_ARCH}.tar.xz \
     && tar -xvf /opt/node-${NODEJS_VERSION}-${NODEJS_ARCH}.tar.xz -C /opt \
+    && mkdir -p /usr/local/bin \
     && ln -s /opt/node-${NODEJS_VERSION}-${NODEJS_ARCH}/bin/node /usr/local/bin/node \
     && rm -f /opt/node-${NODEJS_VERSION}-${NODEJS_ARCH}.tar.xz
 
