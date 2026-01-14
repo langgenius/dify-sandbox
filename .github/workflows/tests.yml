@@ -19,9 +19,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64, arm64]
-    secrets:
-      DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
     steps:
       - name: Checkout code
