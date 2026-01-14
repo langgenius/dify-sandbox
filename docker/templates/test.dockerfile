@@ -96,7 +96,6 @@ RUN case "${TARGETARCH}" in \
     && wget ${GOLANG_MIRROR}/go${GOLANG_VERSION}.${GOLANG_ARCH}.tar.gz \
     && tar -C /usr/local -xzf go${GOLANG_VERSION}.${GOLANG_ARCH}.tar.gz \
     && ln -s /usr/local/go/bin/go /usr/local/bin/go \
-    && ln -s /opt/python/bin/python3 /usr/local/bin/python3 \
     && rm -f go${GOLANG_VERSION}.${GOLANG_ARCH}.tar.gz
 
 # Run tests
