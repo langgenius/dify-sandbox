@@ -3,6 +3,7 @@ package python
 import (
 	_ "embed"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -116,6 +117,8 @@ func InstallDependencies(requirements string) error {
 		if pipMirrorURL != "" {
 			// If a mirror URL is provided, include it in the command arguments
 			args = append(args, "-i", pipMirrorURL)
+			parsedUrl, _ := url.Parse(pipMirrorURL)
+			args = append(args, "--trusted-host", parsedUrl.Host)
 		}
 		cmd := exec.Command("pip3", args...)
 		reader, err := cmd.StdoutPipe()
