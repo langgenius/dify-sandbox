@@ -1,245 +1,162 @@
 package log
 
-/*
-	log module is used to write log info to log file
-	open a log file when log was created, and close it when log was destroyed
-*/
-
 import (
+	"context"
 	"fmt"
-	go_log "log"
+	"io"
+	"log/slog"
 	"os"
-	"time"
-)
+	"sync"
 
-type Log struct {
-	Level int
-	//File of log
-	File *os.File
-	path string
-}
+	"gopkg.in/natefinch/lumberjack.v2"
+)
 
 const (
-	LOG_LEVEL_DEBUG = 0
-	LOG_LEVEL_INFO  = 1
-	LOG_LEVEL_WARN  = 2
-	LOG_LEVEL_ERROR = 3
+	defaultLogPath = "./logs"
 )
 
-func (l *Log) Debug(format string, stdout bool, v ...interface{}) {
-	if l.Level <= LOG_LEVEL_DEBUG {
-		l.writeLog("DEBUG", format, stdout, v...)
-	}
+// global configuration
+var (
+	mainLogger        *slog.Logger
+	configuredLogPath string
+	showLog           bool = true
+	mu                sync.RWMutex
+)
+
+type LoggerConfig struct {
+	Filename   string
+	MaxSize    int
+	MaxBackups int
+	MaxAge     int
+	Compress   bool
 }
 
-func (l *Log) Info(format string, stdout bool, v ...interface{}) {
-	if l.Level <= LOG_LEVEL_INFO {
-		l.writeLog("INFO", format, stdout, v...)
-	}
+// InitFromConfig initializes the logger with configuration
+func InitFromConfig(logPath string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	configuredLogPath = logPath
+	return reinitializeLogger()
 }
 
-func (l *Log) Warn(format string, stdout bool, v ...interface{}) {
-	if l.Level <= LOG_LEVEL_WARN {
-		l.writeLog("WARN", format, stdout, v...)
+func reinitializeLogger() error {
+	config := LoggerConfig{
+		Filename:   getLogPath() + "/app.log",
+		MaxSize:    100,
+		MaxBackups: 30,
+		MaxAge:     30,
+		Compress:   true,
 	}
+
+	return initLoggerWithConfig(config, true)
 }
 
-func (l *Log) Error(format string, stdout bool, v ...interface{}) {
-	if l.Level <= LOG_LEVEL_ERROR {
-		l.writeLog("ERROR", format, stdout, v...)
+func getLogPath() string {
+	if configuredLogPath != "" {
+		return configuredLogPath
 	}
+	return defaultLogPath
 }
 
-func (l *Log) Panic(format string, stdout bool, v ...interface{}) {
-	l.writeLog("PANIC", format, stdout, v...)
-	panic("")
-}
-
-func (l *Log) writeLog(level string, format string, stdout bool, v ...interface{}) {
-	//if the next day is coming, reopen file
-	if time.Now().Format("/2006-01-02.log") != l.File.Name() {
-		l.File.Close()
-		l.OpenFile()
-	}
-	//test if file is closed
-	if l.File == nil {
-		//open file
-		err := l.OpenFile()
-		if err != nil {
-			panic(err)
-		}
-	}
-	//write log
-	format = fmt.Sprintf("["+level+"]"+format, v...)
-
-	if show_log && stdout {
-		logger.Output(4, format)
+func initLoggerWithConfig(config LoggerConfig, showStdout bool) error {
+	lumberjackLogger := &lumberjack.Logger{
+		Filename:   config.Filename,
+		MaxSize:    config.MaxSize,
+		MaxBackups: config.MaxBackups,
+		MaxAge:     config.MaxAge,
+		Compress:   config.Compress,
+		LocalTime:  true,
 	}
 
-	_, err := l.File.Write([]byte(format + "\n"))
-	if err != nil {
-		//reopen file
-		l.File.Close()
-		l.OpenFile()
+	var writer io.Writer = lumberjackLogger
+	if showStdout {
+		writer = io.MultiWriter(lumberjackLogger, os.Stdout)
 	}
-}
 
-func (l *Log) SetLogLevel(level int) {
-	l.Level = level
-}
+	handler := slog.NewJSONHandler(writer, &slog.HandlerOptions{
+		AddSource: false,
+		Level:     slog.LevelDebug,
+	})
 
-func (l *Log) OpenFile() error {
-	//test if file is closed
-	if l.File == nil {
-		//open file
-		file, err := os.OpenFile(l.path+time.Now().Format("/2006-01-02.log"), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
-		if err != nil {
-			return err
-		}
-		l.File = file
-	}
-	//test if file is writable
-	_, err := l.File.Write([]byte(" "))
-	if err != nil {
-		//reopen file
-		l.File.Close()
-		file, err := os.OpenFile(l.path+time.Now().Format("/2006-01-02.log"), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
-		if err != nil {
-			return err
-		}
-		l.File = file
-	}
+	mainLogger = slog.New(handler)
 	return nil
 }
 
-func NewLog(path string) (*Log, error) {
-	if path == "" {
-		path = "log"
-	}
-	//test if path is exist
-	_, err := os.Stat(path)
-	if err != nil {
-		//create path
-		err = os.MkdirAll(path, 0777)
-		if err != nil {
-			return nil, err
-		}
-	}
-	// test if path is a directory
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		return nil, err
-	}
-	if !fileInfo.IsDir() {
-		return nil, fmt.Errorf("log file path %s is not a directory", path)
-	}
-
-	log := &Log{
-		Level: LOG_LEVEL_DEBUG,
-		path:  path,
-	}
-	//open file
-	err = log.OpenFile()
-	if err != nil {
-		return nil, err
-	}
-	return log, nil
-}
-
 func init() {
-	// why logger will cause panic when call
-	initlog()
-}
-
-func initlog() {
-	var err error
-	main_log, err = NewLog("./logs")
-	if err != nil {
+	if err := initlog(); err != nil {
 		panic(err)
 	}
 }
 
-var main_log *Log // wapper of go_log
-var show_log bool = true
-var logger = go_log.New(os.Stdout, "", go_log.Ldate|go_log.Ltime|go_log.Lshortfile)
+func initlog() error {
+	config := LoggerConfig{
+		Filename:   getLogPath() + "/app.log",
+		MaxSize:    100,
+		MaxBackups: 30,
+		MaxAge:     30,
+		Compress:   true,
+	}
 
-func SetShowLog(show bool) {
-	show_log = show
+	return initLoggerWithConfig(config, true)
 }
 
-func SetLogLevel(level int) {
-	if main_log == nil {
-		initlog()
+func logMsg(level slog.Level, format string, stdout bool, v ...interface{}) {
+	mu.RLock()
+	logger := mainLogger
+	mu.RUnlock()
+
+	if logger == nil {
+		if err := initlog(); err != nil {
+			panic(err)
+		}
+		logger = mainLogger
 	}
-	main_log.SetLogLevel(level)
+
+	msg := fmt.Sprintf(format, v...)
+
+	switch level {
+	case slog.LevelDebug:
+		logger.Log(context.Background(), slog.LevelDebug, msg)
+	case slog.LevelInfo:
+		logger.Log(context.Background(), slog.LevelInfo, msg)
+	case slog.LevelWarn:
+		logger.Log(context.Background(), slog.LevelWarn, msg)
+	case slog.LevelError:
+		logger.Log(context.Background(), slog.LevelError, msg)
+	}
+
+	// print to stdout if requested
+	if stdout && showLog {
+		switch level {
+		case slog.LevelDebug:
+			fmt.Println("[DEBUG]" + msg)
+		case slog.LevelInfo:
+			fmt.Println("[INFO]" + msg)
+		case slog.LevelWarn:
+			fmt.Println("[WARN]" + msg)
+		case slog.LevelError:
+			fmt.Println("[ERROR]" + msg)
+		}
+	}
 }
 
 func Debug(format string, v ...interface{}) {
-	if main_log == nil {
-		initlog()
-	}
-	main_log.Debug(format, true, v...)
+	logMsg(slog.LevelDebug, format, true, v...)
 }
 
 func Info(format string, v ...interface{}) {
-	if main_log == nil {
-		initlog()
-	}
-	main_log.Info(format, true, v...)
+	logMsg(slog.LevelInfo, format, true, v...)
 }
 
 func Warn(format string, v ...interface{}) {
-	if main_log == nil {
-		initlog()
-	}
-	main_log.Warn(format, true, v...)
+	logMsg(slog.LevelWarn, format, true, v...)
 }
 
 func Error(format string, v ...interface{}) {
-	if main_log == nil {
-		initlog()
-	}
-	main_log.Error(format, true, v...)
+	logMsg(slog.LevelError, format, true, v...)
 }
 
 func Panic(format string, v ...interface{}) {
-	if main_log == nil {
-		initlog()
-	}
-	main_log.Panic(format, true, v...)
-}
-
-func SlientDebug(format string, v ...interface{}) {
-	if main_log == nil {
-		initlog()
-	}
-	main_log.Debug(format, false, v...)
-}
-
-func SlientInfo(format string, v ...interface{}) {
-	if main_log == nil {
-		initlog()
-	}
-	main_log.Info(format, false, v...)
-}
-
-func SlientWarn(format string, v ...interface{}) {
-	if main_log == nil {
-		initlog()
-	}
-	main_log.Warn(format, false, v...)
-}
-
-func SlientError(format string, v ...interface{}) {
-	if main_log == nil {
-		initlog()
-	}
-	main_log.Error(format, false, v...)
-}
-
-func SlientPanic(format string, v ...interface{}) {
-	if main_log == nil {
-		initlog()
-	}
-	main_log.Panic(format, false, v...)
+	logMsg(slog.LevelError, format, true, v...)
 }

@@ -17,6 +17,16 @@ func initConfig() {
 	if err != nil {
 		log.Panic("failed to init config: %v", err)
 	}
+
+	// initialize logger with config
+	config := static.GetDifySandboxGlobalConfigurations()
+	if config.LogPath != "" {
+		err = log.InitFromConfig(config.LogPath)
+		if err != nil {
+			log.Panic("failed to initialize logger with config: %v", err)
+		}
+	}
+
 	log.Info("config init success")
 
 	err = static.SetupRunnerDependencies()
@@ -68,8 +78,9 @@ func initDependencies() {
 			return
 		}
 		ticker := time.NewTicker(tickerDuration)
+		defer ticker.Stop()
 		for range ticker.C {
-			if err:=updatePythonDependencies(dependencies);err!=nil{
+			if err := updatePythonDependencies(dependencies); err != nil {
 				log.Error("Failed to update Python dependencies: %v", err)
 			}
 		}

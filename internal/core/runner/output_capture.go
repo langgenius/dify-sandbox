@@ -66,23 +66,26 @@ func (s *OutputCaptureRunner) CaptureOutput(cmd *exec.Cmd) error {
 	})
 
 	// create a pipe for the stdout
-	stdout_reader, err := cmd.StdoutPipe()
+	stdoutReader, err := cmd.StdoutPipe()
 	if err != nil {
+		timer.Stop()
 		return err
 	}
 
 	// create a pipe for the stderr
-	stderr_reader, err := cmd.StderrPipe()
+	stderrReader, err := cmd.StderrPipe()
 	if err != nil {
-		stdout_reader.Close()
+		stdoutReader.Close()
+		timer.Stop()
 		return err
 	}
 
 	// start the process
 	err = cmd.Start()
 	if err != nil {
-		stdout_reader.Close()
-		stderr_reader.Close()
+		stdoutReader.Close()
+		stderrReader.Close()
+		timer.Stop()
 		return err
 	}
 
@@ -94,9 +97,10 @@ func (s *OutputCaptureRunner) CaptureOutput(cmd *exec.Cmd) error {
 	// read the output
 	go func() {
 		defer wg.Done()
+		defer stdoutReader.Close()
 		for {
 			buf := make([]byte, 1024)
-			n, err := stdout_reader.Read(buf)
+			n, err := stdoutReader.Read(buf)
 			// exit if EOF
 			if err != nil {
 				if err == io.EOF {
@@ -115,8 +119,9 @@ func (s *OutputCaptureRunner) CaptureOutput(cmd *exec.Cmd) error {
 	go func() {
 		buf := make([]byte, 1024)
 		defer wg.Done()
+		defer stderrReader.Close()
 		for {
-			n, err := stderr_reader.Read(buf)
+			n, err := stderrReader.Read(buf)
 			// exit if EOF
 			if err != nil {
 				if err == io.EOF {
@@ -132,6 +137,8 @@ func (s *OutputCaptureRunner) CaptureOutput(cmd *exec.Cmd) error {
 
 	// wait for the process to finish
 	go func() {
+		defer timer.Stop()
+
 		// wait for the stdout and stderr to finish
 		wg.Wait()
 
@@ -141,20 +148,17 @@ func (s *OutputCaptureRunner) CaptureOutput(cmd *exec.Cmd) error {
 			log.Error("process finished with status: %v", status.String())
 			s.WriteError([]byte(fmt.Sprintf("error: %v\n", err)))
 		} else if status.ExitCode() != 0 {
-			exit_string := status.String()
-			if strings.Contains(exit_string, "bad system call") {
+			exitString := status.String()
+			if strings.Contains(exitString, "bad system call") {
 				s.WriteError([]byte("error: operation not permitted\n"))
 			} else {
-				s.WriteError([]byte(fmt.Sprintf("error: %v\n", exit_string)))
+				s.WriteError([]byte(fmt.Sprintf("error: %v\n", exitString)))
 			}
 		}
 
 		if s.after_exit_hook != nil {
 			s.after_exit_hook()
 		}
-
-		// stop the timer
-		timer.Stop()
 
 		s.done <- true
 	}()
