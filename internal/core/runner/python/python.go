@@ -58,6 +58,9 @@ func (p *PythonRunner) Run(
 	cmd.Env = []string{}
 	cmd.Dir = LIB_PATH
 
+	// Set MPLCONFIGDIR for matplotlib cache directory
+	cmd.Env = append(cmd.Env, "MPLCONFIGDIR=/tmp/matplotlib")
+
 	if configuration.Proxy.Socks5 != "" {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Socks5))
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Socks5))
