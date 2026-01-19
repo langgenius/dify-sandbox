@@ -1,9 +1,13 @@
 package static
 
 import (
+	"errors"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/langgenius/dify-sandbox/internal/types"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
@@ -166,22 +170,81 @@ type RunnerDependencies struct {
 	PythonRequirements string
 }
 
-var runnerDependencies RunnerDependencies
+var (
+	runnerDependencies      RunnerDependencies
+	runnerDependenciesMutex sync.RWMutex
+)
 
 func GetRunnerDependencies() RunnerDependencies {
+	runnerDependenciesMutex.RLock()
+	defer runnerDependenciesMutex.RUnlock()
 	return runnerDependencies
 }
 
 func SetupRunnerDependencies() error {
-	file, err := os.ReadFile("dependencies/python-requirements.txt")
+	reqFile := "dependencies/python-requirements.txt"
+	file, err := os.ReadFile(reqFile)
 	if err != nil {
-		if err == os.ErrNotExist {
+		if errors.Is(err, os.ErrNotExist) {
+			go watchRequirementsFile(reqFile)
 			return nil
 		}
 		return err
 	}
 
+	runnerDependenciesMutex.Lock()
 	runnerDependencies.PythonRequirements = string(file)
+	runnerDependenciesMutex.Unlock()
+
+	// Start watching the file in a goroutine
+	go watchRequirementsFile(reqFile)
 
 	return nil
+}
+
+func watchRequirementsFile(filePath string) {
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		log.Error("Failed to get absolute path for requirements file: %v", err)
+		return
+	}
+
+	var lastModTime time.Time
+	if info, err := os.Stat(absPath); err == nil {
+		lastModTime = info.ModTime()
+	}
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		info, err := os.Stat(absPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// File was deleted, clear the requirements
+				runnerDependenciesMutex.Lock()
+				runnerDependencies.PythonRequirements = ""
+				runnerDependenciesMutex.Unlock()
+				lastModTime = time.Time{}
+			}
+			continue
+		}
+
+		if info.ModTime().After(lastModTime) {
+			log.Info("Detected change in %s, reloading dependencies...", filePath)
+			lastModTime = info.ModTime()
+
+			file, err := os.ReadFile(absPath)
+			if err != nil {
+				log.Error("Failed to read requirements file: %v", err)
+				continue
+			}
+
+			runnerDependenciesMutex.Lock()
+			runnerDependencies.PythonRequirements = string(file)
+			runnerDependenciesMutex.Unlock()
+
+			log.Info("Python requirements reloaded successfully")
+		}
+	}
 }
