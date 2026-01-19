@@ -1,6 +1,6 @@
 # Test environment Dockerfile template
 ARG GOLANG_VERSION=1.23.9
-ARG PYTHON_VERSION=dhi.io/python:3-debian13-sfw-ent-dev
+ARG PYTHON_VERSION=docker.io/langgenius/python:3-debian13-sfw-ent-dev
 ARG DEBIAN_MIRROR="http://deb.debian.org/debian testing main"
 ARG PYTHON_PACKAGES="httpx==0.27.2 requests==2.32.3 jinja2==3.1.6 PySocks httpx[socks]"
 ARG NODEJS_VERSION=v20.11.1

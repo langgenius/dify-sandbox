@@ -41,7 +41,9 @@ fi
 
 # Read version configuration
 echo "Reading version configuration..."
-PYTHON_VERSION=$(yq eval '.versions.python' "$VERSIONS_FILE")
+if [[ "$ENVIRONMENT" != "test" ]]; then
+    PYTHON_VERSION=$(yq eval '.versions.python' "$VERSIONS_FILE")
+fi
 GOLANG_VERSION=$(yq eval '.versions.golang' "$VERSIONS_FILE")
 NODEJS_VERSION=$(yq eval '.versions.nodejs' "$VERSIONS_FILE")
 PYTHON_PACKAGES=$(yq eval '.versions.python_packages' "$VERSIONS_FILE")
@@ -76,16 +78,22 @@ case "$ARCHITECTURE" in
 esac
 
 # Generate Dockerfile
-sed -e "s#\${PYTHON_VERSION}#${PYTHON_VERSION}#g" \
-    -e "s/\${GOLANG_VERSION}/${GOLANG_VERSION}/g" \
-    -e "s/\${NODEJS_VERSION}/${NODEJS_VERSION}/g" \
-    -e "s|\${PYTHON_PACKAGES}|${PYTHON_PACKAGES}|g" \
-    -e "s|\${DEBIAN_MIRROR}|${DEBIAN_MIRROR}|g" \
-    -e "s|\${NODEJS_MIRROR}|${NODEJS_MIRROR}|g" \
-    -e "s|\${GOLANG_MIRROR}|${GOLANG_MIRROR}|g" \
-    -e "s/\${TARGETARCH}/${ARCHITECTURE}/g" \
-    -e "s/__ARCH__/${NODEJS_ARCH}/g" \
-    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+sed_args=()
+if [[ "$ENVIRONMENT" != "test" ]]; then
+    sed_args+=("-e" "s#\${PYTHON_VERSION}#${PYTHON_VERSION}#g")
+fi
+sed_args+=(
+    "-e" "s/\${GOLANG_VERSION}/${GOLANG_VERSION}/g"
+    "-e" "s/\${NODEJS_VERSION}/${NODEJS_VERSION}/g"
+    "-e" "s|\${PYTHON_PACKAGES}|${PYTHON_PACKAGES}|g"
+    "-e" "s|\${DEBIAN_MIRROR}|${DEBIAN_MIRROR}|g"
+    "-e" "s|\${NODEJS_MIRROR}|${NODEJS_MIRROR}|g"
+    "-e" "s|\${GOLANG_MIRROR}|${GOLANG_MIRROR}|g"
+    "-e" "s/\${TARGETARCH}/${ARCHITECTURE}/g"
+    "-e" "s/__ARCH__/${NODEJS_ARCH}/g"
+)
+
+sed "${sed_args[@]}" "$TEMPLATE_FILE" > "$OUTPUT_FILE"
 
 echo "Dockerfile generated: $OUTPUT_FILE"
 
