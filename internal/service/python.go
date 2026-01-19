@@ -5,6 +5,7 @@ import (
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner/python"
 	runner_types "github.com/langgenius/dify-sandbox/internal/core/runner/types"
+	"github.com/langgenius/dify-sandbox/internal/metrics"
 	"github.com/langgenius/dify-sandbox/internal/static"
 	"github.com/langgenius/dify-sandbox/internal/types"
 )
@@ -20,8 +21,18 @@ func RunPython3Code(code string, preload string, options *runner_types.RunnerOpt
 	}
 
 	if !static.GetDifySandboxGlobalConfigurations().EnablePreload {
-	    preload = ""
+    preload = ""
 	}
+
+	start := time.Now()
+	metrics.InflightRuns.WithLabelValues("python3").Inc()
+	defer metrics.InflightRuns.WithLabelValues("python3").Dec()
+	resultLabel := "success"
+	defer func() {
+		dur := time.Since(start).Seconds()
+		metrics.RunsTotal.WithLabelValues("python3", resultLabel).Inc()
+		metrics.RunDurationSeconds.WithLabelValues("python3", resultLabel).Observe(dur)
+	}()
 	
 	timeout := time.Duration(
 		static.GetDifySandboxGlobalConfigurations().WorkerTimeout * int(time.Second),
@@ -32,6 +43,7 @@ func RunPython3Code(code string, preload string, options *runner_types.RunnerOpt
 		code, timeout, nil, preload, options,
 	)
 	if err != nil {
+		resultLabel = "error"
 		return types.ErrorResponse(-500, err.Error())
 	}
 
@@ -45,6 +57,9 @@ func RunPython3Code(code string, preload string, options *runner_types.RunnerOpt
 	for {
 		select {
 		case <-done:
+			if stderr_str != "" {
+				resultLabel = "error"
+			}
 			return types.SuccessResponse(&RunCodeResponse{
 				Stdout: stdout_str,
 				Stderr: stderr_str,

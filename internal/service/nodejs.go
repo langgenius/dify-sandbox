@@ -5,6 +5,7 @@ import (
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner/nodejs"
 	runner_types "github.com/langgenius/dify-sandbox/internal/core/runner/types"
+	"github.com/langgenius/dify-sandbox/internal/metrics"
 	"github.com/langgenius/dify-sandbox/internal/static"
 	"github.com/langgenius/dify-sandbox/internal/types"
 )
@@ -14,10 +15,19 @@ func RunNodeJsCode(code string, preload string, options *runner_types.RunnerOpti
 		return types.ErrorResponse(-400, err.Error())
 	}
 
-	
 	if !static.GetDifySandboxGlobalConfigurations().EnablePreload {
-	    preload = ""
+    preload = ""
 	}
+
+	start := time.Now()
+	metrics.InflightRuns.WithLabelValues("nodejs").Inc()
+	defer metrics.InflightRuns.WithLabelValues("nodejs").Dec()
+	resultLabel := "success"
+	defer func() {
+		dur := time.Since(start).Seconds()
+		metrics.RunsTotal.WithLabelValues("nodejs", resultLabel).Inc()
+		metrics.RunDurationSeconds.WithLabelValues("nodejs", resultLabel).Observe(dur)
+	}()
 	
 	timeout := time.Duration(
 		static.GetDifySandboxGlobalConfigurations().WorkerTimeout * int(time.Second),
@@ -26,6 +36,7 @@ func RunNodeJsCode(code string, preload string, options *runner_types.RunnerOpti
 	runner := nodejs.NodeJsRunner{}
 	stdout, stderr, done, err := runner.Run(code, timeout, nil, preload, options)
 	if err != nil {
+		resultLabel = "error"
 		return types.ErrorResponse(-500, err.Error())
 	}
 
@@ -39,6 +50,9 @@ func RunNodeJsCode(code string, preload string, options *runner_types.RunnerOpti
 	for {
 		select {
 		case <-done:
+			if stderr_str != "" {
+				resultLabel = "error"
+			}
 			return types.SuccessResponse(&RunCodeResponse{
 				Stdout: stdout_str,
 				Stderr: stderr_str,
