@@ -26,6 +26,8 @@ const (
 	LOG_LEVEL_ERROR = 3
 )
 
+const logFileNameLayout = "/2006-01-02.log"
+
 func (l *Log) Debug(format string, stdout bool, v ...interface{}) {
 	if l.Level <= LOG_LEVEL_DEBUG {
 		l.writeLog("DEBUG", format, stdout, v...)
@@ -57,7 +59,7 @@ func (l *Log) Panic(format string, stdout bool, v ...interface{}) {
 
 func (l *Log) writeLog(level string, format string, stdout bool, v ...interface{}) {
 	//if the next day is coming, reopen file
-	if time.Now().Format("/2006-01-02.log") != l.File.Name() {
+	if time.Now().Format(logFileNameLayout) != l.File.Name() {
 		l.File.Close()
 		l.OpenFile()
 	}
@@ -92,7 +94,7 @@ func (l *Log) OpenFile() error {
 	//test if file is closed
 	if l.File == nil {
 		//open file
-		file, err := os.OpenFile(l.path+time.Now().Format("/2006-01-02.log"), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+		file, err := os.OpenFile(l.path+time.Now().Format(logFileNameLayout), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 		if err != nil {
 			return err
 		}
@@ -103,7 +105,7 @@ func (l *Log) OpenFile() error {
 	if err != nil {
 		//reopen file
 		l.File.Close()
-		file, err := os.OpenFile(l.path+time.Now().Format("/2006-01-02.log"), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+		file, err := os.OpenFile(l.path+time.Now().Format(logFileNameLayout), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 		if err != nil {
 			return err
 		}

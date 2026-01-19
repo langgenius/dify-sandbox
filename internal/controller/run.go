@@ -7,6 +7,8 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/types"
 )
 
+const errUnsupportedLanguage = "unsupported language"
+
 func RunSandboxController(c *gin.Context) {
 	BindRequest(c, func(req struct {
 		Language      string `json:"language" form:"language" binding:"required"`
@@ -24,7 +26,7 @@ func RunSandboxController(c *gin.Context) {
 				EnableNetwork: req.EnableNetwork,
 			}))
 		default:
-			c.JSON(400, types.ErrorResponse(-400, "unsupported language"))
+			c.JSON(400, types.ErrorResponse(-400, errUnsupportedLanguage))
 		}
 	})
 }
@@ -37,7 +39,7 @@ func GetDependencies(c *gin.Context) {
 		case "python3":
 			c.JSON(200, service.ListPython3Dependencies())
 		default:
-			c.JSON(400, types.ErrorResponse(-400, "unsupported language"))
+			c.JSON(400, types.ErrorResponse(-400, errUnsupportedLanguage))
 		}
 	})
 }
@@ -50,7 +52,7 @@ func UpdateDependencies(c *gin.Context) {
 		case "python3":
 			c.JSON(200, service.UpdateDependencies())
 		default:
-			c.JSON(400, types.ErrorResponse(-400, "unsupported language"))
+			c.JSON(400, types.ErrorResponse(-400, errUnsupportedLanguage))
 		}
 	})
 }
@@ -63,7 +65,7 @@ func RefreshDependencies(c *gin.Context) {
 		case "python3":
 			c.JSON(200, service.RefreshPython3Dependencies())
 		default:
-			c.JSON(400, types.ErrorResponse(-400, "unsupported language"))
+			c.JSON(400, types.ErrorResponse(-400, errUnsupportedLanguage))
 		}
 	})
 }

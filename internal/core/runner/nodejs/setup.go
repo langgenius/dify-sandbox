@@ -29,59 +29,79 @@ func releaseLibBinary() {
 	log.Info("initializing nodejs runner environment...")
 	os.RemoveAll(LIB_PATH)
 
-	err := os.MkdirAll(LIB_PATH, 0755)
-	if err != nil {
-		log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
-	}
-	err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), nodejs_lib, 0755)
-	if err != nil {
-		log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, PROJECT_NAME)))
-	}
+	createDirectory(LIB_PATH)
+	writeLibFile()
+	createProjectDirectory()
+	copyDependencies()
+	log.Info("nodejs runner environment initialized")
+}
 
-	// copy the nodejs project into /tmp/sandbox-nodejs-project
-	err = os.MkdirAll(path.Join(LIB_PATH, PROJECT_NAME), 0755)
+func createDirectory(dirPath string) {
+	err := os.MkdirAll(dirPath, 0755)
 	if err != nil {
-		log.Panic(fmt.Sprintf("failed to create %s", path.Join(LIB_PATH, PROJECT_NAME)))
+		log.Panic(fmt.Sprintf("failed to create %s", dirPath))
 	}
+}
 
-	// copy the nodejs project into /tmp/sandbox-nodejs-project
-	var recursively_copy func(src string, dst string) error
-	recursively_copy = func(src string, dst string) error {
-		entries, err := nodejs_dependens.ReadDir(src)
-		if err != nil {
-			return err
-		}
-		for _, entry := range entries {
-			src_path := src + "/" + entry.Name()
-			dst_path := dst + "/" + entry.Name()
-			if entry.IsDir() {
-				err = os.Mkdir(dst_path, 0755)
-				if err != nil {
-					return err
-				}
-				err = recursively_copy(src_path, dst_path)
-				if err != nil {
-					return err
-				}
-			} else {
-				data, err := nodejs_dependens.ReadFile(src_path)
-				if err != nil {
-					return err
-				}
-				err = os.WriteFile(dst_path, data, 0755)
-				if err != nil {
-					return err
-				}
-			}
-		}
-		return nil
+func writeLibFile() {
+	libPath := path.Join(LIB_PATH, LIB_NAME)
+	err := os.WriteFile(libPath, nodejs_lib, 0755)
+	if err != nil {
+		log.Panic(fmt.Sprintf("failed to write %s", libPath))
 	}
+}
 
-	err = recursively_copy("dependens", path.Join(LIB_PATH, PROJECT_NAME))
+func createProjectDirectory() {
+	projectPath := path.Join(LIB_PATH, PROJECT_NAME)
+	err := os.MkdirAll(projectPath, 0755)
+	if err != nil {
+		log.Panic(fmt.Sprintf("failed to create %s", projectPath))
+	}
+}
+
+func copyDependencies() {
+	err := recursivelyCopy("dependens", path.Join(LIB_PATH, PROJECT_NAME))
 	if err != nil {
 		log.Panic("failed to copy nodejs project")
 	}
-	log.Info("nodejs runner environment initialized")
+}
+
+func recursivelyCopy(src string, dst string) error {
+	entries, err := nodejs_dependens.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := src + "/" + entry.Name()
+		dstPath := dst + "/" + entry.Name()
+
+		if entry.IsDir() {
+			if err := copyDirectory(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := copyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func copyDirectory(srcPath, dstPath string) error {
+	if err := os.Mkdir(dstPath, 0755); err != nil {
+		return err
+	}
+	return recursivelyCopy(srcPath, dstPath)
+}
+
+func copyFile(srcPath, dstPath string) error {
+	data, err := nodejs_dependens.ReadFile(srcPath)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dstPath, data, 0755)
 }
 
 func checkLibAvaliable() bool {

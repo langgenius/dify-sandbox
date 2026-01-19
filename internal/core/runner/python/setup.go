@@ -3,6 +3,7 @@ package python
 import (
 	_ "embed"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -29,36 +30,44 @@ func init() {
 	releaseLibBinary(true)
 }
 
-func releaseLibBinary(force_remove_old_lib bool) {
+func releaseLibBinary(forceRemoveOldLib bool) {
 	log.Info("initializing python runner environment...")
-	// remove the old lib
-	if _, err := os.Stat(path.Join(LIB_PATH, LIB_NAME)); err == nil {
-		if force_remove_old_lib {
-			err := os.Remove(path.Join(LIB_PATH, LIB_NAME))
-			if err != nil {
-				log.Panic(fmt.Sprintf("failed to remove %s", path.Join(LIB_PATH, LIB_NAME)))
-			}
 
-			// write the new lib
-			err = os.MkdirAll(LIB_PATH, 0755)
-			if err != nil {
-				log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
-			}
-			err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755)
-			if err != nil {
-				log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
-			}
-		}
-	} else {
-		err = os.MkdirAll(LIB_PATH, 0755)
-		if err != nil {
-			log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
-		}
-		err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755)
-		if err != nil {
-			log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
-		}
-		log.Info("python runner environment initialized")
+	libExists := pythonLibExists()
+	if libExists && !forceRemoveOldLib {
+		log.Info("python runner environment already initialized")
+		return
+	}
+
+	if libExists && forceRemoveOldLib {
+		removePythonLib()
+	}
+
+	ensurePythonLibDir()
+	writePythonLib()
+	log.Info("python runner environment initialized")
+}
+
+func pythonLibExists() bool {
+	_, err := os.Stat(path.Join(LIB_PATH, LIB_NAME))
+	return err == nil
+}
+
+func removePythonLib() {
+	if err := os.Remove(path.Join(LIB_PATH, LIB_NAME)); err != nil {
+		log.Panic(fmt.Sprintf("failed to remove %s", path.Join(LIB_PATH, LIB_NAME)))
+	}
+}
+
+func ensurePythonLibDir() {
+	if err := os.MkdirAll(LIB_PATH, 0755); err != nil {
+		log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
+	}
+}
+
+func writePythonLib() {
+	if err := os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755); err != nil {
+		log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
 	}
 }
 
@@ -99,70 +108,100 @@ func InstallDependencies(requirements string) error {
 	}
 
 	runner := runner.TempDirRunner{}
-	return runner.WithTempDir("/", []string{}, func(root_path string) error {
-		defer os.RemoveAll(root_path)
-		// create a requirements file
-		err := os.WriteFile(path.Join(root_path, "requirements.txt"), []byte(requirements), 0644)
-		if err != nil {
+	return runner.WithTempDir("/", []string{}, func(rootPath string) error {
+		defer os.RemoveAll(rootPath)
+
+		if err := writeRequirementsFile(rootPath, requirements); err != nil {
 			log.Error("failed to create requirements.txt")
 			return nil
 		}
 
-		// install dependencies
-		pipMirrorURL := static.GetDifySandboxGlobalConfigurations().PythonPipMirrorURL
-
-		// Create the base command
-		args := []string{"install", "-r", "requirements.txt"}
-		if pipMirrorURL != "" {
-			// If a mirror URL is provided, include it in the command arguments
-			args = append(args, "-i", pipMirrorURL)
-		}
-		cmd := exec.Command("pip3", args...)
-		reader, err := cmd.StdoutPipe()
-		if err != nil {
-			log.Error("failed to get stdout pipe of pip3")
-			return err
-		}
-		defer reader.Close()
-
-		err = cmd.Start()
-		if err != nil {
-			log.Error("failed to start pip3")
+		if err := runPipInstall(rootPath); err != nil {
 			return err
 		}
 
-		for {
-			buf := make([]byte, 1024)
-			n, err := reader.Read(buf)
-			if err != nil {
-				break
-			}
-			log.Info(string(buf[:n]))
-		}
-
-		err = cmd.Wait()
-
-		if err != nil {
-			log.Error("failed to wait for the command to complete")
-			return err
-		}
-
-		// split the requirements
-		requirements = strings.ReplaceAll(requirements, "\r\n", "\n")
-		requirements = strings.ReplaceAll(requirements, "\r", "\n")
-		lines := strings.Split(requirements, "\n")
-		for _, line := range lines {
-			packageName, version := ExtractOnelineDepency(line)
-			if packageName == "" {
-				continue
-			}
-
-			python_dependencies.SetupDependency(packageName, version)
-			log.Info("Python dependency installed: %s %s", packageName, version)
-		}
+		installLocalDependencies(requirements)
 
 		return nil
 	})
+}
+
+func writeRequirementsFile(rootPath string, requirements string) error {
+	return os.WriteFile(path.Join(rootPath, "requirements.txt"), []byte(requirements), 0644)
+}
+
+func runPipInstall(rootPath string) error {
+	cmd, reader, err := setupPipCommand(rootPath)
+	if err != nil {
+		log.Error("failed to get stdout pipe of pip3")
+		return err
+	}
+	defer reader.Close()
+
+	if err := cmd.Start(); err != nil {
+		log.Error("failed to start pip3")
+		return err
+	}
+
+	streamCommandOutput(reader)
+
+	if err := cmd.Wait(); err != nil {
+		log.Error("failed to wait for the command to complete")
+		return err
+	}
+
+	return nil
+}
+
+func setupPipCommand(rootPath string) (*exec.Cmd, io.ReadCloser, error) {
+	args := buildPipArgs()
+	cmd := exec.Command("pip3", args...)
+	cmd.Dir = rootPath
+
+	reader, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cmd, reader, nil
+}
+
+func buildPipArgs() []string {
+	args := []string{"install", "-r", "requirements.txt"}
+	pipMirrorURL := static.GetDifySandboxGlobalConfigurations().PythonPipMirrorURL
+	if pipMirrorURL != "" {
+		args = append(args, "-i", pipMirrorURL)
+	}
+	return args
+}
+
+func streamCommandOutput(reader io.ReadCloser) {
+	for {
+		buf := make([]byte, 1024)
+		n, err := reader.Read(buf)
+		if err != nil {
+			break
+		}
+		log.Info(string(buf[:n]))
+	}
+}
+
+func installLocalDependencies(requirements string) {
+	for _, line := range normalizeRequirementLines(requirements) {
+		packageName, version := ExtractOnelineDepency(line)
+		if packageName == "" {
+			continue
+		}
+
+		python_dependencies.SetupDependency(packageName, version)
+		log.Info("Python dependency installed: %s %s", packageName, version)
+	}
+}
+
+func normalizeRequirementLines(requirements string) []string {
+	normalized := strings.ReplaceAll(requirements, "\r\n", "\n")
+	normalized = strings.ReplaceAll(normalized, "\r", "\n")
+	return strings.Split(normalized, "\n")
 }
 
 func ListDependencies() []types.Dependency {
