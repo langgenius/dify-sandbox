@@ -46,18 +46,23 @@ func initServer() {
 func initDependencies() {
 	log.Info("installing python dependencies...")
 	dependencies := static.GetRunnerDependencies()
-	err := python.InstallDependencies(dependencies.PythonRequirements)
-	if err != nil {
-		log.Panic("failed to install python dependencies: %v", err)
-	}
-	log.Info("python dependencies installed")
 
-	log.Info("initializing python dependencies sandbox...")
-	err = python.PreparePythonDependenciesEnv()
-	if err != nil {
-		log.Panic("failed to initialize python dependencies sandbox: %v", err)
+	config := static.GetDifySandboxGlobalConfigurations()
+
+	if !config.Sandbox.Enabled {
+		err := python.InstallDependencies(dependencies.PythonRequirements)
+		if err != nil {
+			log.Panic("failed to install python dependencies: %v", err)
+		}
+		log.Info("python dependencies installed")
+
+		log.Info("initializing python dependencies sandbox...")
+		err = python.PreparePythonDependenciesEnv()
+		if err != nil {
+			log.Panic("failed to initialize python dependencies sandbox: %v", err)
+		}
+		log.Info("python dependencies sandbox initialized")
 	}
-	log.Info("python dependencies sandbox initialized")
 
 	// start a ticker to update python dependencies to keep the sandbox up-to-date
 	go func() {
@@ -69,7 +74,7 @@ func initDependencies() {
 		}
 		ticker := time.NewTicker(tickerDuration)
 		for range ticker.C {
-			if err:=updatePythonDependencies(dependencies);err!=nil{
+			if err := updatePythonDependencies(dependencies); err != nil {
 				log.Error("Failed to update Python dependencies: %v", err)
 			}
 		}

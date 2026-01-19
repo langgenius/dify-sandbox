@@ -1,6 +1,9 @@
+//go:build linux
+
 package nodejs
 
 import (
+	"context"
 	_ "embed"
 	"encoding/base64"
 	"fmt"
@@ -36,6 +39,7 @@ var (
 )
 
 func (p *NodeJsRunner) Run(
+	ctx context.Context,
 	code string,
 	timeout time.Duration,
 	stdin []byte,

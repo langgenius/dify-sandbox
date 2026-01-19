@@ -1,3 +1,5 @@
+//go:build linux
+
 package main
 
 import "github.com/langgenius/dify-sandbox/internal/core/lib/nodejs"
