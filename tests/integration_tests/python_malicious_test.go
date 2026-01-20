@@ -1,6 +1,7 @@
 package integrationtests_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 
 func TestSysFork(t *testing.T) {
 	// Test case for sys_fork
-	resp := service.RunPython3Code(`
+	resp := service.RunPython3Code(context.TODO(), `
 import os
 print(os.fork())
 print(123)
@@ -29,7 +30,7 @@ print(123)
 
 func TestExec(t *testing.T) {
 	// Test case for exec
-	resp := service.RunPython3Code(`
+	resp := service.RunPython3Code(context.TODO(), `
 import os
 os.execl("/bin/ls", "ls")
 	`, "", &types.RunnerOptions{
@@ -46,7 +47,7 @@ os.execl("/bin/ls", "ls")
 
 func TestRunCommand(t *testing.T) {
 	// Test case for run_command
-	resp := service.RunPython3Code(`
+	resp := service.RunPython3Code(context.TODO(), `
 import subprocess
 subprocess.run(["ls", "-l"])
 	`, "", &types.RunnerOptions{
@@ -62,7 +63,7 @@ subprocess.run(["ls", "-l"])
 }
 
 func TestReadEtcPasswd(t *testing.T) {
-	resp := service.RunPython3Code(`
+	resp := service.RunPython3Code(context.TODO(), `
 print(open("/etc/passwd").read())
 	`, "", &types.RunnerOptions{
 		EnableNetwork: true,

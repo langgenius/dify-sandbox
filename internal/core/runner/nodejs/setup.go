@@ -1,12 +1,13 @@
+//go:build linux
+
 package nodejs
 
 import (
 	"embed"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
-
-	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
 const (
@@ -26,22 +27,25 @@ func init() {
 }
 
 func releaseLibBinary() {
-	log.Info("initializing nodejs runner environment...")
+	slog.Info("initializing nodejs runner environment")
 	os.RemoveAll(LIB_PATH)
 
 	err := os.MkdirAll(LIB_PATH, 0755)
 	if err != nil {
-		log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
+		slog.Error("failed to create lib path", "path", LIB_PATH)
+		panic(fmt.Sprintf("failed to create %s", LIB_PATH))
 	}
 	err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), nodejs_lib, 0755)
 	if err != nil {
-		log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, PROJECT_NAME)))
+		slog.Error("failed to write lib", "path", path.Join(LIB_PATH, PROJECT_NAME))
+		panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, PROJECT_NAME)))
 	}
 
 	// copy the nodejs project into /tmp/sandbox-nodejs-project
 	err = os.MkdirAll(path.Join(LIB_PATH, PROJECT_NAME), 0755)
 	if err != nil {
-		log.Panic(fmt.Sprintf("failed to create %s", path.Join(LIB_PATH, PROJECT_NAME)))
+		slog.Error("failed to create project path", "path", path.Join(LIB_PATH, PROJECT_NAME))
+		panic(fmt.Sprintf("failed to create %s", path.Join(LIB_PATH, PROJECT_NAME)))
 	}
 
 	// copy the nodejs project into /tmp/sandbox-nodejs-project
@@ -79,9 +83,10 @@ func releaseLibBinary() {
 
 	err = recursively_copy("dependens", path.Join(LIB_PATH, PROJECT_NAME))
 	if err != nil {
-		log.Panic("failed to copy nodejs project")
+		slog.Error("failed to copy nodejs project")
+		panic("failed to copy nodejs project")
 	}
-	log.Info("nodejs runner environment initialized")
+	slog.Info("nodejs runner environment initialized")
 }
 
 func checkLibAvaliable() bool {

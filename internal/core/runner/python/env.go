@@ -1,14 +1,16 @@
+//go:build linux
+
 package python
 
 import (
 	_ "embed"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
 	"github.com/langgenius/dify-sandbox/internal/static"
-	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
 //go:embed env.sh
@@ -27,7 +29,7 @@ func PreparePythonDependenciesEnv() error {
 		for _, lib_path := range config.PythonLibPaths {
 			// check if the lib path is available
 			if _, err := os.Stat(lib_path); err != nil {
-				log.Warn("python lib path %s is not available", lib_path)
+				slog.Warn("python lib path is not available", "path", lib_path)
 				continue
 			}
 			exec_cmd := exec.Command(

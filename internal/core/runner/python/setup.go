@@ -1,8 +1,11 @@
+//go:build linux
+
 package python
 
 import (
 	_ "embed"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"os/exec"
@@ -15,7 +18,6 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
 	python_dependencies "github.com/langgenius/dify-sandbox/internal/core/runner/python/dependencies"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
-	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
 //go:embed python.so
@@ -31,35 +33,40 @@ func init() {
 }
 
 func releaseLibBinary(force_remove_old_lib bool) {
-	log.Info("initializing python runner environment...")
+	slog.Info("initializing python runner environment")
 	// remove the old lib
 	if _, err := os.Stat(path.Join(LIB_PATH, LIB_NAME)); err == nil {
 		if force_remove_old_lib {
 			err := os.Remove(path.Join(LIB_PATH, LIB_NAME))
 			if err != nil {
-				log.Panic(fmt.Sprintf("failed to remove %s", path.Join(LIB_PATH, LIB_NAME)))
+				slog.Error("failed to remove lib", "path", path.Join(LIB_PATH, LIB_NAME))
+				panic(fmt.Sprintf("failed to remove %s", path.Join(LIB_PATH, LIB_NAME)))
 			}
 
 			// write the new lib
 			err = os.MkdirAll(LIB_PATH, 0755)
 			if err != nil {
-				log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
+				slog.Error("failed to create lib path", "path", LIB_PATH)
+				panic(fmt.Sprintf("failed to create %s", LIB_PATH))
 			}
 			err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755)
 			if err != nil {
-				log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
+				slog.Error("failed to write lib", "path", path.Join(LIB_PATH, LIB_NAME))
+				panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
 			}
 		}
 	} else {
 		err = os.MkdirAll(LIB_PATH, 0755)
 		if err != nil {
-			log.Panic(fmt.Sprintf("failed to create %s", LIB_PATH))
+			slog.Error("failed to create lib path", "path", LIB_PATH)
+			panic(fmt.Sprintf("failed to create %s", LIB_PATH))
 		}
 		err = os.WriteFile(path.Join(LIB_PATH, LIB_NAME), python_lib, 0755)
 		if err != nil {
-			log.Panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
+			slog.Error("failed to write lib", "path", path.Join(LIB_PATH, LIB_NAME))
+			panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
 		}
-		log.Info("python runner environment initialized")
+		slog.Info("python runner environment initialized")
 	}
 }
 
@@ -105,7 +112,7 @@ func InstallDependencies(requirements string) error {
 		// create a requirements file
 		err := os.WriteFile(path.Join(root_path, "requirements.txt"), []byte(requirements), 0644)
 		if err != nil {
-			log.Error("failed to create requirements.txt")
+			slog.Error("failed to create requirements.txt")
 			return nil
 		}
 
@@ -123,14 +130,14 @@ func InstallDependencies(requirements string) error {
 		cmd := exec.Command("pip3", args...)
 		reader, err := cmd.StdoutPipe()
 		if err != nil {
-			log.Error("failed to get stdout pipe of pip3")
+			slog.Error("failed to get stdout pipe of pip3")
 			return err
 		}
 		defer reader.Close()
 
 		err = cmd.Start()
 		if err != nil {
-			log.Error("failed to start pip3")
+			slog.Error("failed to start pip3")
 			return err
 		}
 
@@ -140,13 +147,13 @@ func InstallDependencies(requirements string) error {
 			if err != nil {
 				break
 			}
-			log.Info(string(buf[:n]))
+			slog.Info(string(buf[:n]))
 		}
 
 		err = cmd.Wait()
 
 		if err != nil {
-			log.Error("failed to wait for the command to complete")
+			slog.Error("failed to wait for the command to complete")
 			return err
 		}
 
@@ -161,7 +168,7 @@ func InstallDependencies(requirements string) error {
 			}
 
 			python_dependencies.SetupDependency(packageName, version)
-			log.Info("Python dependency installed: %s %s", packageName, version)
+			slog.Info("Python dependency installed", "package", packageName, "version", version)
 		}
 
 		return nil
@@ -173,13 +180,13 @@ func ListDependencies() []types.Dependency {
 }
 
 func RefreshDependencies() []types.Dependency {
-	log.Info("updating python dependencies...")
+	slog.Info("updating python dependencies")
 	dependencies := static.GetRunnerDependencies()
 	err := InstallDependencies(dependencies.PythonRequirements)
 	if err != nil {
-		log.Error("failed to install python dependencies: %v", err)
+		slog.Error("failed to install python dependencies", "err", err)
 		return nil
 	}
-	log.Info("python dependencies updated")
+	slog.Info("python dependencies updated")
 	return python_dependencies.ListDependencies()
 }

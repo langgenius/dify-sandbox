@@ -1,6 +1,7 @@
 package nodejs
 
 import (
+	"context"
 	_ "embed"
 	"encoding/base64"
 	"fmt"
@@ -36,6 +37,7 @@ var (
 )
 
 func (p *NodeJsRunner) Run(
+	ctx context.Context,
 	code string,
 	timeout time.Duration,
 	stdin []byte,
@@ -79,7 +81,7 @@ func (p *NodeJsRunner) Run(
 		}
 
 		// capture the output
-		err = output_handler.CaptureOutput(cmd)
+		err = output_handler.CaptureOutput(ctx, cmd)
 		if err != nil {
 			return err
 		}

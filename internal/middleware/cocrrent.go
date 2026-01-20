@@ -1,16 +1,16 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/langgenius/dify-sandbox/internal/types"
-	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
 func MaxWorker(max int) gin.HandlerFunc {
-	log.Info("setting max workers to %d", max)
+	slog.Info("setting max workers", "max", max)
 	sem := make(chan struct{}, max)
 
 	return func(c *gin.Context) {
@@ -28,7 +28,7 @@ type MaxRequestIface struct {
 }
 
 func MaxRequest(max int) gin.HandlerFunc {
-	log.Info("setting max requests to %d", max)
+	slog.Info("setting max requests", "max", max)
 	m := &MaxRequestIface{
 		current: 0,
 		lock:    &sync.RWMutex{},

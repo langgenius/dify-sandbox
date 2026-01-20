@@ -1,14 +1,14 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os/exec"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
 type OutputCaptureRunner struct {
@@ -49,7 +49,7 @@ func (s *OutputCaptureRunner) SetTimeout(timeout time.Duration) {
 	s.timeout = timeout
 }
 
-func (s *OutputCaptureRunner) CaptureOutput(cmd *exec.Cmd) error {
+func (s *OutputCaptureRunner) CaptureOutput(ctx context.Context, cmd *exec.Cmd) error {
 	// start a timer for the timeout
 	timeout := s.timeout
 	if timeout == 0 {
@@ -145,10 +145,11 @@ func (s *OutputCaptureRunner) CaptureOutput(cmd *exec.Cmd) error {
 		// wait for the process to finish
 		status, err := cmd.Process.Wait()
 		if err != nil {
-			log.Error("process finished with status: %v", status.String())
+			slog.ErrorContext(ctx, "process finished with error", "status", status.String(), "err", err)
 			s.WriteError([]byte(fmt.Sprintf("error: %v\n", err)))
 		} else if status.ExitCode() != 0 {
 			exitString := status.String()
+			slog.ErrorContext(ctx, "process finished with error", "status", status.String())
 			if strings.Contains(exitString, "bad system call") {
 				s.WriteError([]byte("error: operation not permitted\n"))
 			} else {

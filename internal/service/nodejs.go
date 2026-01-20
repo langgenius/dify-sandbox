@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/types"
 )
 
-func RunNodeJsCode(code string, preload string, options *runner_types.RunnerOptions) *types.DifySandboxResponse {
+func RunNodeJsCode(ctx context.Context, code string, preload string, options *runner_types.RunnerOptions) *types.DifySandboxResponse {
 	if err := checkOptions(options); err != nil {
 		return types.ErrorResponse(-400, err.Error())
 	}
@@ -24,7 +25,7 @@ func RunNodeJsCode(code string, preload string, options *runner_types.RunnerOpti
 	)
 
 	runner := nodejs.NodeJsRunner{}
-	stdout, stderr, done, err := runner.Run(code, timeout, nil, preload, options)
+	stdout, stderr, done, err := runner.Run(ctx, code, timeout, nil, preload, options)
 	if err != nil {
 		return types.ErrorResponse(-500, err.Error())
 	}

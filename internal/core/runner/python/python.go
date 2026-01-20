@@ -1,6 +1,7 @@
 package python
 
 import (
+	"context"
 	"crypto/rand"
 	_ "embed"
 	"encoding/base64"
@@ -26,6 +27,7 @@ type PythonRunner struct {
 var sandbox_fs []byte
 
 func (p *PythonRunner) Run(
+	ctx context.Context,
 	code string,
 	timeout time.Duration,
 	stdin []byte,
@@ -78,7 +80,7 @@ func (p *PythonRunner) Run(
 		)
 	}
 
-	err = outputHandler.CaptureOutput(cmd)
+	err = outputHandler.CaptureOutput(ctx, cmd)
 	if err != nil {
 		return nil, nil, nil, err
 	}

@@ -1,6 +1,7 @@
 package integrationtests_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -26,7 +27,7 @@ var result = ` + "`<<RESULT>>${output_json}<<RESULT>>`" + `
 console.log(result)`
 
 	runMultipleTestings(t, 30, func(t *testing.T) {
-		resp := service.RunNodeJsCode(code, "", &types.RunnerOptions{
+		resp := service.RunNodeJsCode(context.TODO(), code, "", &types.RunnerOptions{
 			EnableNetwork: true,
 		})
 		if resp.Code != 0 {
@@ -38,7 +39,7 @@ console.log(result)`
 func TestNodejsBase64(t *testing.T) {
 	// Test case for base64
 	runMultipleTestings(t, 30, func(t *testing.T) {
-		resp := service.RunNodeJsCode(`
+		resp := service.RunNodeJsCode(context.TODO(), `
 const base64 = Buffer.from("hello world").toString("base64");
 console.log(Buffer.from(base64, "base64").toString());
 		`, "", &types.RunnerOptions{
@@ -61,7 +62,7 @@ console.log(Buffer.from(base64, "base64").toString());
 func TestNodejsJSON(t *testing.T) {
 	// Test case for json
 	runMultipleTestings(t, 30, func(t *testing.T) {
-		resp := service.RunNodeJsCode(`
+		resp := service.RunNodeJsCode(context.TODO(), `
 console.log(JSON.stringify({"hello": "world"}));
 		`, "", &types.RunnerOptions{
 			EnableNetwork: true,

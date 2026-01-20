@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -15,7 +16,7 @@ type RunCodeResponse struct {
 	Stdout string `json:"stdout"`
 }
 
-func RunPython3Code(code string, preload string, options *runner_types.RunnerOptions) *types.DifySandboxResponse {
+func RunPython3Code(ctx context.Context, code string, preload string, options *runner_types.RunnerOptions) *types.DifySandboxResponse {
 	if err := checkOptions(options); err != nil {
 		return types.ErrorResponse(-400, err.Error())
 	}
@@ -29,7 +30,7 @@ func RunPython3Code(code string, preload string, options *runner_types.RunnerOpt
 	)
 
 	runner := python.PythonRunner{}
-	stdout, stderr, done, err := runner.Run(
+	stdout, stderr, done, err := runner.Run(ctx,
 		code, timeout, nil, preload, options,
 	)
 	if err != nil {
