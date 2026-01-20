@@ -29,6 +29,12 @@ key = b64decode(key)
 
 os.chdir(running_path)
 
+# because DifySeccomp will chroot to running path
+# we need fix sys.path
+for i, path in enumerate(sys.path):
+    if path.startswith(running_path):
+        sys.path[i] = path.replace(running_path, "")
+
 {{preload}}
 
 lib.DifySeccomp({{uid}}, {{gid}}, {{enable_network}})

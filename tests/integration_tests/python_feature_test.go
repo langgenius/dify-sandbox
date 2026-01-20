@@ -101,6 +101,35 @@ print(httpx.get("https://www.bilibili.com").content)
 	})
 }
 
+func TestPythonWithCustomDependencies(t *testing.T) {
+	// Test case for http
+	runMultipleTestings(t, 1, func(t *testing.T) {
+		resp := service.RunPython3Code(`
+import yaml
+print(yaml.safe_load('a: \n    b')['a'])
+	`, "", &types.RunnerOptions{
+			EnableNetwork: true,
+			Dependencies: []types.Dependency{
+				{
+					Name:    "pyyaml",
+					Version: "",
+				},
+			},
+		})
+		if resp.Code != 0 {
+			t.Fatal(resp)
+		}
+
+		if resp.Data.(*service.RunCodeResponse).Stderr != "" {
+			t.Fatalf("unexpected error: %s\n", resp.Data.(*service.RunCodeResponse).Stderr)
+		}
+
+		if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, "b") {
+			t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
+		}
+	})
+}
+
 func TestPythonTimezone(t *testing.T) {
 	// Test case for time
 	runMultipleTestings(t, 1, func(t *testing.T) {

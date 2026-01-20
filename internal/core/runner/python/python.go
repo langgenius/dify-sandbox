@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
+	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
 type PythonRunner struct {
@@ -25,39 +25,13 @@ type PythonRunner struct {
 //go:embed prescript.py
 var sandbox_fs []byte
 
-func (p *PythonRunner) Run(
-	code string,
-	timeout time.Duration,
-	stdin []byte,
-	preload string,
-	options *types.RunnerOptions,
-) (chan []byte, chan []byte, chan bool, error) {
+var (
+	PYTHON_ENTRY_NAME = "main.py"
+	PYTHON_VENV_NAME  = ".venv"
+)
+
+func SetPythonEnvironment(base_path string, cmd *exec.Cmd) {
 	configuration := static.GetDifySandboxGlobalConfigurations()
-
-	// initialize the environment
-	untrusted_code_path, key, err := p.InitializeEnvironment(code, preload, options)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// capture the output
-	output_handler := runner.NewOutputCaptureRunner()
-	output_handler.SetTimeout(timeout)
-	output_handler.SetAfterExitHook(func() {
-		// remove untrusted code
-		os.Remove(untrusted_code_path)
-	})
-
-	// create a new process
-	cmd := exec.Command(
-		configuration.PythonPath,
-		untrusted_code_path,
-		LIB_PATH,
-		key,
-	)
-	cmd.Env = []string{}
-	cmd.Dir = LIB_PATH
-
 	if configuration.Proxy.Socks5 != "" {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Socks5))
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Socks5))
@@ -69,16 +43,68 @@ func (p *PythonRunner) Run(
 			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Http))
 		}
 	}
+}
 
-	if len(configuration.AllowedSyscalls) > 0 {
-		cmd.Env = append(cmd.Env,
-			fmt.Sprintf("ALLOWED_SYSCALLS=%s",
-				strings.Trim(strings.Join(strings.Fields(fmt.Sprint(configuration.AllowedSyscalls)), ","), "[]"),
-			),
+func (p *PythonRunner) Run(
+	code string,
+	timeout time.Duration,
+	stdin []byte,
+	preload string,
+	options *types.RunnerOptions,
+) (chan []byte, chan []byte, chan bool, error) {
+	configuration := static.GetDifySandboxGlobalConfigurations()
+
+	// capture the output
+	output_handler := runner.NewOutputCaptureRunner()
+	output_handler.SetTimeout(timeout)
+
+	err := p.WithTempDir(LIB_PATH, []string{}, func(base_path string) error {
+		output_handler.SetAfterExitHook(func() {
+			// remove untrusted code
+			os.Remove(base_path)
+		})
+		// initialize the environment
+		key, err := p.InitializeEnvironment(base_path, code, preload, options)
+		if err != nil {
+			return err
+		}
+
+		// if we have custom dependencies, we have to use virtual environment
+		// otherwise, we could use system python directly to reduce startup overhead
+		python_path := configuration.PythonPath
+		if len(options.Dependencies) > 0 {
+			// create virtual environment
+			err = p.CreateVirtualEnvironment(base_path, options.Dependencies)
+			if err != nil {
+				return err
+			}
+			python_path = path.Join(base_path, PYTHON_VENV_NAME, "bin", "python")
+		}
+
+		// create a new process
+		cmd := exec.Command(
+			python_path,
+			path.Join(base_path, PYTHON_ENTRY_NAME),
+			// remain on lib path, we need system libraries, these are init on sandbox startup
+			LIB_PATH,
+			key,
 		)
-	}
+		cmd.Env = []string{}
+		SetPythonEnvironment(base_path, cmd)
+		// remain on lib path, we need system libraries, these are init on sandbox startup
+		cmd.Dir = LIB_PATH
 
-	err = output_handler.CaptureOutput(cmd)
+		if len(configuration.AllowedSyscalls) > 0 {
+			cmd.Env = append(cmd.Env,
+				fmt.Sprintf("ALLOWED_SYSCALLS=%s",
+					strings.Trim(strings.Join(strings.Fields(fmt.Sprint(configuration.AllowedSyscalls)), ","), "[]"),
+				),
+			)
+		}
+
+		return output_handler.CaptureOutput(cmd)
+	})
+
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -86,15 +112,11 @@ func (p *PythonRunner) Run(
 	return output_handler.GetStdout(), output_handler.GetStderr(), output_handler.GetDone(), nil
 }
 
-func (p *PythonRunner) InitializeEnvironment(code string, preload string, options *types.RunnerOptions) (string, string, error) {
+func (p *PythonRunner) InitializeEnvironment(base_path string, code string, preload string, options *types.RunnerOptions) (string, error) {
 	if !checkLibAvaliable() {
 		// ensure environment is reversed
 		releaseLibBinary(false)
 	}
-
-	// create a tmp dir and copy the python script
-	temp_code_name := strings.ReplaceAll(uuid.New().String(), "-", "_")
-	temp_code_name = strings.ReplaceAll(temp_code_name, "/", ".")
 
 	script := strings.Replace(
 		string(sandbox_fs),
@@ -130,7 +152,7 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 	key := make([]byte, key_len)
 	_, err := rand.Read(key)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 
 	// encrypt the code
@@ -151,15 +173,67 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 		1,
 	)
 
-	untrusted_code_path := fmt.Sprintf("%s/tmp/%s.py", LIB_PATH, temp_code_name)
-	err = os.MkdirAll(path.Dir(untrusted_code_path), 0755)
+	err = os.WriteFile(path.Join(base_path, PYTHON_ENTRY_NAME), []byte(code), 0755)
 	if err != nil {
-		return "", "", err
-	}
-	err = os.WriteFile(untrusted_code_path, []byte(code), 0755)
-	if err != nil {
-		return "", "", err
+		return "", err
 	}
 
-	return untrusted_code_path, encoded_key, nil
+	return encoded_key, nil
+}
+
+func (p *PythonRunner) CreateVirtualEnvironment(base_path string, dependencies []types.Dependency) error {
+	// we use uv to manage libraries, which is faster than venv
+	// init project
+	cmd := exec.Command("uv", "init", "-q", "--bare")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Error("failed to initialize uv: %v, output: %s", err.Error(), string(output))
+		return err
+	}
+
+	// create venv
+	// we allow system site packages for compatibility with existing functionalities
+	cmd = exec.Command("uv", "venv", path.Join(base_path, PYTHON_VENV_NAME), "-q", "--system-site-packages")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Error("failed to create venv: %v, output: %s", err.Error(), string(output))
+		return err
+	}
+
+	if len(dependencies) == 0 {
+		return nil
+	}
+
+	// install dependencies
+	args := []string{"add", "-q"}
+	pipMirrorURL := static.GetDifySandboxGlobalConfigurations().PythonPipMirrorURL
+	if pipMirrorURL != "" {
+		// If a mirror URL is provided, include it in the command arguments
+		args = append(args, "-i", pipMirrorURL)
+	}
+
+	for _, dependency := range dependencies {
+		if dependency.Version != "" {
+			// if version contains constraints, use it directly
+			// according to PEP 508, searching '=', '>', '<' is enough
+			// see https://peps.python.org/pep-0508/#complete-grammar
+			if strings.Contains(dependency.Version, "=") ||
+				strings.Contains(dependency.Version, "<") ||
+				strings.Contains(dependency.Version, ">") {
+				args = append(args, dependency.Name+dependency.Version)
+			} else {
+				args = append(args, dependency.Name+"=="+dependency.Version)
+			}
+		} else {
+			args = append(args, dependency.Name)
+		}
+	}
+
+	cmd = exec.Command("uv", args...)
+	cmd.Env = []string{}
+	SetPythonEnvironment(base_path, cmd)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Error("failed to install dependencies: %v, output: %s", err.Error(), string(output))
+		return err
+	}
+
+	return nil
 }
