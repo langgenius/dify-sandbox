@@ -23,4 +23,20 @@ type DifySandboxGlobalConfigurations struct {
 		Https  string `yaml:"https"`
 		Http   string `yaml:"http"`
 	} `yaml:"proxy"`
+	Otel struct {
+		Enable                  bool    `yaml:"enable_otel"`
+		ExporterType            string  `yaml:"otel_exporter_type"`
+		Protocol                string  `yaml:"otel_exporter_otlp_protocol"`
+		BaseEndpoint            string  `yaml:"otlp_base_endpoint"`
+		TraceEndpoint           string  `yaml:"otlp_trace_endpoint"`
+		MetricEndpoint          string  `yaml:"otlp_metric_endpoint"`
+		APIKey                  string  `yaml:"otel_api_key"`
+		SamplingRate            float64 `yaml:"otel_sampling_rate"`
+		BatchScheduleDelayMS    int     `yaml:"otel_batch_export_schedule_delay"`
+		MaxQueueSize            int     `yaml:"otel_max_queue_size"`
+		MaxExportBatchSize      int     `yaml:"otel_max_export_batch_size"`
+		MetricExportIntervalMS  int     `yaml:"otel_metric_export_interval"`
+		BatchExportTimeoutMS    int     `yaml:"otel_batch_export_timeout"`
+		MetricExportTimeoutMS   int     `yaml:"otel_metric_export_timeout"`
+	} `yaml:"otel"`
 }

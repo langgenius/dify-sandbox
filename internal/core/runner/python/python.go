@@ -17,6 +17,9 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
+	"github.com/langgenius/dify-sandbox/internal/telemetry"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type PythonRunner struct {
@@ -60,6 +63,11 @@ func (p *PythonRunner) Run(
 	cmd.Env = []string{}
 	cmd.Dir = LIB_PATH
 
+	// inject trace context into env for potential child instrumentation (only if OTel enabled)
+	if static.GetDifySandboxGlobalConfigurations().Otel.Enable {
+		cmd.Env = append(cmd.Env, telemetry.InjectTraceEnv(ctx)...)
+	}
+
 	if configuration.Proxy.Socks5 != "" {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Socks5))
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Socks5))
@@ -80,8 +88,16 @@ func (p *PythonRunner) Run(
 		)
 	}
 
+	tr := otel.Tracer("dify-sandbox/runner")
+	ctx, span := tr.Start(ctx, "python.exec")
+	span.SetAttributes(
+		attribute.Int("code.length", len(code)),
+		attribute.Int64("timeout.ms", int64(timeout/time.Millisecond)),
+	)
+	defer span.End()
 	err = outputHandler.CaptureOutput(ctx, cmd)
 	if err != nil {
+		span.RecordError(err)
 		return nil, nil, nil, err
 	}
 

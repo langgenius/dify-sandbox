@@ -9,6 +9,9 @@ import (
 	runner_types "github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
 	"github.com/langgenius/dify-sandbox/internal/types"
+	appLog "github.com/langgenius/dify-sandbox/internal/utils/log"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type RunCodeResponse struct {
@@ -29,9 +32,21 @@ func RunPython3Code(ctx context.Context, code string, preload string, options *r
 		static.GetDifySandboxGlobalConfigurations().WorkerTimeout * int(time.Second),
 	)
 
+	tr := otel.Tracer("dify-sandbox/service")
+	ctx, span := tr.Start(ctx, "python.run")
+	span.SetAttributes(
+		attribute.Int("code.length", len(code)),
+		attribute.Bool("options.enable_network", options != nil && options.EnableNetwork),
+		attribute.Int64("timeout.ms", int64(timeout/time.Millisecond)),
+	)
+	if id, ok := appLog.IdentityFromContext(ctx); ok && id.TenantID != "" {
+		span.SetAttributes(attribute.String("tenant.id", id.TenantID))
+	}
+	defer span.End()
+
 	runner := python.PythonRunner{}
-	stdout, stderr, done, err := runner.Run(ctx,
-		code, timeout, nil, preload, options,
+	stdout, stderr, done, err := runner.Run(
+		ctx, code, timeout, nil, preload, options,
 	)
 	if err != nil {
 		return types.ErrorResponse(-500, err.Error())
@@ -57,9 +72,11 @@ func RunPython3Code(ctx context.Context, code string, preload string, options *r
 					break drain
 				}
 			}
-			// Close channels after draining all data
-			close(stdout)
-			close(stderr)
+			// Annotate span with sizes
+			span.SetAttributes(
+				attribute.Int("stdout.length", stdoutStr.Len()),
+				attribute.Int("stderr.length", stderrStr.Len()),
+			)
 			return types.SuccessResponse(&RunCodeResponse{
 				Stdout: stdoutStr.String(),
 				Stderr: stderrStr.String(),
