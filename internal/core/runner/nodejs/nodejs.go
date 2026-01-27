@@ -109,7 +109,7 @@ func (p *NodeJsRunner) InitializeEnvironment(code string, preload string, root_p
 	// join nodejs_sandbox_fs and code
 	// encode code with base64
 	code = base64.StdEncoding.EncodeToString([]byte(code))
-	// FIXE: redeclared function causes code injection
+	// FIXME: redeclared function causes code injection
 	evalCode := fmt.Sprintf("eval(Buffer.from('%s', 'base64').toString('utf-8'))", code)
 	code = node_sandbox_file + evalCode
 
