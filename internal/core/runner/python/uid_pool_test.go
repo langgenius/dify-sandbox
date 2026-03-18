@@ -1,0 +1,147 @@
+package python
+
+import (
+	"sync"
+	"testing"
+)
+
+func TestAcquireAndRelease(t *testing.T) {
+	pool := NewUIDPool(10000, 10005)
+
+	uid, err := pool.Acquire()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if uid < 10000 || uid >= 10005 {
+		t.Fatalf("uid %d out of range [10000, 10005)", uid)
+	}
+
+	pool.Release(uid)
+
+	uid2, err := pool.Acquire()
+	if err != nil {
+		t.Fatalf("unexpected error after release: %v", err)
+	}
+	if uid2 < 10000 || uid2 >= 10005 {
+		t.Fatalf("uid %d out of range after release", uid2)
+	}
+}
+
+func TestPoolExhaustion(t *testing.T) {
+	pool := NewUIDPool(10000, 10005)
+
+	acquired := make([]int, 0, 5)
+	for i := 0; i < 5; i++ {
+		uid, err := pool.Acquire()
+		if err != nil {
+			t.Fatalf("failed to acquire uid #%d: %v", i, err)
+		}
+		acquired = append(acquired, uid)
+	}
+
+	_, err := pool.Acquire()
+	if err != ErrUIDPoolExhausted {
+		t.Fatalf("expected ErrUIDPoolExhausted, got %v", err)
+	}
+
+	pool.Release(acquired[0])
+	uid, err := pool.Acquire()
+	if err != nil {
+		t.Fatalf("expected acquire to succeed after release: %v", err)
+	}
+	if uid != acquired[0] {
+		t.Fatalf("expected uid %d back, got %d", acquired[0], uid)
+	}
+}
+
+func TestUIDUniqueness(t *testing.T) {
+	pool := NewUIDPool(10000, 10005)
+
+	seen := make(map[int]bool)
+	for i := 0; i < 5; i++ {
+		uid, err := pool.Acquire()
+		if err != nil {
+			t.Fatalf("failed to acquire uid #%d: %v", i, err)
+		}
+		if seen[uid] {
+			t.Fatalf("duplicate uid %d at acquisition #%d", uid, i)
+		}
+		seen[uid] = true
+	}
+	if len(seen) != 5 {
+		t.Fatalf("expected 5 unique UIDs, got %d", len(seen))
+	}
+}
+
+func TestConcurrentAcquireRelease(t *testing.T) {
+	pool := NewUIDPool(10000, 10005)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			uid, err := pool.Acquire()
+			if err != nil {
+				return
+			}
+			_ = uid * uid
+			pool.Release(uid)
+		}()
+	}
+	wg.Wait()
+
+	if pool.Len() != 5 {
+		t.Fatalf("pool size after concurrent test: got %d, want 5", pool.Len())
+	}
+}
+
+func TestReleaseInvalidUID(t *testing.T) {
+	pool := NewUIDPool(10000, 10005)
+
+	before := pool.Len()
+	pool.Release(99999)
+	pool.Release(-1)
+	pool.Release(9999)
+	after := pool.Len()
+
+	if after != before {
+		t.Fatalf("invalid release changed pool size: before=%d, after=%d", before, after)
+	}
+}
+
+func TestReleaseRestoresCapacity(t *testing.T) {
+	pool := NewUIDPool(10000, 10005)
+
+	acquired := make([]int, 0, 5)
+	for i := 0; i < 5; i++ {
+		uid, _ := pool.Acquire()
+		acquired = append(acquired, uid)
+	}
+	if _, err := pool.Acquire(); err != ErrUIDPoolExhausted {
+		t.Fatal("pool should be exhausted")
+	}
+
+	for _, uid := range acquired {
+		pool.Release(uid)
+	}
+
+	if pool.Len() != 5 {
+		t.Fatalf("pool size after release all: got %d, want 5", pool.Len())
+	}
+
+	seen := make(map[int]bool)
+	for i := 0; i < 5; i++ {
+		uid, err := pool.Acquire()
+		if err != nil {
+			t.Fatalf("acquire #%d failed after restore: %v", i, err)
+		}
+		if uid < 10000 || uid >= 10005 {
+			t.Fatalf("uid %d out of range", uid)
+		}
+		if seen[uid] {
+			t.Fatalf("duplicate uid %d", uid)
+		}
+		seen[uid] = true
+	}
+}
