@@ -37,7 +37,7 @@ func (p *PythonRunner) Run(
 ) (chan []byte, chan []byte, chan bool, error) {
 	configuration := static.GetDifySandboxGlobalConfigurations()
 
-	uid, err := AcquireUID()
+	uid, err := AcquireUID(ctx)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("no available sandbox UID: %w", err)
 	}

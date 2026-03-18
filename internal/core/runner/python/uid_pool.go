@@ -1,6 +1,7 @@
 package python
 
 import (
+	"context"
 	"errors"
 	"sync"
 )
@@ -25,11 +26,12 @@ func NewUIDPool(min, max int) *UIDPool {
 	return p
 }
 
-func (p *UIDPool) Acquire() (int, error) {
+// Acquire waits for an available UID until ctx is cancelled.
+func (p *UIDPool) Acquire(ctx context.Context) (int, error) {
 	select {
 	case uid := <-p.pool:
 		return uid, nil
-	default:
+	case <-ctx.Done():
 		return 0, ErrUIDPoolExhausted
 	}
 }
@@ -50,11 +52,11 @@ var (
 	globalPoolOnce sync.Once
 )
 
-func AcquireUID() (int, error) {
+func AcquireUID(ctx context.Context) (int, error) {
 	globalPoolOnce.Do(func() {
 		globalPool = NewUIDPool(10000, 11000)
 	})
-	return globalPool.Acquire()
+	return globalPool.Acquire(ctx)
 }
 
 func ReleaseUID(uid int) {

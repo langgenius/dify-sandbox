@@ -1,14 +1,17 @@
 package python
 
 import (
+	"context"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestAcquireAndRelease(t *testing.T) {
 	pool := NewUIDPool(10000, 10005)
+	ctx := context.Background()
 
-	uid, err := pool.Acquire()
+	uid, err := pool.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -18,7 +21,7 @@ func TestAcquireAndRelease(t *testing.T) {
 
 	pool.Release(uid)
 
-	uid2, err := pool.Acquire()
+	uid2, err := pool.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error after release: %v", err)
 	}
@@ -29,23 +32,28 @@ func TestAcquireAndRelease(t *testing.T) {
 
 func TestPoolExhaustion(t *testing.T) {
 	pool := NewUIDPool(10000, 10005)
+	ctx := context.Background()
 
 	acquired := make([]int, 0, 5)
 	for i := 0; i < 5; i++ {
-		uid, err := pool.Acquire()
+		uid, err := pool.Acquire(ctx)
 		if err != nil {
 			t.Fatalf("failed to acquire uid #%d: %v", i, err)
 		}
 		acquired = append(acquired, uid)
 	}
 
-	_, err := pool.Acquire()
+	// Pool exhausted: acquire with short timeout should fail
+	timeoutCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancel()
+	_, err := pool.Acquire(timeoutCtx)
 	if err != ErrUIDPoolExhausted {
 		t.Fatalf("expected ErrUIDPoolExhausted, got %v", err)
 	}
 
+	// Release one, should be able to acquire again
 	pool.Release(acquired[0])
-	uid, err := pool.Acquire()
+	uid, err := pool.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("expected acquire to succeed after release: %v", err)
 	}
@@ -54,12 +62,43 @@ func TestPoolExhaustion(t *testing.T) {
 	}
 }
 
+func TestPoolWaitsForRelease(t *testing.T) {
+	pool := NewUIDPool(10000, 10001) // only 1 UID
+	ctx := context.Background()
+
+	uid, _ := pool.Acquire(ctx)
+
+	// Launch a goroutine that releases after 100ms
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		pool.Release(uid)
+	}()
+
+	// Acquire should block and succeed once the UID is released
+	start := time.Now()
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+	uid2, err := pool.Acquire(timeoutCtx)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Fatalf("expected acquire to succeed after waiting, got: %v", err)
+	}
+	if uid2 != uid {
+		t.Fatalf("expected uid %d, got %d", uid, uid2)
+	}
+	if elapsed < 80*time.Millisecond {
+		t.Fatalf("acquire returned too fast (%v), should have waited for release", elapsed)
+	}
+}
+
 func TestUIDUniqueness(t *testing.T) {
 	pool := NewUIDPool(10000, 10005)
+	ctx := context.Background()
 
 	seen := make(map[int]bool)
 	for i := 0; i < 5; i++ {
-		uid, err := pool.Acquire()
+		uid, err := pool.Acquire(ctx)
 		if err != nil {
 			t.Fatalf("failed to acquire uid #%d: %v", i, err)
 		}
@@ -75,13 +114,16 @@ func TestUIDUniqueness(t *testing.T) {
 
 func TestConcurrentAcquireRelease(t *testing.T) {
 	pool := NewUIDPool(10000, 10005)
+	ctx := context.Background()
 
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			uid, err := pool.Acquire()
+			timeoutCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+			defer cancel()
+			uid, err := pool.Acquire(timeoutCtx)
 			if err != nil {
 				return
 			}
@@ -112,13 +154,16 @@ func TestReleaseInvalidUID(t *testing.T) {
 
 func TestReleaseRestoresCapacity(t *testing.T) {
 	pool := NewUIDPool(10000, 10005)
+	ctx := context.Background()
 
 	acquired := make([]int, 0, 5)
 	for i := 0; i < 5; i++ {
-		uid, _ := pool.Acquire()
+		uid, _ := pool.Acquire(ctx)
 		acquired = append(acquired, uid)
 	}
-	if _, err := pool.Acquire(); err != ErrUIDPoolExhausted {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancel()
+	if _, err := pool.Acquire(timeoutCtx); err != ErrUIDPoolExhausted {
 		t.Fatal("pool should be exhausted")
 	}
 
@@ -132,7 +177,7 @@ func TestReleaseRestoresCapacity(t *testing.T) {
 
 	seen := make(map[int]bool)
 	for i := 0; i < 5; i++ {
-		uid, err := pool.Acquire()
+		uid, err := pool.Acquire(ctx)
 		if err != nil {
 			t.Fatalf("acquire #%d failed after restore: %v", i, err)
 		}
