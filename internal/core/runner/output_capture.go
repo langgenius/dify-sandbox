@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -18,7 +19,14 @@ type OutputCaptureRunner struct {
 
 	timeout time.Duration
 
-	after_exit_hook func()
+	afterExitHook func()
+
+	// closeOnce ensures we only signal done once
+	closeOnce sync.Once
+	// closed is set when the done signal has been sent;
+	// after that, no more writes to stdout/stderr are safe
+	// because the consumer closes those channels upon receiving done.
+	closed chan struct{}
 }
 
 func NewOutputCaptureRunner() *OutputCaptureRunner {
@@ -26,23 +34,38 @@ func NewOutputCaptureRunner() *OutputCaptureRunner {
 		stdout: make(chan []byte),
 		stderr: make(chan []byte),
 		done:   make(chan bool),
+		closed: make(chan struct{}),
 	}
 }
 
-func (s *OutputCaptureRunner) WriteError(data []byte) {
-	if s.stderr != nil {
-		s.stderr <- data
+// sendOut sends data to stdout, unless the runner is already done.
+func (s *OutputCaptureRunner) sendOut(data []byte) {
+	select {
+	case <-s.closed:
+		return
+	case s.stdout <- data:
 	}
 }
 
-func (s *OutputCaptureRunner) WriteOutput(data []byte) {
-	if s.stdout != nil {
-		s.stdout <- data
+// sendErr sends data to stderr, unless the runner is already done.
+func (s *OutputCaptureRunner) sendErr(data []byte) {
+	select {
+	case <-s.closed:
+		return
+	case s.stderr <- data:
 	}
+}
+
+// signalDone sends the done signal exactly once and marks the runner as closed.
+func (s *OutputCaptureRunner) signalDone() {
+	s.closeOnce.Do(func() {
+		close(s.closed)
+		s.done <- true
+	})
 }
 
 func (s *OutputCaptureRunner) SetAfterExitHook(hook func()) {
-	s.after_exit_hook = hook
+	s.afterExitHook = hook
 }
 
 func (s *OutputCaptureRunner) SetTimeout(timeout time.Duration) {
@@ -50,118 +73,85 @@ func (s *OutputCaptureRunner) SetTimeout(timeout time.Duration) {
 }
 
 func (s *OutputCaptureRunner) CaptureOutput(ctx context.Context, cmd *exec.Cmd) error {
-	// start a timer for the timeout
 	timeout := s.timeout
 	if timeout == 0 {
 		timeout = 5 * time.Second
 	}
 
+	stdoutReader, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+
+	stderrReader, err := cmd.StderrPipe()
+	if err != nil {
+		stdoutReader.Close()
+		return err
+	}
+
+	if err := cmd.Start(); err != nil {
+		stdoutReader.Close()
+		stderrReader.Close()
+		return err
+	}
+
+	// Kill the process on timeout. We use timedOut to detect
+	// whether the kill was caused by the timer, since timer.Stop()
+	// alone is racy with AfterFunc's goroutine.
+	var timedOut atomic.Bool
 	timer := time.AfterFunc(timeout, func() {
-		if cmd != nil && cmd.Process != nil {
-			// write the error
-			s.WriteError([]byte("error: timeout\n"))
-			// send a signal to the process
+		timedOut.Store(true)
+		if cmd.Process != nil {
 			cmd.Process.Kill()
 		}
 	})
 
-	// create a pipe for the stdout
-	stdoutReader, err := cmd.StdoutPipe()
-	if err != nil {
-		timer.Stop()
-		return err
-	}
-
-	// create a pipe for the stderr
-	stderrReader, err := cmd.StderrPipe()
-	if err != nil {
-		stdoutReader.Close()
-		timer.Stop()
-		return err
-	}
-
-	// start the process
-	err = cmd.Start()
-	if err != nil {
-		stdoutReader.Close()
-		stderrReader.Close()
-		timer.Stop()
-		return err
-	}
-
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 	wg.Add(2)
 
-	written := 0
-
-	// read the output
-	go func() {
+	readPipe := func(reader io.ReadCloser, sender func([]byte)) {
 		defer wg.Done()
-		defer stdoutReader.Close()
+		defer reader.Close()
 		for {
 			buf := make([]byte, 1024)
-			n, err := stdoutReader.Read(buf)
-			// exit if EOF
-			if err != nil {
-				if err == io.EOF {
-					break
-				} else {
-					s.WriteError([]byte(fmt.Sprintf("error: %v\n", err)))
-					break
-				}
+			n, err := reader.Read(buf)
+			if n > 0 {
+				sender(buf[:n])
 			}
-			written += n
-			s.WriteOutput(buf[:n])
-		}
-	}()
-
-	// read the error
-	go func() {
-		buf := make([]byte, 1024)
-		defer wg.Done()
-		defer stderrReader.Close()
-		for {
-			n, err := stderrReader.Read(buf)
-			// exit if EOF
 			if err != nil {
-				if err == io.EOF {
-					break
-				} else {
-					s.WriteError([]byte(fmt.Sprintf("error: %v\n", err)))
-					break
+				if err != io.EOF {
+					s.sendErr([]byte(fmt.Sprintf("error: %v\n", err)))
 				}
+				return
 			}
-			s.WriteError(buf[:n])
 		}
-	}()
+	}
 
-	// wait for the process to finish
+	go readPipe(stdoutReader, s.sendOut)
+	go readPipe(stderrReader, s.sendErr)
+
 	go func() {
 		defer timer.Stop()
 
-		// wait for the stdout and stderr to finish
 		wg.Wait()
+		err := cmd.Wait()
 
-		// wait for the process to finish
-		status, err := cmd.Process.Wait()
 		if err != nil {
-			slog.ErrorContext(ctx, "process finished with error", "status", status.String(), "err", err)
-			s.WriteError([]byte(fmt.Sprintf("error: %v\n", err)))
-		} else if status.ExitCode() != 0 {
-			exitString := status.String()
-			slog.ErrorContext(ctx, "process finished with error", "status", status.String())
-			if strings.Contains(exitString, "bad system call") {
-				s.WriteError([]byte("error: operation not permitted\n"))
+			errMsg := err.Error()
+			slog.ErrorContext(ctx, "process finished with error", "err", err)
+			if timedOut.Load() {
+				s.sendErr([]byte("error: timeout\n"))
+			} else if strings.Contains(errMsg, "bad system call") {
+				s.sendErr([]byte("error: operation not permitted\n"))
 			} else {
-				s.WriteError([]byte(fmt.Sprintf("error: %v\n", exitString)))
+				s.sendErr([]byte(fmt.Sprintf("error: %v\n", errMsg)))
 			}
 		}
 
-		if s.after_exit_hook != nil {
-			s.after_exit_hook()
+		if s.afterExitHook != nil {
+			s.afterExitHook()
 		}
-
-		s.done <- true
+		s.signalDone()
 	}()
 
 	return nil

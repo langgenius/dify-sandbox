@@ -24,8 +24,9 @@ import (
 var python_lib []byte
 
 const (
-	LIB_PATH = "/var/sandbox/sandbox-python"
-	LIB_NAME = "python.so"
+	LIB_PATH        = "/var/sandbox/sandbox-python"
+	LIB_NAME        = "python.so"
+	PRESCRIPT_NAME  = "prescript.py"
 )
 
 func init() {
@@ -66,8 +67,23 @@ func releaseLibBinary(force_remove_old_lib bool) {
 			slog.Error("failed to write lib", "path", path.Join(LIB_PATH, LIB_NAME))
 			panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, LIB_NAME)))
 		}
-		slog.Info("python runner environment initialized")
 	}
+
+	// write the static prescript.py alongside python.so
+	err := os.WriteFile(path.Join(LIB_PATH, PRESCRIPT_NAME), sandbox_fs, 0755)
+	if err != nil {
+		slog.Error("failed to write prescript", "path", path.Join(LIB_PATH, PRESCRIPT_NAME))
+		panic(fmt.Sprintf("failed to write %s", path.Join(LIB_PATH, PRESCRIPT_NAME)))
+	}
+
+	// ensure tmp directory exists
+	err = os.MkdirAll(path.Join(LIB_PATH, "tmp"), 0755)
+	if err != nil {
+		slog.Error("failed to create tmp path", "path", path.Join(LIB_PATH, "tmp"))
+		panic(fmt.Sprintf("failed to create %s", path.Join(LIB_PATH, "tmp")))
+	}
+
+	slog.Info("python runner environment initialized")
 }
 
 func checkLibAvaliable() bool {

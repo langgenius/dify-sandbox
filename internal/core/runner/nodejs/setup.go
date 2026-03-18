@@ -86,6 +86,15 @@ func releaseLibBinary() {
 		slog.Error("failed to copy nodejs project")
 		panic("failed to copy nodejs project")
 	}
+
+	// overwrite test.js with the static prescript content
+	prescriptPath := path.Join(LIB_PATH, PROJECT_NAME, "node_temp", "test.js")
+	err = os.WriteFile(prescriptPath, nodejs_sandbox_fs, 0755)
+	if err != nil {
+		slog.Error("failed to write prescript", "path", prescriptPath)
+		panic(fmt.Sprintf("failed to write %s", prescriptPath))
+	}
+
 	slog.Info("nodejs runner environment initialized")
 }
 
