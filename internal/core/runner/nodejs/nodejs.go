@@ -1,6 +1,7 @@
 package nodejs
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/base64"
@@ -46,6 +47,13 @@ func (p *NodeJsRunner) Run(
 ) (chan []byte, chan []byte, chan bool, error) {
 	configuration := static.GetDifySandboxGlobalConfigurations()
 
+	if !checkLibAvaliable() {
+		releaseLibBinary()
+	}
+
+	// prepare stdin payload before entering temp dir
+	payload := p.prepareStdinPayload(code, preload)
+
 	// capture the output
 	output_handler := runner.NewOutputCaptureRunner()
 	output_handler.SetTimeout(timeout)
@@ -55,11 +63,8 @@ func (p *NodeJsRunner) Run(
 			os.RemoveAll(root_path)
 		})
 
-		// initialize the environment
-		script_path, err := p.InitializeEnvironment(code, preload, root_path)
-		if err != nil {
-			return err
-		}
+		// the static prescript is already in the temp dir via cp -r
+		script_path := path.Join(root_path, LIB_PATH, PROJECT_NAME, "node_temp/node_temp/test.js")
 
 		// create a new process
 		cmd := exec.Command(
@@ -70,6 +75,7 @@ func (p *NodeJsRunner) Run(
 			options.Json(),
 		)
 		cmd.Env = []string{}
+		cmd.Stdin = bytes.NewReader(payload)
 
 		if len(configuration.AllowedSyscalls) > 0 {
 			cmd.Env = append(
@@ -81,7 +87,7 @@ func (p *NodeJsRunner) Run(
 		}
 
 		// capture the output
-		err = output_handler.CaptureOutput(ctx, cmd)
+		err := output_handler.CaptureOutput(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -96,29 +102,8 @@ func (p *NodeJsRunner) Run(
 	return output_handler.GetStdout(), output_handler.GetStderr(), output_handler.GetDone(), nil
 }
 
-func (p *NodeJsRunner) InitializeEnvironment(code string, preload string, root_path string) (string, error) {
-	if !checkLibAvaliable() {
-		releaseLibBinary()
-	}
-
-	node_sandbox_file := string(nodejs_sandbox_fs)
-	if preload != "" {
-		node_sandbox_file = fmt.Sprintf("%s\n%s", preload, node_sandbox_file)
-	}
-
-	// join nodejs_sandbox_fs and code
-	// encode code with base64
-	code = base64.StdEncoding.EncodeToString([]byte(code))
-	// FIXE: redeclared function causes code injection
-	evalCode := fmt.Sprintf("eval(Buffer.from('%s', 'base64').toString('utf-8'))", code)
-	code = node_sandbox_file + evalCode
-
-	// override root_path/tmp/sandbox-nodejs-project/prescript.js
-	script_path := path.Join(root_path, LIB_PATH, PROJECT_NAME, "node_temp/node_temp/test.js")
-	err := os.WriteFile(script_path, []byte(code), 0755)
-	if err != nil {
-		return "", err
-	}
-
-	return script_path, nil
+func (p *NodeJsRunner) prepareStdinPayload(code string, preload string) []byte {
+	preloadB64 := base64.StdEncoding.EncodeToString([]byte(preload))
+	codeB64 := base64.StdEncoding.EncodeToString([]byte(code))
+	return []byte(preloadB64 + "\n" + codeB64 + "\n")
 }
