@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -34,6 +35,9 @@ func RunPython3Code(ctx context.Context, code string, preload string, options *r
 		code, timeout, nil, preload, options,
 	)
 	if err != nil {
+		if errors.Is(err, python.ErrUIDPoolExhausted) {
+			return types.ErrorResponse(-429, err.Error())
+		}
 		return types.ErrorResponse(-500, err.Error())
 	}
 

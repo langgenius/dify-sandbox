@@ -11,6 +11,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,18 +37,22 @@ func (p *PythonRunner) Run(
 ) (chan []byte, chan []byte, chan bool, error) {
 	configuration := static.GetDifySandboxGlobalConfigurations()
 
-	// initialize the environment
-	untrustedCodePath, key, err := p.InitializeEnvironment(code, preload, options)
+	uid, err := AcquireUID(ctx)
 	if err != nil {
+		return nil, nil, nil, fmt.Errorf("no available sandbox UID: %w", err)
+	}
+
+	untrustedCodePath, key, err := p.InitializeEnvironment(code, preload, options, uid)
+	if err != nil {
+		ReleaseUID(uid)
 		return nil, nil, nil, err
 	}
 
-	// capture the output
 	outputHandler := runner.NewOutputCaptureRunner()
 	outputHandler.SetTimeout(timeout)
 	outputHandler.SetAfterExitHook(func() {
-		// remove untrusted code
 		os.Remove(untrustedCodePath)
+		ReleaseUID(uid)
 	})
 
 	// create a new process
@@ -82,25 +87,25 @@ func (p *PythonRunner) Run(
 
 	err = outputHandler.CaptureOutput(ctx, cmd)
 	if err != nil {
+		os.Remove(untrustedCodePath)
+		ReleaseUID(uid)
 		return nil, nil, nil, err
 	}
 
 	return outputHandler.GetStdout(), outputHandler.GetStderr(), outputHandler.GetDone(), nil
 }
 
-func (p *PythonRunner) InitializeEnvironment(code string, preload string, options *types.RunnerOptions) (string, string, error) {
+func (p *PythonRunner) InitializeEnvironment(code string, preload string, options *types.RunnerOptions, uid int) (string, string, error) {
 	if !checkLibAvaliable() {
-		// ensure environment is reversed
 		releaseLibBinary(false)
 	}
 
-	// create a tmp dir and copy the python script
 	tempCodeName := strings.ReplaceAll(uuid.New().String(), "-", "_")
 	tempCodeName = strings.ReplaceAll(tempCodeName, "/", ".")
 
 	script := strings.Replace(
 		string(sandbox_fs),
-		"{{uid}}", strconv.Itoa(static.SANDBOX_USER_UID), 1,
+		"{{uid}}", strconv.Itoa(uid), 1,
 	)
 
 	script = strings.Replace(
@@ -158,9 +163,13 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 	if err != nil {
 		return "", "", err
 	}
-	err = os.WriteFile(untrustedCodePath, []byte(code), 0755)
+	err = os.WriteFile(untrustedCodePath, []byte(code), 0600)
 	if err != nil {
 		return "", "", err
+	}
+	if err = syscall.Chown(untrustedCodePath, uid, static.SANDBOX_GROUP_ID); err != nil {
+		os.Remove(untrustedCodePath)
+		return "", "", fmt.Errorf("chown script to uid %d: %w", uid, err)
 	}
 
 	return untrustedCodePath, encodedKey, nil
