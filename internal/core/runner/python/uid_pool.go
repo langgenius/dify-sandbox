@@ -63,30 +63,19 @@ func AcquireUID(ctx context.Context) (int, error) {
 	return globalPool.Acquire(ctx)
 }
 
-// ensurePasswdEntries writes sandbox UIDs to /etc/passwd in both the host
-// and the chroot root so that Python's getpwuid on exit doesn't trigger
-// syscalls blocked by seccomp.
+// ensurePasswdEntries appends sandbox UIDs to /etc/passwd so that
+// Python's cleanup (e.g. getpwuid) doesn't trigger blocked syscalls.
 func ensurePasswdEntries(min, max int) {
-	chrootPasswd := "/var/sandbox/sandbox-python/etc/passwd"
-	paths := []string{"/etc/passwd", chrootPasswd}
-
-	for _, p := range paths {
-		dir := p[:len(p)-len("passwd")]
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			slog.Warn("failed to create dir for passwd", "path", p, "err", err)
-			continue
-		}
-		f, err := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			slog.Warn("failed to open passwd for UID entries", "path", p, "err", err)
-			continue
-		}
-		for i := min; i < max; i++ {
-			fmt.Fprintf(f, "sandbox%d:x:%d:0::/nonexistent:/usr/sbin/nologin\n", i, i)
-		}
-		f.Close()
-		slog.Info("sandbox UID passwd entries created", "path", p, "range", fmt.Sprintf("%d-%d", min, max-1))
+	f, err := os.OpenFile("/etc/passwd", os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		slog.Warn("failed to open /etc/passwd for UID entries", "err", err)
+		return
 	}
+	defer f.Close()
+	for i := min; i < max; i++ {
+		fmt.Fprintf(f, "sandbox%d:x:%d:0::/nonexistent:/usr/sbin/nologin\n", i, i)
+	}
+	slog.Info("sandbox UID passwd entries created", "range", fmt.Sprintf("%d-%d", min, max-1))
 }
 
 func ReleaseUID(uid int) {
