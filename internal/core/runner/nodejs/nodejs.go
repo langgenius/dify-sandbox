@@ -71,6 +71,10 @@ func (p *NodeJsRunner) Run(
 		)
 		cmd.Env = []string{}
 
+		for key, value := range configuration.SandboxEnvs {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
+		}
+
 		if len(configuration.AllowedSyscalls) > 0 {
 			cmd.Env = append(
 				cmd.Env,
