@@ -154,6 +154,17 @@ func InitConfig(path string) error {
 			slog.Info("using http proxy", "proxy", difySandboxGlobalConfigurations.Proxy.Http)
 		}
 	}
+	if difySandboxGlobalConfigurations.SandboxEnvs == nil {
+		difySandboxGlobalConfigurations.SandboxEnvs = make(map[string]string)
+	}
+	for _, env := range os.Environ() {
+		kv := strings.SplitN(env, "=", 2)
+		if len(kv) == 2 && strings.HasPrefix(kv[0], "SANDBOX_ENV_") {
+			key := strings.TrimPrefix(kv[0], "SANDBOX_ENV_")
+			value := kv[1]
+			difySandboxGlobalConfigurations.SandboxEnvs[key] = value
+		}
+	}
 	return nil
 }
 
