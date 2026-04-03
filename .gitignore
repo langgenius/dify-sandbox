@@ -11,3 +11,4 @@ env
 main
 
 *.gen.dockerfile
+docker/node-dist/

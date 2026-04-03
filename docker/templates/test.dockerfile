@@ -1,7 +1,6 @@
 # Test environment Dockerfile template
 ARG GOLANG_VERSION=1.23.9
-ARG PYTHON_VERSION=docker.io/langgenius/python:3-debian13-sfw-ent-dev
-ARG DEBIAN_MIRROR="http://deb.debian.org/debian testing main"
+ARG PYTHON_VERSION=python:3.12-slim-bookworm
 ARG PYTHON_PACKAGES="httpx==0.27.2 requests==2.32.3 jinja2==3.1.6 PySocks httpx[socks]"
 ARG NODEJS_VERSION=v20.11.1
 ARG NODEJS_MIRROR="https://npmmirror.com/mirrors/node"
@@ -35,8 +34,7 @@ ARG GOLANG_MIRROR
 ARG TARGETARCH
 
 # Install system dependencies
-RUN echo "deb ${DEBIAN_MIRROR}" > /etc/apt/sources.list \
-    && apt-get update \
+RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        pkg-config \
        libseccomp-dev \
@@ -99,4 +97,4 @@ RUN case "${TARGETARCH}" in \
     && rm -f go${GOLANG_VERSION}.${GOLANG_ARCH}.tar.gz
 
 # Run tests
-RUN go test -timeout 120s -v ./tests/integration_tests/... 
+RUN go test -timeout 120s -v ./tests/integration_tests/...
