@@ -1,0 +1,103 @@
+name: Custom Build and Push
+
+on:
+  workflow_dispatch:
+    inputs:
+      custom_tag:
+        description: "Custom image tag"
+        required: false
+        default: ""
+
+env:
+  REGISTRY: registry.cn-chengdu.aliyuncs.com
+  IMAGE_NAME: tavan-ai/dify-sandbox
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Aliyun Container Registry
+        uses: aliyun/acr-login@v1
+        with:
+          login-server: https://registry.cn-chengdu.aliyuncs.com
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Install System Dependencies
+        run: sudo apt-get install -y pkg-config gcc libseccomp-dev
+
+      - name: Install yq for version configuration
+        run: |
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "x86_64" ]; then
+            YQ_ARCH="amd64"
+          elif [ "$ARCH" = "aarch64" ]; then
+            YQ_ARCH="arm64"
+          else
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+          fi
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${YQ_ARCH}
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Read Go version from configuration
+        id: go-version
+        run: |
+          GO_VERSION=$(yq eval '.versions.golang' docker/versions.yaml)
+          echo "go-version=${GO_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ steps.go-version.outputs.go-version }}
+
+      - name: Install dependencies
+        run: go mod tidy
+
+      - name: Run Build Binary
+        run: bash ./build/build_amd64.sh
+
+      - name: Generate Dockerfiles
+        run: bash docker/generate.sh production amd64
+
+      - name: Download Node.js tarball
+        run: |
+          NODEJS_VERSION=$(yq eval '.versions.nodejs' docker/versions.yaml)
+          mkdir -p docker/node-dist
+          curl -fL "https://nodejs.org/dist/${NODEJS_VERSION}/node-${NODEJS_VERSION}-linux-x64.tar.xz" \
+            -o "docker/node-dist/node-${NODEJS_VERSION}-linux-x64.tar.xz"
+          echo "Downloaded: docker/node-dist/node-${NODEJS_VERSION}-linux-x64.tar.xz"
+
+      - name: Generate tag
+        id: generate_tag
+        run: |
+          if [[ "${{ github.event.inputs.custom_tag }}" != "" ]]; then
+            echo "tag=${{ github.event.inputs.custom_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.run_number }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push image
+        id: build_push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/amd64-production.gen.dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.generate_tag.outputs.tag }}
+
+      - name: Verify image push success
+        if: steps.build_push.outcome == 'success'
+        run: |
+          echo "✅ Image successfully built and pushed"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.generate_tag.outputs.tag }}"
