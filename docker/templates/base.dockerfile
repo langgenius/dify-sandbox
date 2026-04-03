@@ -1,5 +1,5 @@
 # Base Dockerfile template - shared system dependencies installation logic
-ARG PYTHON_VERSION=python:3.12-slim-bookworm
+ARG PYTHON_VERSION=python:3.14-slim-bookworm
 FROM ${PYTHON_VERSION}
 
 # Install system dependencies

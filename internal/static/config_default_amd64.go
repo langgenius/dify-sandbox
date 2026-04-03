@@ -3,7 +3,6 @@
 package static
 
 var DEFAULT_PYTHON_LIB_REQUIREMENTS = []string{
-	"/opt/python/lib/python3.14",
 	"/usr/local/lib/python3.14",
 	"/usr/lib/python3.14",
 	"/usr/lib/python3",

@@ -1,7 +1,7 @@
 # Version configuration file - centralized management of all software versions
 versions:
   # Base images
-  python: "python:3.12-slim-bookworm"
+  python: "python:3.14-slim-bookworm"
   golang: "1.24.13"
   nodejs: "v20.20.0"
 

@@ -1,5 +1,5 @@
 # Production environment Dockerfile template
-ARG PYTHON_VERSION=python:3.12-slim-bookworm
+ARG PYTHON_VERSION=python:3.14-slim-bookworm
 ARG PYTHON_PACKAGES="httpx==0.27.2 requests==2.32.3 jinja2==3.1.6 PySocks httpx[socks]"
 ARG NODEJS_VERSION=v20.11.1
 
