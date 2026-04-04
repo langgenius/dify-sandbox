@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/langgenius/dify-sandbox/internal/types"
 )
@@ -18,7 +20,7 @@ func BindRequest[T any](r *gin.Context, success func(T)) {
 
 	if err != nil {
 		resp := types.ErrorResponse(-400, err.Error())
-		r.JSON(200, resp)
+		r.JSON(http.StatusBadRequest, resp)
 		return
 	}
 	success(request)
