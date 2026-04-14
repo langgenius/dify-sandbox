@@ -15,7 +15,11 @@ COPY . /app
 WORKDIR /app
 
 # Install build dependencies and build
-RUN apt-get update && apt-get install -y pkg-config gcc libseccomp-dev \
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+       -o Dpkg::Options::="--force-confdef" \
+       -o Dpkg::Options::="--force-confold" \
+       pkg-config gcc libseccomp-dev \
     && go mod tidy \
     && case "${TARGETARCH}" in \
        "amd64") bash ./build/build_amd64.sh ;; \
@@ -37,7 +41,9 @@ ARG TARGETARCH
 # Install system dependencies
 RUN echo "deb ${DEBIAN_MIRROR}" > /etc/apt/sources.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+       -o Dpkg::Options::="--force-confdef" \
+       -o Dpkg::Options::="--force-confold" \
        pkg-config \
        libseccomp-dev \
        wget \
