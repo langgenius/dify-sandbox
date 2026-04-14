@@ -77,8 +77,10 @@ jobs:
             type=raw,value=${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
 
       - name: Install System Dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+          sudo --preserve-env=DEBIAN_FRONTEND apt-get install -y \
             -o Dpkg::Options::="--force-confdef" \
             -o Dpkg::Options::="--force-confold" \
             pkg-config gcc libseccomp-dev

@@ -1,6 +1,7 @@
 # check if ubuntu/debain
 if [ -f /etc/debian_version ]; then
-    sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    export DEBIAN_FRONTEND=noninteractive
+    sudo --preserve-env=DEBIAN_FRONTEND apt-get install -y \
         -o Dpkg::Options::="--force-confdef" \
         -o Dpkg::Options::="--force-confold" \
         pkg-config gcc libseccomp-dev
