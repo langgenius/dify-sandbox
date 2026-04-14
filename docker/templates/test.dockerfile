@@ -10,13 +10,14 @@ ARG TARGETARCH
 
 # Build stage
 FROM golang:${GOLANG_VERSION} AS builder
+ENV DEBIAN_FRONTEND=noninteractive
 
 COPY . /app
 WORKDIR /app
 
 # Install build dependencies and build
 RUN apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    && apt-get install -y \
        -o Dpkg::Options::="--force-confdef" \
        -o Dpkg::Options::="--force-confold" \
        pkg-config gcc libseccomp-dev \
@@ -29,6 +30,7 @@ RUN apt-get update \
 
 # Test stage
 FROM ${PYTHON_VERSION} as tester
+ENV DEBIAN_FRONTEND=noninteractive
 
 ARG DEBIAN_MIRROR
 ARG PYTHON_PACKAGES
@@ -41,7 +43,7 @@ ARG TARGETARCH
 # Install system dependencies
 RUN echo "deb ${DEBIAN_MIRROR}" > /etc/apt/sources.list \
     && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
        -o Dpkg::Options::="--force-confdef" \
        -o Dpkg::Options::="--force-confold" \
        pkg-config \

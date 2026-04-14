@@ -1,6 +1,7 @@
 # Base Dockerfile template - shared system dependencies installation logic
 ARG PYTHON_VERSION=dhi.io/python:3-debian13-sfw-ent-dev
 FROM ${PYTHON_VERSION}
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Build arguments
 ARG DEBIAN_MIRROR="http://deb.debian.org/debian testing main"
@@ -8,7 +9,7 @@ ARG DEBIAN_MIRROR="http://deb.debian.org/debian testing main"
 # Install system dependencies
 RUN echo "deb ${DEBIAN_MIRROR}" > /etc/apt/sources.list \
     && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
        -o Dpkg::Options::="--force-confdef" \
        -o Dpkg::Options::="--force-confold" \
        pkg-config \

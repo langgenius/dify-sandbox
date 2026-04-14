@@ -7,11 +7,12 @@ ARG NODEJS_MIRROR="https://npmmirror.com/mirrors/node"
 ARG TARGETARCH
 
 FROM ${PYTHON_VERSION}
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Install system dependencies
 RUN echo "deb ${DEBIAN_MIRROR}" > /etc/apt/sources.list \
     && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
        -o Dpkg::Options::="--force-confdef" \
        -o Dpkg::Options::="--force-confold" \
        pkg-config \
