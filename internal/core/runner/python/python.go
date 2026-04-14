@@ -2,10 +2,9 @@ package python
 
 import (
 	"context"
-	"crypto/rand"
 	_ "embed"
-	"encoding/base64"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -42,8 +41,15 @@ func (p *PythonRunner) Run(
 		return nil, nil, nil, fmt.Errorf("no available sandbox UID: %w", err)
 	}
 
-	untrustedCodePath, key, err := p.InitializeEnvironment(code, preload, options, uid)
+	bootstrapPath, err := p.InitializeEnvironment(preload, options, uid)
 	if err != nil {
+		ReleaseUID(uid)
+		return nil, nil, nil, err
+	}
+
+	codeReader, codeWriter, err := os.Pipe()
+	if err != nil {
+		os.Remove(bootstrapPath)
 		ReleaseUID(uid)
 		return nil, nil, nil, err
 	}
@@ -51,19 +57,21 @@ func (p *PythonRunner) Run(
 	outputHandler := runner.NewOutputCaptureRunner()
 	outputHandler.SetTimeout(timeout)
 	outputHandler.SetAfterExitHook(func() {
-		os.Remove(untrustedCodePath)
+		codeReader.Close()
+		codeWriter.Close()
+		os.Remove(bootstrapPath)
 		ReleaseUID(uid)
 	})
 
 	// create a new process
 	cmd := exec.Command(
 		configuration.PythonPath,
-		untrustedCodePath,
+		bootstrapPath,
 		LIB_PATH,
-		key,
 	)
 	cmd.Env = []string{}
 	cmd.Dir = LIB_PATH
+	cmd.ExtraFiles = []*os.File{codeReader}
 
 	if configuration.Proxy.Socks5 != "" {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Socks5))
@@ -85,9 +93,16 @@ func (p *PythonRunner) Run(
 		)
 	}
 
+	go func() {
+		_, _ = io.WriteString(codeWriter, code)
+		codeWriter.Close()
+	}()
+
 	err = outputHandler.CaptureOutput(ctx, cmd)
 	if err != nil {
-		os.Remove(untrustedCodePath)
+		codeReader.Close()
+		codeWriter.Close()
+		os.Remove(bootstrapPath)
 		ReleaseUID(uid)
 		return nil, nil, nil, err
 	}
@@ -95,14 +110,7 @@ func (p *PythonRunner) Run(
 	return outputHandler.GetStdout(), outputHandler.GetStderr(), outputHandler.GetDone(), nil
 }
 
-func (p *PythonRunner) InitializeEnvironment(code string, preload string, options *types.RunnerOptions, uid int) (string, string, error) {
-	if !checkLibAvaliable() {
-		releaseLibBinary(false)
-	}
-
-	tempCodeName := strings.ReplaceAll(uuid.New().String(), "-", "_")
-	tempCodeName = strings.ReplaceAll(tempCodeName, "/", ".")
-
+func buildBootstrap(preload string, options *types.RunnerOptions, uid int) string {
 	script := strings.Replace(
 		string(sandbox_fs),
 		"{{uid}}", strconv.Itoa(uid), 1,
@@ -125,52 +133,37 @@ func (p *PythonRunner) InitializeEnvironment(code string, preload string, option
 		)
 	}
 
-	script = strings.Replace(
+	return strings.Replace(
 		script,
 		"{{preload}}",
 		fmt.Sprintf("%s\n", preload),
 		1,
 	)
+}
 
-	// generate a random 512 bit key
-	key_len := 64
-	key := make([]byte, key_len)
-	_, err := rand.Read(key)
+func (p *PythonRunner) InitializeEnvironment(preload string, options *types.RunnerOptions, uid int) (string, error) {
+	if !checkLibAvaliable() {
+		releaseLibBinary(false)
+	}
+
+	tempCodeName := strings.ReplaceAll(uuid.New().String(), "-", "_")
+	tempCodeName = strings.ReplaceAll(tempCodeName, "/", ".")
+
+	script := buildBootstrap(preload, options, uid)
+
+	bootstrapPath := fmt.Sprintf("%s/tmp/%s.py", LIB_PATH, tempCodeName)
+	err := os.MkdirAll(path.Dir(bootstrapPath), 0755)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-
-	// encrypt the code
-	encrypted_code := make([]byte, len(code))
-	for i := 0; i < len(code); i++ {
-		encrypted_code[i] = code[i] ^ key[i%key_len]
-	}
-
-	// encode code using base64
-	code = base64.StdEncoding.EncodeToString(encrypted_code)
-	// encode key using base64
-	encodedKey := base64.StdEncoding.EncodeToString(key)
-
-	code = strings.Replace(
-		script,
-		"{{code}}",
-		code,
-		1,
-	)
-
-	untrustedCodePath := fmt.Sprintf("%s/tmp/%s.py", LIB_PATH, tempCodeName)
-	err = os.MkdirAll(path.Dir(untrustedCodePath), 0755)
+	err = os.WriteFile(bootstrapPath, []byte(script), 0600)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	err = os.WriteFile(untrustedCodePath, []byte(code), 0600)
-	if err != nil {
-		return "", "", err
-	}
-	if err = syscall.Chown(untrustedCodePath, uid, static.SANDBOX_GROUP_ID); err != nil {
-		os.Remove(untrustedCodePath)
-		return "", "", fmt.Errorf("chown script to uid %d: %w", uid, err)
+	if err = syscall.Chown(bootstrapPath, uid, static.SANDBOX_GROUP_ID); err != nil {
+		os.Remove(bootstrapPath)
+		return "", fmt.Errorf("chown script to uid %d: %w", uid, err)
 	}
 
-	return untrustedCodePath, encodedKey, nil
+	return bootstrapPath, nil
 }

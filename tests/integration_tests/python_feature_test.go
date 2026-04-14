@@ -131,3 +131,23 @@ print(datetime.now(ZoneInfo("Asia/Shanghai")).isoformat())
 		}
 	})
 }
+
+func TestPythonFd3Transport(t *testing.T) {
+	resp := service.RunPython3Code(context.TODO(), `
+marker = "fd3-transport"
+print(marker)
+	`, "", &types.RunnerOptions{
+		EnableNetwork: true,
+	})
+	if resp.Code != 0 {
+		t.Fatal(resp)
+	}
+
+	if resp.Data.(*service.RunCodeResponse).Stderr != "" {
+		t.Fatalf("unexpected error: %s\n", resp.Data.(*service.RunCodeResponse).Stderr)
+	}
+
+	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, "fd3-transport") {
+		t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
+	}
+}
