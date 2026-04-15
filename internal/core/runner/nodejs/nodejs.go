@@ -3,8 +3,8 @@ package nodejs
 import (
 	"context"
 	_ "embed"
-	"encoding/base64"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -51,15 +51,32 @@ func (p *NodeJsRunner) Run(
 	output_handler.SetTimeout(timeout)
 
 	err := p.WithTempDir("/", REQUIRED_FS, func(root_path string) error {
+		cleanupRootPath := true
+		defer func() {
+			if cleanupRootPath {
+				os.RemoveAll(root_path)
+			}
+		}()
+
 		output_handler.SetAfterExitHook(func() {
 			os.RemoveAll(root_path)
 		})
 
 		// initialize the environment
-		script_path, err := p.InitializeEnvironment(code, preload, root_path)
+		script_path, err := p.InitializeEnvironment(preload, root_path)
 		if err != nil {
 			return err
 		}
+
+		codeReader, codeWriter, err := os.Pipe()
+		if err != nil {
+			return err
+		}
+		output_handler.SetAfterExitHook(func() {
+			codeReader.Close()
+			codeWriter.Close()
+			os.RemoveAll(root_path)
+		})
 
 		// create a new process
 		cmd := exec.Command(
@@ -70,6 +87,7 @@ func (p *NodeJsRunner) Run(
 			options.Json(),
 		)
 		cmd.Env = []string{}
+		cmd.ExtraFiles = []*os.File{codeReader}
 
 		if len(configuration.AllowedSyscalls) > 0 {
 			cmd.Env = append(
@@ -80,11 +98,19 @@ func (p *NodeJsRunner) Run(
 			)
 		}
 
+		go func() {
+			_, _ = io.WriteString(codeWriter, code)
+			codeWriter.Close()
+		}()
+
 		// capture the output
 		err = output_handler.CaptureOutput(ctx, cmd)
 		if err != nil {
+			codeReader.Close()
+			codeWriter.Close()
 			return err
 		}
+		cleanupRootPath = false
 
 		return nil
 	})
@@ -96,22 +122,21 @@ func (p *NodeJsRunner) Run(
 	return output_handler.GetStdout(), output_handler.GetStderr(), output_handler.GetDone(), nil
 }
 
-func (p *NodeJsRunner) InitializeEnvironment(code string, preload string, root_path string) (string, error) {
-	if !checkLibAvaliable() {
-		releaseLibBinary()
-	}
-
+func buildBootstrap(preload string) string {
 	node_sandbox_file := string(nodejs_sandbox_fs)
 	if preload != "" {
 		node_sandbox_file = fmt.Sprintf("%s\n%s", preload, node_sandbox_file)
 	}
 
-	// join nodejs_sandbox_fs and code
-	// encode code with base64
-	code = base64.StdEncoding.EncodeToString([]byte(code))
-	// FIXME: redeclared function causes code injection
-	evalCode := fmt.Sprintf("eval(Buffer.from('%s', 'base64').toString('utf-8'))", code)
-	code = node_sandbox_file + evalCode
+	return node_sandbox_file
+}
+
+func (p *NodeJsRunner) InitializeEnvironment(preload string, root_path string) (string, error) {
+	if !checkLibAvaliable() {
+		releaseLibBinary()
+	}
+
+	code := buildBootstrap(preload)
 
 	// override root_path/tmp/sandbox-nodejs-project/prescript.js
 	script_path := path.Join(root_path, LIB_PATH, PROJECT_NAME, "node_temp/node_temp/test.js")
