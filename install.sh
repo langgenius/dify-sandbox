@@ -1,6 +1,10 @@
 # check if ubuntu/debain
 if [ -f /etc/debian_version ]; then
-    sudo apt-get install pkg-config gcc libseccomp-dev
+    export DEBIAN_FRONTEND=noninteractive
+    sudo --preserve-env=DEBIAN_FRONTEND apt-get install -y \
+        -o Dpkg::Options::="--force-confdef" \
+        -o Dpkg::Options::="--force-confold" \
+        pkg-config gcc libseccomp-dev
 # check if fedora
 elif [ -f /etc/fedora-release ]; then
     sudo dnf install pkgconfig gcc libseccomp-devel
