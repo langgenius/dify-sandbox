@@ -1,4 +1,5 @@
 const argv = process.argv
+const fs = require('fs')
 
 const koffi = require('koffi')
 const lib = koffi.load('./var/sandbox/sandbox-nodejs/nodejs.so')
@@ -11,3 +12,5 @@ const options = JSON.parse(argv[4])
 
 difySeccomp(uid, gid, options['enable_network'])
 
+const code = fs.readFileSync(3, 'utf8')
+eval(code)
