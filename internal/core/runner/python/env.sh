@@ -20,10 +20,10 @@ copy_and_link() {
     elif [ -b "$src_file" ] || [ -c "$src_file" ]; then
         # If src_file is a device file, copy it and change permissions
         cp "$src_file" "$dest_file"
-        chmod 444 "$dest_file"
+        chmod 644 "$dest_file"
     else
         # Otherwise, create a hard link and change the permissions to read-only
-        ln -f "$src_file" "$dest_file" 2>/dev/null || { cp "$src_file" "$dest_file" && chmod 444 "$dest_file"; }
+        ln -f "$src_file" "$dest_file" 2>/dev/null || { cp "$src_file" "$dest_file" && chmod 644 "$dest_file"; }
     fi
 }
 
