@@ -26,16 +26,6 @@ os.chdir(running_path)
 
 {{preload}}
 
-'''
-	SUCCESS = iota
-	ERR_CHROOT
-	ERR_CHDIR
-	ERR_SETNONEWPRIVS
-	ERR_SECCOMP
-	ERR_SETUID
-	ERR_SETGID
-	ERR_UNKNOWN
-'''
 
 ret = lib.DifySeccomp({{uid}}, {{gid}}, {{enable_network}})
 if ret != 0:
