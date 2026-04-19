@@ -10,6 +10,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -158,6 +159,10 @@ func (p *PythonRunner) InitializeEnvironment(preload string, options *types.Runn
 	err = os.WriteFile(bootstrapPath, []byte(script), 0600)
 	if err != nil {
 		return "", err
+	}
+	if err = syscall.Chown(bootstrapPath, uid, static.SANDBOX_GROUP_ID); err != nil {
+		os.Remove(bootstrapPath)
+		return "", fmt.Errorf("chown script to uid %d: %w", uid, err)
 	}
 
 	return bootstrapPath, nil

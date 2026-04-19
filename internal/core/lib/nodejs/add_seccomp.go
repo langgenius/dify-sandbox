@@ -17,14 +17,32 @@ import (
 func InitSeccomp(uid int, gid int, enable_network bool) error {
 	err := syscall.Chroot(".")
 	if err != nil {
-		return err
+		return &lib.ChrootError{
+			BaseError: lib.BaseError{
+				Err:  err,
+				Code: lib.ERR_CHROOT,
+			},
+		}
 	}
 	err = syscall.Chdir("/")
 	if err != nil {
-		return err
+		return &lib.ChdirError{
+			BaseError: lib.BaseError{
+				Err:  err,
+				Code: lib.ERR_CHDIR,
+			},
+		}
 	}
 
-	lib.SetNoNewPrivs()
+	err = lib.SetNoNewPrivs()
+	if err != nil {
+		return &lib.SetNoNewPrivsError{
+			BaseError: lib.BaseError{
+				Err:  err,
+				Code: lib.ERR_SETNONEWPRIVS,
+			},
+		}
+	}
 
 	allowed_syscalls := []int{}
 	allowed_not_kill_syscalls := []int{}
@@ -50,19 +68,34 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 
 	err = lib.Seccomp(allowed_syscalls, allowed_not_kill_syscalls)
 	if err != nil {
-		return err
+		return &lib.SeccompError{
+			BaseError: lib.BaseError{
+				Err:  err,
+				Code: lib.ERR_SECCOMP,
+			},
+		}
 	}
 
 	// setuid
 	err = syscall.Setuid(uid)
 	if err != nil {
-		return err
+		return &lib.SetuidError{
+			BaseError: lib.BaseError{
+				Err:  err,
+				Code: lib.ERR_SETUID,
+			},
+		}
 	}
 
 	// setgid
 	err = syscall.Setgid(gid)
 	if err != nil {
-		return err
+		return &lib.SetgidError{
+			BaseError: lib.BaseError{
+				Err:  err,
+				Code: lib.ERR_SETGID,
+			},
+		}
 	}
 
 	return nil
