@@ -23,7 +23,7 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_SIGALTSTACK, syscall.SYS_MREMAP,
 
 	// user/group
-	syscall.SYS_SETUID, syscall.SYS_SETGID, syscall.SYS_GETUID,
+	syscall.SYS_SETGROUPS, syscall.SYS_SETGID, syscall.SYS_SETUID, syscall.SYS_GETUID,
 
 	// process
 	syscall.SYS_GETPID, syscall.SYS_GETPPID, syscall.SYS_GETTID,
