@@ -14,6 +14,7 @@ import (
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/uidpool"
 	"github.com/langgenius/dify-sandbox/internal/static"
 )
 
@@ -46,21 +47,23 @@ func (p *NodeJsRunner) Run(
 ) (chan []byte, chan []byte, chan bool, error) {
 	configuration := static.GetDifySandboxGlobalConfigurations()
 
+	uid, err := uidpool.AcquireUID(ctx)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("no available sandbox UID: %w", err)
+	}
+	releaseUID := true
+
 	// capture the output
 	output_handler := runner.NewOutputCaptureRunner()
 	output_handler.SetTimeout(timeout)
 
-	err := p.WithTempDir("/", REQUIRED_FS, func(root_path string) error {
+	err = p.WithTempDir("/", REQUIRED_FS, func(root_path string) error {
 		cleanupRootPath := true
 		defer func() {
 			if cleanupRootPath {
 				os.RemoveAll(root_path)
 			}
 		}()
-
-		output_handler.SetAfterExitHook(func() {
-			os.RemoveAll(root_path)
-		})
 
 		// initialize the environment
 		script_path, err := p.InitializeEnvironment(preload, root_path)
@@ -76,16 +79,11 @@ func (p *NodeJsRunner) Run(
 			codeReader.Close()
 			codeWriter.Close()
 			os.RemoveAll(root_path)
+			uidpool.ReleaseUID(uid)
 		})
 
 		// create a new process
-		cmd := exec.Command(
-			static.GetDifySandboxGlobalConfigurations().NodejsPath,
-			script_path,
-			strconv.Itoa(static.SANDBOX_USER_UID),
-			strconv.Itoa(static.SANDBOX_GROUP_ID),
-			options.Json(),
-		)
+		cmd := exec.Command(configuration.NodejsPath, buildCommandArgs(script_path, uid, options)...)
 		cmd.Env = []string{}
 		cmd.ExtraFiles = []*os.File{codeReader}
 
@@ -110,16 +108,29 @@ func (p *NodeJsRunner) Run(
 			codeWriter.Close()
 			return err
 		}
+		releaseUID = false
 		cleanupRootPath = false
 
 		return nil
 	})
 
 	if err != nil {
+		if releaseUID {
+			uidpool.ReleaseUID(uid)
+		}
 		return nil, nil, nil, err
 	}
 
 	return output_handler.GetStdout(), output_handler.GetStderr(), output_handler.GetDone(), nil
+}
+
+func buildCommandArgs(scriptPath string, uid int, options *types.RunnerOptions) []string {
+	return []string{
+		scriptPath,
+		strconv.Itoa(uid),
+		strconv.Itoa(static.SANDBOX_GROUP_ID),
+		options.Json(),
+	}
 }
 
 func buildBootstrap(preload string) string {

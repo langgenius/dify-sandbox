@@ -1,4 +1,4 @@
-package python
+package uidpool
 
 import (
 	"context"
@@ -43,7 +43,6 @@ func TestPoolExhaustion(t *testing.T) {
 		acquired = append(acquired, uid)
 	}
 
-	// Pool exhausted: acquire with short timeout should fail
 	timeoutCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
 	defer cancel()
 	_, err := pool.Acquire(timeoutCtx)
@@ -51,7 +50,6 @@ func TestPoolExhaustion(t *testing.T) {
 		t.Fatalf("expected ErrUIDPoolExhausted, got %v", err)
 	}
 
-	// Release one, should be able to acquire again
 	pool.Release(acquired[0])
 	uid, err := pool.Acquire(ctx)
 	if err != nil {
@@ -63,18 +61,16 @@ func TestPoolExhaustion(t *testing.T) {
 }
 
 func TestPoolWaitsForRelease(t *testing.T) {
-	pool := NewUIDPool(10000, 10001) // only 1 UID
+	pool := NewUIDPool(10000, 10001)
 	ctx := context.Background()
 
 	uid, _ := pool.Acquire(ctx)
 
-	// Launch a goroutine that releases after 100ms
 	go func() {
 		time.Sleep(100 * time.Millisecond)
 		pool.Release(uid)
 	}()
 
-	// Acquire should block and succeed once the UID is released
 	start := time.Now()
 	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
