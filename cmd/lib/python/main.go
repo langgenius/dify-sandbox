@@ -7,7 +7,9 @@ import "C"
 
 //export DifySeccomp
 func DifySeccomp(uid int, gid int, enable_network bool) {
-	python.InitSeccomp(uid, gid, enable_network)
+	if err := python.InitSeccomp(uid, gid, enable_network); err != nil {
+		panic(err)
+	}
 }
 
 func main() {}
