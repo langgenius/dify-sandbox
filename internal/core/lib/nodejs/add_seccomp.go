@@ -57,6 +57,7 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 			}
 			allowed_syscalls = append(allowed_syscalls, syscall)
 		}
+		allowed_syscalls = append(allowed_syscalls, syscall.SYS_SETGROUPS)
 	} else {
 		allowed_syscalls = append(allowed_syscalls, nodejs_syscall.ALLOW_SYSCALLS...)
 		allowed_not_kill_syscalls = append(allowed_not_kill_syscalls, nodejs_syscall.ALLOW_ERROR_SYSCALLS...)
@@ -76,13 +77,12 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 		}
 	}
 
-	// setuid
-	err = syscall.Setuid(uid)
+	err = syscall.Setgroups([]int{})
 	if err != nil {
-		return &lib.SetuidError{
+		return &lib.SetgroupsError{
 			BaseError: lib.BaseError{
 				Err:  err,
-				Code: lib.ERR_SETUID,
+				Code: lib.ERR_SETGROPS,
 			},
 		}
 	}
@@ -94,6 +94,17 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 			BaseError: lib.BaseError{
 				Err:  err,
 				Code: lib.ERR_SETGID,
+			},
+		}
+	}
+
+	// setuid
+	err = syscall.Setuid(uid)
+	if err != nil {
+		return &lib.SetuidError{
+			BaseError: lib.BaseError{
+				Err:  err,
+				Code: lib.ERR_SETUID,
 			},
 		}
 	}

@@ -20,7 +20,8 @@ if (ret !== 0) {
         4: "Seccomp failed",
         5: "Setuid failed",
         6: "Setgid failed",
-        7: "Unknown error",
+        7: "Setgroups failed",
+        99: "Unknown error",
     }
     const errorMsg = errorMessages[ret] || `Unknown error code: ${ret}`
     console.error(`DifySeccomp failed: ${errorMsg}`)

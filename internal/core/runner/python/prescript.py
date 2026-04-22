@@ -36,7 +36,8 @@ if ret != 0:
         4: "Seccomp failed",
         5: "Setuid failed",
         6: "Setgid failed",
-        7: "Unknown error",
+        7: "Setgroups failed",
+        99: "Unknown error",
     }
     error_msg = error_messages.get(ret, f"Unknown error code: {ret}")
     sys.stderr.write(f"DifySeccomp failed: {error_msg}\n")

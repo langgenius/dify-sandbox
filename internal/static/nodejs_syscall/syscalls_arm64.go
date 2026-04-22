@@ -22,7 +22,7 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_RT_SIGRETURN, syscall.SYS_BRK,
 
 	//user/group
-	syscall.SYS_SETUID, syscall.SYS_SETGID, syscall.SYS_GETTID,
+	syscall.SYS_SETGROUPS, syscall.SYS_SETGID, syscall.SYS_SETUID, syscall.SYS_GETTID,
 	syscall.SYS_GETUID, syscall.SYS_GETGID,
 
 	// epoll

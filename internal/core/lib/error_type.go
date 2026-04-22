@@ -72,3 +72,11 @@ type SeccompError struct {
 func (e *SeccompError) Error() string {
 	return fmt.Sprintf("seccomp failed: %v", e.Err)
 }
+
+type SetgroupsError struct {
+	BaseError
+}
+
+func (e *SetgroupsError) Error() string {
+	return fmt.Sprintf("setgroups failed: %v", e.Err)
+}
