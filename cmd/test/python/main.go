@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner/python"
@@ -12,7 +13,7 @@ import (
 func main() {
 	static.InitConfig("conf/config.yaml")
 	python.PreparePythonDependenciesEnv()
-	resp := service.RunPython3Code(`import json;print(json.dumps({"hello": "world"}))`,
+	resp := service.RunPython3Code(context.Background(), `import json;print(json.dumps({"hello": "world"}))`,
 		``,
 		&types.RunnerOptions{
 			EnableNetwork: true,

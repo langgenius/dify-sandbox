@@ -5,7 +5,9 @@ import "C"
 
 //export DifySeccomp
 func DifySeccomp(uid int, gid int, enable_network bool) {
-	nodejs.InitSeccomp(uid, gid, enable_network)
+	if err := nodejs.InitSeccomp(uid, gid, enable_network); err != nil {
+		panic(err)
+	}
 }
 
 func main() {}

@@ -29,7 +29,7 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_SCHED_GETAFFINITY, syscall.SYS_SET_ROBUST_LIST,
 	SYS_RSEQ,
 
-	syscall.SYS_SETUID, syscall.SYS_SETGID, syscall.SYS_GETTID,
+	syscall.SYS_SETGROUPS, syscall.SYS_SETGID, syscall.SYS_SETUID, syscall.SYS_GETTID,
 
 	syscall.SYS_CLOCK_GETTIME, syscall.SYS_GETTIMEOFDAY, syscall.SYS_NANOSLEEP,
 	syscall.SYS_TIME,
