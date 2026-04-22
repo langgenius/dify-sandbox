@@ -28,3 +28,18 @@ proxy:
   socks5: ''
   http: ''
   https: ''
+otel:
+  enable_otel: false
+  otel_exporter_type: otlp
+  otel_exporter_otlp_protocol: http/protobuf
+  otlp_base_endpoint: http://localhost:4318
+  otlp_trace_endpoint: ''
+  otlp_metric_endpoint: ''
+  otel_api_key: ''
+  otel_sampling_rate: 1.0
+  otel_batch_export_schedule_delay: 5000
+  otel_max_queue_size: 2048
+  otel_max_export_batch_size: 512
+  otel_metric_export_interval: 60000
+  otel_batch_export_timeout: 10000
+  otel_metric_export_timeout: 30000

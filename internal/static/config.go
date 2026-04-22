@@ -14,6 +14,18 @@ var difySandboxGlobalConfigurations types.DifySandboxGlobalConfigurations
 
 func InitConfig(path string) error {
 	difySandboxGlobalConfigurations = types.DifySandboxGlobalConfigurations{}
+	// set sensible defaults for OTel before loading file/env overrides
+	difySandboxGlobalConfigurations.Otel.Enable = false
+	difySandboxGlobalConfigurations.Otel.ExporterType = "otlp"
+	difySandboxGlobalConfigurations.Otel.Protocol = "http/protobuf"
+	difySandboxGlobalConfigurations.Otel.BaseEndpoint = "http://localhost:4318"
+	difySandboxGlobalConfigurations.Otel.SamplingRate = 1.0
+	difySandboxGlobalConfigurations.Otel.BatchScheduleDelayMS = 5000
+	difySandboxGlobalConfigurations.Otel.MaxQueueSize = 2048
+	difySandboxGlobalConfigurations.Otel.MaxExportBatchSize = 512
+	difySandboxGlobalConfigurations.Otel.MetricExportIntervalMS = 60000
+	difySandboxGlobalConfigurations.Otel.BatchExportTimeoutMS = 10000
+	difySandboxGlobalConfigurations.Otel.MetricExportTimeoutMS = 30000
 
 	// read config file
 	configFile, err := os.Open(path)
@@ -154,6 +166,7 @@ func InitConfig(path string) error {
 			slog.Info("using http proxy", "proxy", difySandboxGlobalConfigurations.Proxy.Http)
 		}
 	}
+	slog.Info("otel", difySandboxGlobalConfigurations.Otel)
 	return nil
 }
 

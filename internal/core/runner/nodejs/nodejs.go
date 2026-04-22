@@ -16,6 +16,9 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/uidpool"
 	"github.com/langgenius/dify-sandbox/internal/static"
+	"github.com/langgenius/dify-sandbox/internal/telemetry"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type NodeJsRunner struct {
@@ -54,8 +57,8 @@ func (p *NodeJsRunner) Run(
 	releaseUID := true
 
 	// capture the output
-	output_handler := runner.NewOutputCaptureRunner()
-	output_handler.SetTimeout(timeout)
+	outputHandler := runner.NewOutputCaptureRunner()
+	outputHandler.SetTimeout(timeout)
 
 	err = p.WithTempDir("/", REQUIRED_FS, func(root_path string) error {
 		cleanupRootPath := true
@@ -87,6 +90,11 @@ func (p *NodeJsRunner) Run(
 		cmd.Env = []string{}
 		cmd.ExtraFiles = []*os.File{codeReader}
 
+		// inject trace context into env (only if OTel enabled)
+		if static.GetDifySandboxGlobalConfigurations().Otel.Enable {
+			cmd.Env = append(cmd.Env, telemetry.InjectTraceEnv(ctx)...)
+		}
+
 		if len(configuration.AllowedSyscalls) > 0 {
 			cmd.Env = append(
 				cmd.Env,
@@ -96,14 +104,22 @@ func (p *NodeJsRunner) Run(
 			)
 		}
 
+		tr := otel.Tracer("dify-sandbox/runner")
+		_, span := tr.Start(ctx, "node.exec")
+		span.SetAttributes(
+			attribute.Int("code.length", len(code)),
+			attribute.Int64("timeout.ms", int64(timeout/time.Millisecond)),
+		)
+		defer span.End()
 		go func() {
 			_, _ = io.WriteString(codeWriter, code)
 			codeWriter.Close()
 		}()
 
 		// capture the output
-		err = output_handler.CaptureOutput(ctx, cmd)
+		err = outputHandler.CaptureOutput(ctx, cmd)
 		if err != nil {
+			span.RecordError(err)
 			codeReader.Close()
 			codeWriter.Close()
 			return err
@@ -121,7 +137,7 @@ func (p *NodeJsRunner) Run(
 		return nil, nil, nil, err
 	}
 
-	return output_handler.GetStdout(), output_handler.GetStderr(), output_handler.GetDone(), nil
+	return outputHandler.GetStdout(), outputHandler.GetStderr(), outputHandler.GetDone(), nil
 }
 
 func buildCommandArgs(scriptPath string, uid int, options *types.RunnerOptions) []string {
