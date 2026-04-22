@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path"
@@ -82,6 +83,28 @@ func (p *PythonRunner) Run(
 		}
 		if configuration.Proxy.Http != "" {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Http))
+		}
+	}
+
+	if configuration.AllowedSyscallFilePath != "" {
+		if _, err := os.Stat(configuration.AllowedSyscallFilePath); err == nil {
+			content, _ := os.ReadFile(configuration.AllowedSyscallFilePath)
+
+			parts := strings.Split(strings.TrimSpace(string(content)), ",")
+			var numbers []int
+			for _, part := range parts {
+				if part == "" {
+					continue
+				}
+				num, _ := strconv.Atoi(strings.TrimSpace(part))
+				numbers = append(numbers, num)
+			}
+			if len(numbers) > 0 {
+				configuration.AllowedSyscalls = append(configuration.AllowedSyscalls, numbers...)
+				slog.Info("config syscall length", "info", len(configuration.AllowedSyscalls))
+			}
+		} else {
+			slog.Error("file not exists", "err", err, "file path", configuration.AllowedSyscallFilePath)
 		}
 	}
 

@@ -17,6 +17,7 @@ type DifySandboxGlobalConfigurations struct {
 	EnableNetwork            bool     `yaml:"enable_network"`
 	EnablePreload            bool     `yaml:"enable_preload"`
 	AllowedSyscalls          []int    `yaml:"allowed_syscalls"`
+	AllowedSyscallFilePath   string   `yaml:"allowed_syscall_filepath"`
 	LogPath                  string   `yaml:"log_path"`
 	Proxy                    struct {
 		Socks5 string `yaml:"socks5"`
