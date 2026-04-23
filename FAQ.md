@@ -96,6 +96,14 @@ Edit the following `ALLOW_SYSCALLS` variable, Add all the above system calls to 
 var ALLOW_SYSCALLS = ${ALLOW_SYSCALLS_LIST}
 ```
 
+If you cannot access network resources, you can proceed directly [strace_syscall.sh](strace_syscall.sh)
+Set different parameters according to different system architectures, with x86_64 as the default
+
+```bash
+./strace_syscall.sh x86_64
+```
+The results will be stored in the syscall_numbers.log
+
 3. These syscalls is the sandbox already added: `0,1,3,8,9,10,11,12,13,14,15,16,16,24,25,35,39,60,96,102,105,106,110,131,186,201,202,217,228,230,231,233,234,257,262,270,273,291,318,334`. You need to compare what is the extras syscall numbers of previous step. You can use a simple script or ask LLM to archive that. In this case, it's `5, 17, 28, 63, 204, 237, 281, 435`
 
 4. add the correct syscall alias in [/internal/static/python_syscall/syscalls_amd64.go](./internal/static/python_syscall/syscalls_amd64.go), you can find it in the golang lib, like`/usr/lib/go-1.18/src/syscall/zsysnum_linux_amd64.go`
@@ -115,3 +123,27 @@ var ALLOW_SYSCALLS = []int{
 If the syscall alias not defined in golang, you can directly use the number instead.
 
 5. Build and Run the whole project again.
+
+### 3. ModuleNotFoundError: No module named 'json'
+1. View the path of the Python interpreter's search module
+```bash
+$ python3
+Python 3.12.3 (main, Mar  3 2026, 12:15:18) [GCC 13.3.0] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import sys
+>>> print(sys.path)
+['', '/usr/lib/python312.zip', '/usr/lib/python3.12', '/usr/lib/python3.12/lib-dynload', '/usr/local/lib/python3.12/dist-packages', '/usr/lib/python3/dist-packages']
+>>> 
+```
+
+2. Find the corresponding module among all paths
+```bash
+$ find /usr/lib/python3.12 /usr/lib/python3.12/lib-dynload /usr/local/lib/python3.12/dist-packages /usr/lib/python3/dist-packages -name json
+/usr/lib/python3.12/json
+```
+
+3. Configure to YAML based on the search results
+```yaml
+python_lib_path:
+  - "/usr/lib/python3.12"
+```
