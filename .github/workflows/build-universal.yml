@@ -11,7 +11,7 @@ jobs:
   build-amd64:
     uses: ./.github/workflows/build.yml
     with:
-      runner: ubuntu-latest
+      runner: depot-ubuntu-24.04-4
       arch: amd64
       arch_label: AMD64
     secrets:
@@ -36,7 +36,7 @@ jobs:
 
   build-universal:
     needs: [build-amd64, build-arm64]
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04
     env:
       DOCKERHUB_IMAGE: ${{ vars.DIFY_SANDBOX_IMAGE_NAME || 'langgenius/dify-sandbox' }}
       ECR_REGISTRY: ${{ vars.AWS_ECR_REGISTRY }}
