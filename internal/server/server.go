@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/langgenius/dify-sandbox/internal/controller"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/python"
+	"github.com/langgenius/dify-sandbox/internal/service"
 	"github.com/langgenius/dify-sandbox/internal/static"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
@@ -95,6 +96,9 @@ func Run() {
 	initConfig()
 	// init dependencies, it will cost some times
 	go initDependencies()
+
+	// init worker pool if enabled
+	service.InitPool()
 
 	initServer()
 }

@@ -13,3 +13,10 @@ proxy:
   socks5: ''
   http: ''
   https: ''
+# Worker pool mode: reuses persistent python/nodejs processes instead of
+# forking a new process for every request.  Disabled by default.
+# Enable with env WORKER_POOL_ENABLED=true or set enabled: true below.
+worker_pool:
+  enabled: false
+  python_workers: 4   # number of pre-warmed Python processes
+  nodejs_workers: 2   # number of pre-warmed Node.js processes

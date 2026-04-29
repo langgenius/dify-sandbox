@@ -125,6 +125,24 @@ func InitConfig(path string) error {
 		difySandboxGlobalConfigurations.AllowedSyscalls = ary
 	}
 
+	// worker_pool env overrides
+	if v := os.Getenv("WORKER_POOL_ENABLED"); v != "" {
+		difySandboxGlobalConfigurations.WorkerPool.Enabled, _ = strconv.ParseBool(v)
+	}
+	if v := os.Getenv("WORKER_POOL_PYTHON_WORKERS"); v != "" {
+		difySandboxGlobalConfigurations.WorkerPool.Python, _ = strconv.Atoi(v)
+	}
+	if v := os.Getenv("WORKER_POOL_NODEJS_WORKERS"); v != "" {
+		difySandboxGlobalConfigurations.WorkerPool.NodeJS, _ = strconv.Atoi(v)
+	}
+
+	if difySandboxGlobalConfigurations.WorkerPool.Python == 0 {
+		difySandboxGlobalConfigurations.WorkerPool.Python = 4
+	}
+	if difySandboxGlobalConfigurations.WorkerPool.NodeJS == 0 {
+		difySandboxGlobalConfigurations.WorkerPool.NodeJS = 2
+	}
+
 	if difySandboxGlobalConfigurations.EnableNetwork {
 		log.Info("network has been enabled")
 		socks5_proxy := os.Getenv("SOCKS5_PROXY")

@@ -1,5 +1,12 @@
 package types
 
+// WorkerPoolConfig configures the optional process-pool mode.
+type WorkerPoolConfig struct {
+	Enabled  bool `yaml:"enabled"`
+	Python   int  `yaml:"python_workers"`
+	NodeJS   int  `yaml:"nodejs_workers"`
+}
+
 type DifySandboxGlobalConfigurations struct {
 	App struct {
 		Port  int    `yaml:"port"`
@@ -22,4 +29,5 @@ type DifySandboxGlobalConfigurations struct {
 		Https  string `yaml:"https"`
 		Http   string `yaml:"http"`
 	} `yaml:"proxy"`
+	WorkerPool WorkerPoolConfig `yaml:"worker_pool"`
 }
