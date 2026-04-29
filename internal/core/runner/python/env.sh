@@ -14,6 +14,17 @@ copy_and_link() {
     local src_file="$1"
     local dest_file="$2"
 
+    # Check if src and dest are the same file (already linked or copied)
+    if [ -e "$dest_file" ]; then
+        # Compare inodes to check if they are the same file
+        src_inode=$(ls -i "$src_file" 2>/dev/null | awk '{print $1}')
+        dest_inode=$(ls -i "$dest_file" 2>/dev/null | awk '{print $1}')
+        if [ "$src_inode" = "$dest_inode" ]; then
+            # Already the same file, skip
+            return 0
+        fi
+    fi
+
     if [ -L "$src_file" ]; then
         # If src_file is a symbolic link, copy it without changing permissions
         cp -P "$src_file" "$dest_file"
