@@ -1,11 +1,13 @@
 package uidpool
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -62,19 +64,62 @@ func AcquireUID(ctx context.Context) (int, error) {
 	return globalPool.Acquire(ctx)
 }
 
-// ensurePasswdEntries appends sandbox UIDs to /etc/passwd so that
-// Python's cleanup (e.g. getpwuid) doesn't trigger blocked syscalls.
+// ensurePasswdEntries validates that sandbox UID entries exist in /etc/passwd
+// Performs exact matching on the complete entry format
 func ensurePasswdEntries(min, max int) {
-	f, err := os.OpenFile("/etc/passwd", os.O_APPEND|os.O_WRONLY, 0644)
+	// Open /etc/passwd in read-only mode
+	f, err := os.Open("/etc/passwd")
 	if err != nil {
-		slog.Warn("failed to open /etc/passwd for UID entries", "err", err)
+		slog.Error("failed to open /etc/passwd", "err", err)
 		return
 	}
 	defer f.Close()
+
+	// Read and parse file line by line
+	scanner := bufio.NewScanner(f)
+
+	// Build a set of expected exact strings
+	expected := make(map[string]bool)
 	for i := min; i < max; i++ {
-		fmt.Fprintf(f, "sandbox%d:x:%d:0::/nonexistent:/usr/sbin/nologin\n", i, i)
+		expected[fmt.Sprintf("sandbox%d:x:%d:0::/nonexistent:/usr/sbin/nologin", i, i)] = true
 	}
-	slog.Info("sandbox UID passwd entries created", "range", fmt.Sprintf("%d-%d", min, max-1))
+
+	// Track found entries
+	found := make(map[string]bool)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if expected[line] {
+			found[line] = true
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		slog.Error("error reading /etc/passwd", "err", err)
+		return
+	}
+
+	// Find missing entries
+	var missingUIDs []int
+	for i := min; i < max; i++ {
+		expectedLine := fmt.Sprintf("sandbox%d:x:%d:0::/nonexistent:/usr/sbin/nologin", i, i)
+		if !found[expectedLine] {
+			missingUIDs = append(missingUIDs, i)
+		}
+	}
+
+	// Report errors
+	if len(missingUIDs) > 0 {
+		slog.Error("sandbox UID entries missing or incorrect in /etc/passwd",
+			"missing_uids", missingUIDs,
+			"count", len(missingUIDs),
+			"expected_format", "sandbox${UID}:x:${UID}:0::/nonexistent:/usr/sbin/nologin",
+			"example", fmt.Sprintf("sandbox%d:x:%d:0::/nonexistent:/usr/sbin/nologin", min, min))
+	} else {
+		slog.Info("sandbox UID entries verified",
+			"range", fmt.Sprintf("%d-%d", min, max-1),
+			"count", max-min)
+	}
 }
 
 func ReleaseUID(uid int) {
