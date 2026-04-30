@@ -27,6 +27,25 @@ type MaxRequestIface struct {
 	lock    *sync.RWMutex
 }
 
+func (m *MaxRequestIface) tryAcquire(max int) bool {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if m.current >= max {
+		return false
+	}
+
+	m.current++
+	return true
+}
+
+func (m *MaxRequestIface) release() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.current--
+}
+
 func MaxRequest(max int) gin.HandlerFunc {
 	slog.Info("setting max requests", "max", max)
 	m := &MaxRequestIface{
@@ -35,20 +54,13 @@ func MaxRequest(max int) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
-		m.lock.RLock()
-		if m.current >= max {
-			m.lock.RUnlock()
+		if !m.tryAcquire(max) {
 			c.JSON(http.StatusServiceUnavailable, types.ErrorResponse(-503, "Too many requests"))
 			c.Abort()
 			return
 		}
-		m.lock.RUnlock()
-		m.lock.Lock()
-		m.current++
-		m.lock.Unlock()
+		defer m.release()
+
 		c.Next()
-		m.lock.Lock()
-		m.current--
-		m.lock.Unlock()
 	}
 }
