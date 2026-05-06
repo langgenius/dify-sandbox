@@ -33,7 +33,6 @@ func (p *PythonRunner) Run(
 	options *types.RunnerOptions,
 ) (chan []byte, chan []byte, chan bool, error) {
 	configuration := static.GetDifySandboxGlobalConfigurations()
-
 	// initialize the environment
 	untrusted_code_path, key, err := p.InitializeEnvironment(code, preload, options)
 	if err != nil {

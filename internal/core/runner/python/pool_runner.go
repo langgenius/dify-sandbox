@@ -86,7 +86,10 @@ func (e *PythonPoolExecutor) startProcess() (*pythonPoolProcess, error) {
 
 	cmd := exec.Command(cfg.PythonPath, "-u", scriptPath)
 	cmd.Dir = LIB_PATH
-	cmd.Env = []string{}
+	cmd.Env = []string{
+		fmt.Sprintf("SANDBOX_UID=%d", static.SANDBOX_USER_UID),
+		fmt.Sprintf("SANDBOX_GID=%d", static.SANDBOX_GROUP_ID),
+	}
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

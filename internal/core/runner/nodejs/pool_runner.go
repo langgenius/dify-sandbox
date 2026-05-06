@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -29,6 +30,7 @@ type nodejsPoolProcess struct {
 	stdin      io.WriteCloser
 	stdout     io.ReadCloser
 	stderr     io.ReadCloser
+	reader     *bufio.Reader // persistent stdout reader — must not be re-created
 	scriptPath string
 	mu         sync.Mutex
 }
@@ -81,8 +83,22 @@ func (e *NodeJSPoolExecutor) startProcess() (*nodejsPoolProcess, error) {
 	}
 	tmp.Close()
 
+	// NODE_PATH points at the embedded koffi node_modules so pool_init_script.js
+	// can require('koffi') without inheriting the host's environment.
+	nodeModulesPath := path.Join(LIB_PATH, PROJECT_NAME, "node_temp/node_temp/node_modules")
 	cmd := exec.Command(cfg.NodejsPath, scriptPath)
-	cmd.Env = append(os.Environ())
+	cmd.Env = []string{
+		fmt.Sprintf("NODE_PATH=%s", nodeModulesPath),
+		fmt.Sprintf("SANDBOX_UID=%d", static.SANDBOX_USER_UID),
+		fmt.Sprintf("SANDBOX_GID=%d", static.SANDBOX_GROUP_ID),
+	}
+
+	if len(static.GetDifySandboxGlobalConfigurations().AllowedSyscalls) > 0 {
+		allowed := static.GetDifySandboxGlobalConfigurations().AllowedSyscalls
+		cmd.Env = append(cmd.Env, fmt.Sprintf("ALLOWED_SYSCALLS=%s",
+			strings.Trim(strings.Join(strings.Fields(fmt.Sprint(allowed)), ","), "[]"),
+		))
+	}
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -116,6 +132,7 @@ func (e *NodeJSPoolExecutor) startProcess() (*nodejsPoolProcess, error) {
 		stdin:      stdin,
 		stdout:     stdout,
 		stderr:     stderr,
+		reader:     bufio.NewReader(stdout),
 		scriptPath: scriptPath,
 	}
 
@@ -124,8 +141,12 @@ func (e *NodeJSPoolExecutor) startProcess() (*nodejsPoolProcess, error) {
 	go func() {
 		scanner := bufio.NewScanner(proc.stderr)
 		for scanner.Scan() {
-			if strings.Contains(scanner.Text(), "NODEJS_POOL_READY") {
+			line := scanner.Text()
+			if strings.Contains(line, "NODEJS_POOL_READY") {
 				close(readyCh)
+				// Keep draining stderr so the pipe buffer never blocks.
+				for scanner.Scan() {
+				}
 				return
 			}
 		}
@@ -207,12 +228,11 @@ func (e *NodeJSPoolExecutor) Execute(task *pool.PoolTask) *pool.PoolResult {
 		proc.stdin.Write(append(cmdJSON, '\n')) //nolint:errcheck
 		proc.mu.Unlock()
 
-		// Read one response line from stdout.
+		// Read one response line using the persistent per-process reader.
 		respCh := make(chan []byte, 1)
 		errCh := make(chan error, 1)
 		go func() {
-			reader := bufio.NewReader(proc.stdout)
-			line, readErr := reader.ReadBytes('\n')
+			line, readErr := proc.reader.ReadBytes('\n')
 			if readErr != nil {
 				errCh <- readErr
 				return

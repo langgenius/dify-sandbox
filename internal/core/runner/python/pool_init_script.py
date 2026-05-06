@@ -15,6 +15,12 @@ stdin  (one line per request):
 
 stdout (one line per response):
   {"stdout": "...", "stderr": "...", "error": null|"<msg>"}
+
+Security note
+-------------
+DifySeccomp(uid, gid, enable_network=False) is called ONCE at process startup
+via the SANDBOX_UID / SANDBOX_GID environment variables set by the Go pool
+runner.  seccomp filters are one-way; arming them multiple times is not allowed.
 """
 
 import sys
@@ -28,17 +34,19 @@ from io import StringIO
 
 
 # ---------------------------------------------------------------------------
-# Optional seccomp support (python.so injected by dify-sandbox at startup)
+# Optional seccomp support — called ONCE at process startup, not per-request.
 # ---------------------------------------------------------------------------
-_seccomp_lib = None
-try:
-    import ctypes
-    _lib = ctypes.CDLL("./python.so")
-    _lib.DifySeccomp.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_bool]
-    _lib.DifySeccomp.restype = None
-    _seccomp_lib = _lib
-except Exception:
-    pass  # seccomp not available in this environment
+def _arm_seccomp() -> None:
+    uid = int(os.environ.get('SANDBOX_UID', '65537'))
+    gid = int(os.environ.get('SANDBOX_GID', '0'))
+    try:
+        import ctypes
+        lib = ctypes.CDLL("./python.so")
+        lib.DifySeccomp.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_bool]
+        lib.DifySeccomp.restype = None
+        lib.DifySeccomp(ctypes.c_uint32(uid), ctypes.c_uint32(gid), ctypes.c_bool(False))
+    except Exception:
+        pass  # seccomp not available in this environment
 
 
 # ---------------------------------------------------------------------------
@@ -101,20 +109,9 @@ _SAFE_BUILTINS = {
 def _execute(code_str: str, preload: str, enable_network: bool) -> dict:
     stdout_buf = StringIO()
     stderr_buf = StringIO()
-    result = None
     error = None
 
     try:
-        if _seccomp_lib is not None:
-            try:
-                _seccomp_lib.DifySeccomp(
-                    ctypes.c_uint32(65537),  # sandbox uid
-                    ctypes.c_uint32(65537),  # sandbox gid
-                    ctypes.c_bool(enable_network),
-                )
-            except Exception:
-                pass
-
         with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
             g = {"__name__": "__user__", "__builtins__": _SAFE_BUILTINS}
 
@@ -138,6 +135,9 @@ def _execute(code_str: str, preload: str, enable_network: bool) -> dict:
 # ---------------------------------------------------------------------------
 
 def main():
+    # Arm seccomp once before accepting any requests.
+    _arm_seccomp()
+
     # Signal to the Go pool runner that this process is ready.
     sys.stderr.write("PYTHON_POOL_READY\n")
     sys.stderr.flush()
