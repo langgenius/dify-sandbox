@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner/python"
@@ -11,11 +10,6 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/static"
 	"github.com/langgenius/dify-sandbox/internal/types"
 )
-
-type RunCodeResponse struct {
-	Stderr string `json:"error"`
-	Stdout string `json:"stdout"`
-}
 
 func RunPython3Code(ctx context.Context, code string, preload string, options *runner_types.RunnerOptions) *types.DifySandboxResponse {
 	if err := checkOptions(options); err != nil {
@@ -31,7 +25,7 @@ func RunPython3Code(ctx context.Context, code string, preload string, options *r
 	)
 
 	runner := python.PythonRunner{}
-	stdout, stderr, done, err := runner.Run(ctx,
+	result, err := runner.Run(ctx,
 		code, timeout, nil, preload, options,
 	)
 	if err != nil {
@@ -41,39 +35,7 @@ func RunPython3Code(ctx context.Context, code string, preload string, options *r
 		return types.ErrorResponse(-500, err.Error())
 	}
 
-	var stdoutStr strings.Builder
-	var stderrStr strings.Builder
-
-	defer close(done)
-
-	for {
-		select {
-		case <-done:
-			// Drain any remaining buffered output to avoid races
-		drain:
-			for {
-				select {
-				case out := <-stdout:
-					stdoutStr.Write(out)
-				case err := <-stderr:
-					stderrStr.Write(err)
-				default:
-					break drain
-				}
-			}
-			// Close channels after draining all data
-			close(stdout)
-			close(stderr)
-			return types.SuccessResponse(&RunCodeResponse{
-				Stdout: stdoutStr.String(),
-				Stderr: stderrStr.String(),
-			})
-		case out := <-stdout:
-			stdoutStr.Write(out)
-		case err := <-stderr:
-			stderrStr.Write(err)
-		}
-	}
+	return types.SuccessResponse(collectRunCodeResponse(result))
 }
 
 type ListDependenciesResponse struct {

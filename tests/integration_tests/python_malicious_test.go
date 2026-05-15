@@ -43,6 +43,10 @@ os.execl("/bin/ls", "ls")
 	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "operation not permitted") {
 		t.Error(resp.Data.(*service.RunCodeResponse).Stderr)
 	}
+
+	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Error, "process exited with code") {
+		t.Error(resp.Data.(*service.RunCodeResponse).Error)
+	}
 }
 
 func TestRunCommand(t *testing.T) {
@@ -60,6 +64,10 @@ subprocess.run(["ls", "-l"])
 	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "operation not permitted") {
 		t.Error(resp.Data.(*service.RunCodeResponse).Stderr)
 	}
+
+	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Error, "process exited with code") {
+		t.Error(resp.Data.(*service.RunCodeResponse).Error)
+	}
 }
 
 func TestReadEtcPasswd(t *testing.T) {
@@ -74,5 +82,9 @@ print(open("/etc/passwd").read())
 
 	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "No such file or directory") {
 		t.Error(resp.Data.(*service.RunCodeResponse).Stderr)
+	}
+
+	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Error, resp.Data.(*service.RunCodeResponse).Stderr) {
+		t.Error(resp.Data.(*service.RunCodeResponse).Error)
 	}
 }

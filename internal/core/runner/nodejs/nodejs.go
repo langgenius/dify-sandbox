@@ -44,12 +44,12 @@ func (p *NodeJsRunner) Run(
 	stdin []byte,
 	preload string,
 	options *types.RunnerOptions,
-) (chan []byte, chan []byte, chan bool, error) {
+) (*runner.OutputCaptureResult, error) {
 	configuration := static.GetDifySandboxGlobalConfigurations()
 
 	uid, err := uidpool.AcquireUID(ctx)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("no available sandbox UID: %w", err)
+		return nil, fmt.Errorf("no available sandbox UID: %w", err)
 	}
 	releaseUID := true
 
@@ -118,10 +118,10 @@ func (p *NodeJsRunner) Run(
 		if releaseUID {
 			uidpool.ReleaseUID(uid)
 		}
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	return output_handler.GetStdout(), output_handler.GetStderr(), output_handler.GetDone(), nil
+	return output_handler.Result(), nil
 }
 
 func buildCommandArgs(scriptPath string, uid int, options *types.RunnerOptions) []string {

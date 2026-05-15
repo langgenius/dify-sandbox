@@ -151,3 +151,65 @@ print(marker)
 		t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
 	}
 }
+
+func TestPythonLoggingStaysInStderr(t *testing.T) {
+	resp := service.RunPython3Code(context.TODO(), `
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logging.info("Starting task...")
+print("ok")
+	`, "", &types.RunnerOptions{
+		EnableNetwork: true,
+	})
+	if resp.Code != 0 {
+		t.Fatal(resp)
+	}
+
+	data := resp.Data.(*service.RunCodeResponse)
+
+	if !strings.Contains(data.Stdout, "ok") {
+		t.Fatalf("unexpected output: %s\n", data.Stdout)
+	}
+
+	if !strings.Contains(data.Stderr, "INFO:root:Starting task...") {
+		t.Fatalf("expected logging output in stderr, got: %s\n", data.Stderr)
+	}
+
+	if data.Error != "" {
+		t.Fatalf("expected empty execution error, got: %s\n", data.Error)
+	}
+
+	if data.ExitCode != 0 {
+		t.Fatalf("expected zero exit code, got: %d\n", data.ExitCode)
+	}
+}
+
+func TestPythonExceptionPopulatesErrorAndStderr(t *testing.T) {
+	resp := service.RunPython3Code(context.TODO(), `
+raise ValueError("bad input")
+	`, "", &types.RunnerOptions{
+		EnableNetwork: true,
+	})
+	if resp.Code != 0 {
+		t.Fatal(resp)
+	}
+
+	data := resp.Data.(*service.RunCodeResponse)
+
+	if !strings.Contains(data.Stderr, "ValueError: bad input") {
+		t.Fatalf("expected traceback in stderr, got: %s\n", data.Stderr)
+	}
+
+	if !strings.Contains(data.Error, "process exited with code") {
+		t.Fatalf("expected error to include exit code, got: %s\n", data.Error)
+	}
+
+	if !strings.Contains(data.Error, data.Stderr) {
+		t.Fatalf("expected error to include full stderr, got: %s\n", data.Error)
+	}
+
+	if data.ExitCode == 0 {
+		t.Fatalf("expected non-zero exit code, got: %d\n", data.ExitCode)
+	}
+}

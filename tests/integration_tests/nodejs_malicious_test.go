@@ -34,6 +34,10 @@ ls.on( 'close', ( code ) => {
 	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stderr, "operation not permitted") {
 		t.Error(resp.Data.(*service.RunCodeResponse).Stderr)
 	}
+
+	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Error, "process exited with code") {
+		t.Error(resp.Data.(*service.RunCodeResponse).Error)
+	}
 }
 
 func TestNodejsRunRedeclareFunctionCommand(t *testing.T) {

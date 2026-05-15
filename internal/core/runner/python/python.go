@@ -33,25 +33,25 @@ func (p *PythonRunner) Run(
 	stdin []byte,
 	preload string,
 	options *types.RunnerOptions,
-) (chan []byte, chan []byte, chan bool, error) {
+) (*runner.OutputCaptureResult, error) {
 	configuration := static.GetDifySandboxGlobalConfigurations()
 
 	uid, err := AcquireUID(ctx)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("no available sandbox UID: %w", err)
+		return nil, fmt.Errorf("no available sandbox UID: %w", err)
 	}
 
 	bootstrapPath, err := p.InitializeEnvironment(preload, options, uid)
 	if err != nil {
 		ReleaseUID(uid)
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	codeReader, codeWriter, err := os.Pipe()
 	if err != nil {
 		os.Remove(bootstrapPath)
 		ReleaseUID(uid)
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	outputHandler := runner.NewOutputCaptureRunner()
@@ -104,10 +104,10 @@ func (p *PythonRunner) Run(
 		codeWriter.Close()
 		os.Remove(bootstrapPath)
 		ReleaseUID(uid)
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	return outputHandler.GetStdout(), outputHandler.GetStderr(), outputHandler.GetDone(), nil
+	return outputHandler.Result(), nil
 }
 
 func buildBootstrap(preload string, options *types.RunnerOptions, uid int) string {
