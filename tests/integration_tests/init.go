@@ -9,9 +9,13 @@ import (
 )
 
 func init() {
-	static.InitConfig("conf/config.yaml")
+	err := static.InitConfig("conf/config.yaml")
+	if err != nil {
+		slog.Error("failed to initialize config", "err", err)
+		panic(fmt.Sprintf("failed to initialize config: %v", err))
+	}
 
-	err := python.PreparePythonDependenciesEnv()
+	err = python.PreparePythonDependenciesEnv()
 	if err != nil {
 		slog.Error("failed to initialize python dependencies sandbox", "err", err)
 		panic(fmt.Sprintf("failed to initialize python dependencies sandbox: %v", err))

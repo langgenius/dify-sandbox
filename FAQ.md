@@ -4,51 +4,17 @@
 
 This occurs because the `dify-sandbox` implementation generates a temporary file in the `/var/sandbox/sandbox-python/` directory to save and execute your Python code. Before running your Python code, it uses `syscall.Chroot` to restrict the current process's root to the `/var/sandbox/sandbox-python/` directory. This directory structure, visible to the Python process, determines all the Python modules/packages that can be imported, including modules based on C code.
 
-- Root: `/var/sandbox/sandbox-python/` is the root directory from the Python process perspective. Its subdirectories depend on the `python_lib_path` configuration in your `config.yaml`. Usually, it includes:
+- Root: `/var/sandbox/sandbox-python/` is the root directory from the Python process perspective. Its subdirectories are now discovered automatically from the configured `python_path` before chroot. Usually, it includes:
   - `etc/` directory
   - `python.so` shared object, compiled and built by `dify-sandbox`
   - `usr/lib` directory
   - `usr/local/`
 
-If you haven't configured `python_lib_path`, `dify-sandbox` will default to the following settings (see code [internal/static/config_default_amd64.go](https://github.com/langgenius/dify-sandbox/blob/main/internal/static/config_default_amd64.go); for ARM systems, see `config_default_arm64.go`):
+At startup, `dify-sandbox` runs the configured interpreter from `python_path` and discovers its stdlib, site-packages, and absolute `sys.path` entries. It then appends a small fixed set of system files such as certificate bundles, resolver config, timezone data, and the platform library directory.
 
-```go
-var DEFAULT_PYTHON_LIB_REQUIREMENTS = []string{
-	"/opt/python/lib/python3.14",
-    "/usr/local/lib/python3.14", // Usually your Python installation directory; if using conda, modify this to the conda virtual environment root directory, e.g., /root/anaconda3/envs/{env_name}
-    "/usr/lib/python3.14",
-    "/usr/lib/python3",
-    "/usr/lib/x86_64-linux-gnu/libssl.so.3", // Your Python code's shared object dependency; it will be copied to /var/sandbox/sandbox-python/usr/lib/x86_64-linux-gnu/, and your Python process will load it from /usr/lib/x86_64-linux-gnu/
-    "/usr/lib/x86_64-linux-gnu/libcrypto.so.3", // Similar to above
-    "/etc/ssl/certs/ca-certificates.crt",
-    "/etc/nsswitch.conf",
-    "/etc/hosts",
-    "/etc/resolv.conf",
-    "/run/systemd/resolve/stub-resolv.conf",
-    "/run/resolvconf/resolv.conf",
-}
-```
+`python_lib_path` and `PYTHON_LIB_PATH` are no longer used. If discovery fails, fix `python_path` or the Python installation in your image so that running `python_path -c 'import json'` succeeds before the sandbox starts.
 
-So, when encountering such errors, you need to modify the `python_lib_path` in your `config.yaml` to include the shared object paths required by your Python code. For example:
-```config.yaml
-python_path: /opt/python/bin/python3
-python_lib_path:
-  - "/opt/python/lib/python3.14"
-  - "/usr/local/lib/python3.14"
-  - "/usr/lib/python3.14"
-  - "/usr/lib/python3"
-  - /usr/lib/x86_64-linux-gnu/libssl.so.3
-  - /usr/lib/x86_64-linux-gnu/libcrypto.so.3
-  - /etc/ssl/certs/ca-certificates.crt
-  - /etc/nsswitch.conf
-  - /etc/hosts
-  - /etc/resolv.conf
-  - /run/systemd/resolve/stub-resolv.conf
-  - /run/resolvconf/resolv.conf
-  - *** add path which you required here ***
-```
-
-**Note:** The Go process initializes this environment at startup, so if you configure too many `python_lib_path`, the startup will be very slow. For serverless environments, consider modifying the code to complete this build in a Docker container.
+If you still see missing shared-library errors, install the package or shared object into the same Python environment referenced by `python_path`, or into the system library locations that are already copied into the sandbox. Do not try to work around this by configuring extra sandbox copy paths.
 
 ### 2. My Python code returns an "operation not permitted" error?
 

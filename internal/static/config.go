@@ -1,6 +1,7 @@
 package static
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
@@ -15,19 +16,23 @@ var difySandboxGlobalConfigurations types.DifySandboxGlobalConfigurations
 func InitConfig(path string) error {
 	difySandboxGlobalConfigurations = types.DifySandboxGlobalConfigurations{}
 
-	// read config file
-	configFile, err := os.Open(path)
+	configContent, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 
-	defer configFile.Close()
+	var rawConfig map[string]any
+	if err = yaml.Unmarshal(configContent, &rawConfig); err != nil {
+		return err
+	}
 
-	// parse config file
-	decoder := yaml.NewDecoder(configFile)
-	err = decoder.Decode(&difySandboxGlobalConfigurations)
+	err = yaml.Unmarshal(configContent, &difySandboxGlobalConfigurations)
 	if err != nil {
 		return err
+	}
+
+	if _, ok := rawConfig["python_lib_path"]; ok {
+		slog.Warn("python_lib_path is deprecated and ignored; python library paths are discovered from python_path")
 	}
 
 	debug, err := strconv.ParseBool(os.Getenv("DEBUG"))
@@ -69,13 +74,22 @@ func InitConfig(path string) error {
 		difySandboxGlobalConfigurations.PythonPath = "/opt/python/bin/python3"
 	}
 
-	python_lib_path := os.Getenv("PYTHON_LIB_PATH")
-	if python_lib_path != "" {
-		difySandboxGlobalConfigurations.PythonLibPaths = strings.Split(python_lib_path, ",")
+	if os.Getenv("PYTHON_LIB_PATH") != "" {
+		slog.Warn("PYTHON_LIB_PATH is deprecated and ignored; python library paths are discovered from python_path")
 	}
 
-	if len(difySandboxGlobalConfigurations.PythonLibPaths) == 0 {
-		difySandboxGlobalConfigurations.PythonLibPaths = DEFAULT_PYTHON_LIB_REQUIREMENTS
+	// PythonLibPaths is a derived runtime field, not a user-configurable one.
+	// Resolve the interpreter first, then discover its stdlib/site paths here so
+	// downstream sandbox preparation only copies interpreter-owned paths.
+	resolvedPythonPath, err := resolvePythonPath(difySandboxGlobalConfigurations.PythonPath)
+	if err != nil {
+		return fmt.Errorf("resolve python_path %q: %w", difySandboxGlobalConfigurations.PythonPath, err)
+	}
+	difySandboxGlobalConfigurations.PythonPath = resolvedPythonPath
+
+	difySandboxGlobalConfigurations.PythonLibPaths, err = discoverPythonLibPaths(difySandboxGlobalConfigurations.PythonPath)
+	if err != nil {
+		return fmt.Errorf("discover python library paths from %q: %w", difySandboxGlobalConfigurations.PythonPath, err)
 	}
 
 	python_pip_mirror_url := os.Getenv("PIP_MIRROR_URL")
