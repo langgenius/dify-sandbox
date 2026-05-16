@@ -2,32 +2,18 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/langgenius/dify-sandbox/internal/utils/log"
+	"go.opentelemetry.io/otel/trace"
 )
 
-func TraceMiddleware() gin.HandlerFunc {
+// TraceIDHeader sets the current trace id on the response header after the handler runs.
+// Requires otel instrumentation (e.g., otelgin) to run earlier in the chain to ensure a span exists.
+func TraceIDHeader() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := c.Request.Context()
-
-		traceparent := c.GetHeader("traceparent")
-		traceID, spanID, ok := log.ParseTraceparent(traceparent)
-		if !ok {
-			traceID = log.GenerateTraceID()
-			spanID = log.GenerateSpanID()
-		}
-		ctx = log.WithTrace(ctx, log.TraceContext{
-			TraceID: traceID,
-			SpanID:  spanID,
-		})
-
-		identity := log.Identity{
-			TenantID: c.Param("tenant_id"),
-			UserID:   c.GetHeader("X-User-ID"),
-			UserType: c.GetHeader("X-User-Type"),
-		}
-		ctx = log.WithIdentity(ctx, identity)
-
-		c.Request = c.Request.WithContext(ctx)
 		c.Next()
+		span := trace.SpanFromContext(c.Request.Context())
+		sc := span.SpanContext()
+		if sc.IsValid() {
+			c.Writer.Header().Set("Trace-Id", sc.TraceID().String())
+		}
 	}
 }

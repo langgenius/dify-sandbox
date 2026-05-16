@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"time"
@@ -8,8 +9,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/langgenius/dify-sandbox/internal/controller"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/python"
+	"github.com/langgenius/dify-sandbox/internal/middleware"
 	"github.com/langgenius/dify-sandbox/internal/static"
+	"github.com/langgenius/dify-sandbox/internal/telemetry"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 func initConfig() {
@@ -45,11 +49,31 @@ func initServer() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	r := gin.Default()
-	r.Use(gin.Recovery())
+	// Initialize OpenTelemetry by config. If disabled or init fails, run without tracing.
+	cfgAll := static.GetDifySandboxGlobalConfigurations()
+	if cfgAll.Otel.Enable {
+		if shutdown, err := telemetry.Init(context.Background(), "dify-sandbox", cfgAll); err != nil {
+			slog.Warn("opentelemetry init failed", "err", err)
+		} else if shutdown != nil {
+			_ = shutdown
+		}
+	} else {
+		slog.Info("opentelemetry disabled via config; set app.otel.enable_otel=true to enable")
+	}
+
+	r := gin.New()
+	if cfgAll.Otel.Enable {
+		// OTel middleware should be first to ensure upstream trace id is extracted.
+		r.Use(otelgin.Middleware("dify-sandbox"))
+		// Attach identity and annotate tenant.id on the HTTP span.
+		r.Use(middleware.Identity())
+		// Expose Trace-Id header for easier troubleshooting.
+		r.Use(middleware.TraceIDHeader())
+	}
 	if gin.Mode() == gin.DebugMode {
 		r.Use(gin.Logger())
 	}
+	r.Use(gin.Recovery())
 
 	controller.Setup(r)
 
