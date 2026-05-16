@@ -73,6 +73,10 @@ func (p *PythonRunner) Run(
 	cmd.Dir = LIB_PATH
 	cmd.ExtraFiles = []*os.File{codeReader}
 
+	for key, value := range configuration.SandboxEnvs {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
+	}
+
 	if configuration.Proxy.Socks5 != "" {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Socks5))
 		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Socks5))
