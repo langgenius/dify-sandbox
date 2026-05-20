@@ -2,11 +2,7 @@
 
 package static
 
-var DEFAULT_PYTHON_LIB_REQUIREMENTS = []string{
-	"/opt/python/lib/python3.14",
-	"/usr/local/lib/python3.14",
-	"/usr/lib/python3.14",
-	"/usr/lib/python3",
+var DEFAULT_SYSTEM_LIB_REQUIREMENTS = []string{
 	"/usr/lib/aarch64-linux-gnu",
 	"/etc/ssl/certs/ca-certificates.crt",
 	"/etc/nsswitch.conf",

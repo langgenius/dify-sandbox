@@ -6,11 +6,14 @@ type DifySandboxGlobalConfigurations struct {
 		Debug bool   `yaml:"debug"`
 		Key   string `yaml:"key"`
 	} `yaml:"app"`
-	MaxWorkers               int      `yaml:"max_workers"`
-	MaxRequests              int      `yaml:"max_requests"`
-	WorkerTimeout            int      `yaml:"worker_timeout"`
-	PythonPath               string   `yaml:"python_path"`
-	PythonLibPaths           []string `yaml:"python_lib_path"`
+	MaxWorkers    int    `yaml:"max_workers"`
+	MaxRequests   int    `yaml:"max_requests"`
+	WorkerTimeout int    `yaml:"worker_timeout"`
+	PythonPath    string `yaml:"python_path"`
+	// PythonLibPaths is internal-only. InitConfig derives it from PythonPath at
+	// startup, and legacy python_lib_path / PYTHON_LIB_PATH user inputs are
+	// intentionally ignored.
+	PythonLibPaths           []string `yaml:"-"`
 	PythonPipMirrorURL       string   `yaml:"python_pip_mirror_url"`
 	PythonDepsUpdateInterval string   `yaml:"python_deps_update_interval"`
 	NodejsPath               string   `yaml:"nodejs_path"`
