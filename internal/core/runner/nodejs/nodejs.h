@@ -21,6 +21,11 @@ extern const char *_GoStringPtr(_GoString_ s);
 /* Start of preamble from import "C" comments.  */
 
 
+#line 11 "main.go"
+
+#include <stdint.h>
+
+#line 1 "cgo-generated-wrapper"
 
 
 /* End of preamble from import "C" comments.  */
@@ -82,7 +87,7 @@ typedef struct { void *data; GoInt len; GoInt cap; } GoSlice;
 extern "C" {
 #endif
 
-extern void DifySeccomp(GoInt uid, GoInt gid, GoUint8 enable_network);
+extern int DifySeccomp(GoInt uid, GoInt gid, GoUint8 enable_network);
 
 #ifdef __cplusplus
 }
