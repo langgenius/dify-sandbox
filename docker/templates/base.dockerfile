@@ -26,6 +26,6 @@ RUN echo "deb ${DEBIAN_MIRROR}" > /etc/apt/sources.list \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-ARG PYTHON_PACKAGES="httpx==0.27.2 requests==2.32.3 jinja2==3.1.6 PySocks httpx[socks]"
+ARG PYTHON_PACKAGES="httpx==0.27.2 requests==2.33.0 jinja2==3.1.6 PySocks httpx[socks]"
 
 RUN pip3 install --no-cache-dir ${PYTHON_PACKAGES} 

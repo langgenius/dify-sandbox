@@ -84,7 +84,13 @@ func (p *NodeJsRunner) Run(
 
 		// create a new process
 		cmd := exec.Command(configuration.NodejsPath, buildCommandArgs(script_path, uid, options)...)
-		cmd.Env = []string{}
+		cmd.Env = []string{
+			// The sandbox child loads a Go c-shared library to install seccomp.
+			// Disable Go runtime features that may issue housekeeping syscalls after
+			// the seccomp filter is active; the prescript removes this before running
+			// user code.
+			"GODEBUG=decoratemappings=0,containermaxprocs=0,updatemaxprocs=0",
+		}
 		cmd.ExtraFiles = []*os.File{codeReader}
 
 		if len(configuration.AllowedSyscalls) > 0 {

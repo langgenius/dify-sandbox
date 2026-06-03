@@ -16,11 +16,11 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_FSTAT, syscall.SYS_FCNTL,
 
 	// thread
-	syscall.SYS_FUTEX,
+	syscall.SYS_FUTEX, syscall.SYS_SCHED_GETAFFINITY,
 
 	// memory
 	syscall.SYS_MMAP, syscall.SYS_BRK, syscall.SYS_MPROTECT, syscall.SYS_MUNMAP, syscall.SYS_RT_SIGRETURN, syscall.SYS_RT_SIGPROCMASK,
-	syscall.SYS_SIGALTSTACK, syscall.SYS_MREMAP,
+	syscall.SYS_SIGALTSTACK, syscall.SYS_MREMAP, syscall.SYS_MADVISE,
 
 	// user/group
 	syscall.SYS_SETGROUPS, syscall.SYS_SETGID, syscall.SYS_SETUID, syscall.SYS_GETUID,
@@ -41,6 +41,7 @@ var ALLOW_SYSCALLS = []int{
 
 	// get random
 	syscall.SYS_GETRANDOM,
+	syscall.SYS_EVENTFD2,
 }
 
 var ALLOW_ERROR_SYSCALLS = []int{

@@ -27,6 +27,7 @@ os.chdir(running_path)
 {{preload}}
 
 lib.DifySeccomp({{uid}}, {{gid}}, {{enable_network}})
+os.environ.pop("GODEBUG", None)
 
 with os.fdopen(3, "rb") as code_fd:
     code = code_fd.read().decode("utf-8")

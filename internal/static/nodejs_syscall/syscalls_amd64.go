@@ -38,6 +38,7 @@ var ALLOW_SYSCALLS = []int{
 
 	syscall.SYS_READLINK,
 	syscall.SYS_DUP3,
+	syscall.SYS_EVENTFD2,
 }
 
 var ALLOW_ERROR_SYSCALLS = []int{

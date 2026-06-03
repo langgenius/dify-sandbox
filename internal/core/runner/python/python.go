@@ -69,7 +69,13 @@ func (p *PythonRunner) Run(
 		bootstrapPath,
 		LIB_PATH,
 	)
-	cmd.Env = []string{}
+	cmd.Env = []string{
+		// The sandbox child loads a Go c-shared library to install seccomp.
+		// Disable Go runtime features that may issue housekeeping syscalls after
+		// the seccomp filter is active; the prescript removes this before running
+		// user code.
+		"GODEBUG=decoratemappings=0,containermaxprocs=0,updatemaxprocs=0",
+	}
 	cmd.Dir = LIB_PATH
 	cmd.ExtraFiles = []*os.File{codeReader}
 

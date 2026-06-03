@@ -15,10 +15,10 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_NEWFSTATAT, syscall.SYS_FSTAT, syscall.SYS_FCNTL, syscall.SYS_IOCTL, syscall.SYS_LSEEK, syscall.SYS_GETDENTS64,
 	syscall.SYS_WRITE, syscall.SYS_CLOSE, syscall.SYS_OPENAT, syscall.SYS_READ,
 	// thread
-	syscall.SYS_FUTEX,
+	syscall.SYS_FUTEX, syscall.SYS_SCHED_GETAFFINITY,
 	// memory
 	syscall.SYS_MMAP, syscall.SYS_BRK, syscall.SYS_MPROTECT, syscall.SYS_MUNMAP, syscall.SYS_RT_SIGRETURN,
-	syscall.SYS_MREMAP,
+	syscall.SYS_MREMAP, syscall.SYS_MADVISE,
 
 	// user/group
 	syscall.SYS_SETGROUPS, syscall.SYS_SETGID, syscall.SYS_SETUID, syscall.SYS_GETUID,
@@ -36,6 +36,7 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_TIME,
 
 	syscall.SYS_RT_SIGPROCMASK, syscall.SYS_SIGALTSTACK, SYS_GETRANDOM,
+	syscall.SYS_EVENTFD2,
 }
 
 var ALLOW_ERROR_SYSCALLS = []int{
