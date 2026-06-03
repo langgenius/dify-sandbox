@@ -5,20 +5,24 @@ package python_syscall
 import "syscall"
 
 const (
-	SYS_GETRANDOM = 318
-	SYS_RSEQ      = 334
-	SYS_SENDMMSG  = 307
+	SYS_GETRANDOM  = 318
+	SYS_RSEQ       = 334
+	SYS_SENDMMSG   = 307
+	SYS_CLONE3     = 435
+	SYS_MEMBARRIER = 324
+	SYS_PRCTL      = 157
+	SYS_STATX      = 332
 )
 
 var ALLOW_SYSCALLS = []int{
 	// file io
 	syscall.SYS_NEWFSTATAT, syscall.SYS_FSTAT, syscall.SYS_FCNTL, syscall.SYS_IOCTL, syscall.SYS_LSEEK, syscall.SYS_GETDENTS64,
-	syscall.SYS_WRITE, syscall.SYS_CLOSE, syscall.SYS_OPENAT, syscall.SYS_READ,
+	syscall.SYS_WRITE, syscall.SYS_CLOSE, syscall.SYS_OPENAT, syscall.SYS_READ, syscall.SYS_READLINK, SYS_STATX,
 	// thread
 	syscall.SYS_FUTEX,
 	// memory
 	syscall.SYS_MMAP, syscall.SYS_BRK, syscall.SYS_MPROTECT, syscall.SYS_MUNMAP, syscall.SYS_RT_SIGRETURN,
-	syscall.SYS_MREMAP,
+	syscall.SYS_MREMAP, syscall.SYS_MADVISE, SYS_MEMBARRIER,
 
 	// user/group
 	syscall.SYS_SETGROUPS, syscall.SYS_SETGID, syscall.SYS_SETUID, syscall.SYS_GETUID,
@@ -26,8 +30,8 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_GETPID, syscall.SYS_GETPPID, syscall.SYS_GETTID,
 	syscall.SYS_EXIT, syscall.SYS_EXIT_GROUP,
 	syscall.SYS_TGKILL, syscall.SYS_RT_SIGACTION, syscall.SYS_IOCTL,
-	syscall.SYS_SCHED_YIELD,
-	syscall.SYS_SET_ROBUST_LIST, syscall.SYS_GET_ROBUST_LIST, SYS_RSEQ,
+	syscall.SYS_SCHED_YIELD, syscall.SYS_SCHED_GETAFFINITY,
+	syscall.SYS_SET_ROBUST_LIST, syscall.SYS_GET_ROBUST_LIST, SYS_RSEQ, SYS_PRCTL,
 
 	// time
 	syscall.SYS_CLOCK_GETTIME, syscall.SYS_GETTIMEOFDAY, syscall.SYS_NANOSLEEP,
@@ -39,7 +43,7 @@ var ALLOW_SYSCALLS = []int{
 }
 
 var ALLOW_ERROR_SYSCALLS = []int{
-	syscall.SYS_CLONE,
+	syscall.SYS_CLONE, SYS_CLONE3,
 	syscall.SYS_MKDIRAT,
 	syscall.SYS_MKDIR,
 }

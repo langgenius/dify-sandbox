@@ -5,16 +5,17 @@ package nodejs_syscall
 import "syscall"
 
 const (
-	//334
-	SYS_RSEQ = 334
-	// 435
-	SYS_CLONE3 = 435
+	SYS_RSEQ       = 334
+	SYS_CLONE3     = 435
+	SYS_MEMBARRIER = 324
+	SYS_PRCTL      = 157
+	SYS_STATX      = 332
 )
 
 var ALLOW_SYSCALLS = []int{
 	syscall.SYS_OPEN, syscall.SYS_WRITE, syscall.SYS_CLOSE, syscall.SYS_READ,
 	syscall.SYS_OPENAT, syscall.SYS_NEWFSTATAT, syscall.SYS_IOCTL, syscall.SYS_LSEEK,
-	syscall.SYS_FSTAT,
+	syscall.SYS_FSTAT, SYS_STATX,
 	syscall.SYS_MPROTECT, syscall.SYS_MMAP, syscall.SYS_MUNMAP,
 	syscall.SYS_MREMAP,
 	syscall.SYS_BRK,
@@ -23,11 +24,11 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_FCNTL, syscall.SYS_SIGALTSTACK, syscall.SYS_RT_SIGRETURN,
 	syscall.SYS_FUTEX,
 	syscall.SYS_EXIT_GROUP,
-	syscall.SYS_EPOLL_CTL,
+	syscall.SYS_EPOLL_CREATE1, syscall.SYS_EPOLL_CTL,
 	syscall.SYS_EPOLL_PWAIT,
 	syscall.SYS_SCHED_YIELD, syscall.SYS_EXIT,
-	syscall.SYS_SCHED_GETAFFINITY, syscall.SYS_SET_ROBUST_LIST,
-	SYS_RSEQ,
+	syscall.SYS_SCHED_GETAFFINITY, syscall.SYS_SET_ROBUST_LIST, syscall.SYS_GET_ROBUST_LIST,
+	SYS_RSEQ, SYS_MEMBARRIER, SYS_PRCTL,
 
 	syscall.SYS_SETGROUPS, syscall.SYS_SETGID, syscall.SYS_SETUID, syscall.SYS_GETTID,
 
@@ -38,6 +39,8 @@ var ALLOW_SYSCALLS = []int{
 
 	syscall.SYS_READLINK,
 	syscall.SYS_DUP3,
+
+	syscall.SYS_GETRANDOM,
 }
 
 var ALLOW_ERROR_SYSCALLS = []int{

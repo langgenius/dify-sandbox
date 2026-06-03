@@ -104,7 +104,7 @@ generate_all() {
     for env in production test; do
         for arch in amd64 arm64; do
             echo "Generating $env-$arch..."
-            "$0" "$env" "$arch"
+            bash "$0" "$env" "$arch"
         done
     done
     
