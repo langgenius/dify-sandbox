@@ -10,6 +10,7 @@ const (
 	SYS_MEMBARRIER = 324
 	SYS_PRCTL      = 157
 	SYS_STATX      = 332
+	SYS_GETRANDOM  = 318
 )
 
 var ALLOW_SYSCALLS = []int{
@@ -40,7 +41,7 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_READLINK,
 	syscall.SYS_DUP3,
 
-	syscall.SYS_GETRANDOM,
+	SYS_GETRANDOM,
 }
 
 var ALLOW_ERROR_SYSCALLS = []int{
