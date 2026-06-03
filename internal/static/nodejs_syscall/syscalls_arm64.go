@@ -27,6 +27,7 @@ var ALLOW_SYSCALLS = []int{
 
 	// epoll
 	syscall.SYS_EPOLL_CTL, syscall.SYS_EPOLL_PWAIT,
+	syscall.SYS_EVENTFD2,
 }
 
 var ALLOW_ERROR_SYSCALLS = []int{
