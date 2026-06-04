@@ -170,7 +170,7 @@ func resolvePythonPath(pythonPath string) (string, error) {
 //   - Python-discovered paths keep their logical names because the interpreter's
 //     sys.path keeps those names after chroot; the copy script follows directory
 //     symlinks when materializing those logical paths inside the sandbox.
-func discoverPythonLibPaths(pythonPath string) ([]string, error) {
+func discoverPythonLibPaths(pythonPath string, systemPaths []string) ([]string, error) {
 	command := exec.Command(pythonPath, "-P", "-c", pythonLibDiscoveryScript)
 	command.Env = pythonDiscoveryEnv()
 	output, err := command.CombinedOutput()
@@ -187,7 +187,10 @@ func discoverPythonLibPaths(pythonPath string) ([]string, error) {
 		return nil, fmt.Errorf("parse python discovery output: %w", err)
 	}
 
-	return buildPythonLibPaths(result, DEFAULT_SYSTEM_LIB_REQUIREMENTS)
+	if systemPaths == nil {
+		systemPaths = defaultSystemLibRequirements()
+	}
+	return buildPythonLibPaths(result, systemPaths)
 }
 
 // buildPythonLibPaths validates interpreter-reported paths and appends fixed
