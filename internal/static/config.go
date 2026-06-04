@@ -87,7 +87,18 @@ func InitConfig(path string) error {
 	}
 	difySandboxGlobalConfigurations.PythonPath = resolvedPythonPath
 
-	difySandboxGlobalConfigurations.PythonLibPaths, err = discoverPythonLibPaths(difySandboxGlobalConfigurations.PythonPath)
+	systemPaths := defaultSystemLibRequirements()
+	if envSystemPaths := os.Getenv("SYSTEM_LIB_REQUIREMENTS"); envSystemPaths != "" {
+		parts := strings.Split(envSystemPaths, ",")
+		systemPaths = make([]string, 0, len(parts))
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				systemPaths = append(systemPaths, trimmed)
+			}
+		}
+	}
+	difySandboxGlobalConfigurations.PythonLibPaths, err = discoverPythonLibPaths(difySandboxGlobalConfigurations.PythonPath, systemPaths)
 	if err != nil {
 		return fmt.Errorf("discover python library paths from %q: %w", difySandboxGlobalConfigurations.PythonPath, err)
 	}

@@ -11,7 +11,7 @@ import (
 func TestDiscoverPythonLibPathsFindsStdlibAndJSON(t *testing.T) {
 	pythonPath := mustFindTestPython(t)
 
-	paths, err := discoverPythonLibPaths(pythonPath)
+	paths, err := discoverPythonLibPaths(pythonPath, defaultSystemLibRequirements())
 	if err != nil {
 		t.Fatalf("discoverPythonLibPaths returned error: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestDiscoverPythonLibPathsIgnoresCurrentWorkingDirectoryShadowing(t *testin
 		t.Fatalf("chdir temp dir: %v", err)
 	}
 
-	paths, err := discoverPythonLibPaths(pythonPath)
+	paths, err := discoverPythonLibPaths(pythonPath, defaultSystemLibRequirements())
 	if err != nil {
 		t.Fatalf("discoverPythonLibPaths returned error with cwd shadowing: %v", err)
 	}
