@@ -8,7 +8,10 @@ worker_timeout: 30
 python_path: /opt/python/bin/python3
 enable_network: True # please make sure there is no network risk in your environment
 allowed_syscalls: # please leave it empty if you have no idea how seccomp works
+allowed_env_vars:
+  - TEST_SANDBOX_ENV_VAR
 proxy:
   socks5: ''
   http: ''
   https: ''
+  no_proxy: 'test.no-proxy.internal'

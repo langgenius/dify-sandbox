@@ -14,3 +14,5 @@ proxy:
   socks5: ''
   http: ''
   https: ''
+  no_proxy: ''
+allowed_env_vars: [] # list of environment variable names to propagate from the container to the script execution environment

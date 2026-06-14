@@ -93,6 +93,28 @@ func (p *NodeJsRunner) Run(
 		}
 		cmd.ExtraFiles = []*os.File{codeReader}
 
+		if configuration.Proxy.Socks5 != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Socks5))
+			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Socks5))
+		} else if configuration.Proxy.Https != "" || configuration.Proxy.Http != "" {
+			if configuration.Proxy.Https != "" {
+				cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Https))
+			}
+			if configuration.Proxy.Http != "" {
+				cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Http))
+			}
+		}
+
+		if configuration.Proxy.NoProxy != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("NO_PROXY=%s", configuration.Proxy.NoProxy))
+		}
+
+		for _, envVar := range configuration.AllowedEnvVars {
+			if val := os.Getenv(envVar); val != "" {
+				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", envVar, val))
+			}
+		}
+
 		if len(configuration.AllowedSyscalls) > 0 {
 			cmd.Env = append(
 				cmd.Env,
