@@ -312,3 +312,146 @@ func writeTempConfig(t *testing.T, content string) string {
 
 	return configPath
 }
+
+func TestInitConfigNoProxyFromEnv(t *testing.T) {
+	pythonPath := mustFindTestPython(t)
+	configPath := writeTempConfig(t, "app:\n  port: 8194\npython_path: "+pythonPath+"\nenable_network: true\n")
+
+	t.Setenv("SOCKS5_PROXY", "")
+	t.Setenv("HTTPS_PROXY", "")
+	t.Setenv("HTTP_PROXY", "")
+	t.Setenv("NO_PROXY", "localhost,127.0.0.1")
+
+	if err := InitConfig(configPath); err != nil {
+		t.Fatalf("InitConfig returned error: %v", err)
+	}
+
+	config := GetDifySandboxGlobalConfigurations()
+	if config.Proxy.NoProxy != "localhost,127.0.0.1" {
+		t.Fatalf("expected NO_PROXY to be propagated, got %q", config.Proxy.NoProxy)
+	}
+}
+
+func TestInitConfigNoProxyFromYAML(t *testing.T) {
+	pythonPath := mustFindTestPython(t)
+	configPath := writeTempConfig(t, "app:\n  port: 8194\npython_path: "+pythonPath+"\nenable_network: true\nproxy:\n  no_proxy: 'internal.example.com'\n")
+
+	t.Setenv("NO_PROXY", "")
+
+	if err := InitConfig(configPath); err != nil {
+		t.Fatalf("InitConfig returned error: %v", err)
+	}
+
+	config := GetDifySandboxGlobalConfigurations()
+	if config.Proxy.NoProxy != "internal.example.com" {
+		t.Fatalf("expected no_proxy from YAML, got %q", config.Proxy.NoProxy)
+	}
+}
+
+func TestInitConfigNoProxyEnvOverridesYAML(t *testing.T) {
+	pythonPath := mustFindTestPython(t)
+	configPath := writeTempConfig(t, "app:\n  port: 8194\npython_path: "+pythonPath+"\nenable_network: true\nproxy:\n  no_proxy: 'from-yaml'\n")
+
+	t.Setenv("NO_PROXY", "from-env")
+
+	if err := InitConfig(configPath); err != nil {
+		t.Fatalf("InitConfig returned error: %v", err)
+	}
+
+	config := GetDifySandboxGlobalConfigurations()
+	if config.Proxy.NoProxy != "from-env" {
+		t.Fatalf("expected NO_PROXY env to override YAML, got %q", config.Proxy.NoProxy)
+	}
+}
+
+func TestInitConfigNoProxyIgnoredWhenNetworkDisabled(t *testing.T) {
+	pythonPath := mustFindTestPython(t)
+	configPath := writeTempConfig(t, "app:\n  port: 8194\npython_path: "+pythonPath+"\nenable_network: false\n")
+
+	t.Setenv("NO_PROXY", "should-be-ignored")
+
+	if err := InitConfig(configPath); err != nil {
+		t.Fatalf("InitConfig returned error: %v", err)
+	}
+
+	config := GetDifySandboxGlobalConfigurations()
+	if config.Proxy.NoProxy != "" {
+		t.Fatalf("expected NO_PROXY to be empty when network disabled, got %q", config.Proxy.NoProxy)
+	}
+}
+
+func TestInitConfigAllowedEnvVarsFromEnv(t *testing.T) {
+	pythonPath := mustFindTestPython(t)
+	configPath := writeTempConfig(t, "app:\n  port: 8194\npython_path: "+pythonPath+"\n")
+
+	t.Setenv("ALLOWED_ENV_VARS", "MY_VAR, ANOTHER_VAR , THIRD_VAR")
+
+	if err := InitConfig(configPath); err != nil {
+		t.Fatalf("InitConfig returned error: %v", err)
+	}
+
+	config := GetDifySandboxGlobalConfigurations()
+	want := []string{"MY_VAR", "ANOTHER_VAR", "THIRD_VAR"}
+	if len(config.AllowedEnvVars) != len(want) {
+		t.Fatalf("expected AllowedEnvVars %v, got %v", want, config.AllowedEnvVars)
+	}
+	for i, v := range want {
+		if config.AllowedEnvVars[i] != v {
+			t.Fatalf("AllowedEnvVars[%d]: expected %q, got %q", i, v, config.AllowedEnvVars[i])
+		}
+	}
+}
+
+func TestInitConfigAllowedEnvVarsFromYAML(t *testing.T) {
+	pythonPath := mustFindTestPython(t)
+	configPath := writeTempConfig(t, "app:\n  port: 8194\npython_path: "+pythonPath+"\nallowed_env_vars:\n  - FOO\n  - BAR\n")
+
+	t.Setenv("ALLOWED_ENV_VARS", "")
+
+	if err := InitConfig(configPath); err != nil {
+		t.Fatalf("InitConfig returned error: %v", err)
+	}
+
+	config := GetDifySandboxGlobalConfigurations()
+	want := []string{"FOO", "BAR"}
+	if len(config.AllowedEnvVars) != len(want) {
+		t.Fatalf("expected AllowedEnvVars %v, got %v", want, config.AllowedEnvVars)
+	}
+	for i, v := range want {
+		if config.AllowedEnvVars[i] != v {
+			t.Fatalf("AllowedEnvVars[%d]: expected %q, got %q", i, v, config.AllowedEnvVars[i])
+		}
+	}
+}
+
+func TestInitConfigAllowedEnvVarsEnvOverridesYAML(t *testing.T) {
+	pythonPath := mustFindTestPython(t)
+	configPath := writeTempConfig(t, "app:\n  port: 8194\npython_path: "+pythonPath+"\nallowed_env_vars:\n  - FROM_YAML\n")
+
+	t.Setenv("ALLOWED_ENV_VARS", "FROM_ENV")
+
+	if err := InitConfig(configPath); err != nil {
+		t.Fatalf("InitConfig returned error: %v", err)
+	}
+
+	config := GetDifySandboxGlobalConfigurations()
+	if len(config.AllowedEnvVars) != 1 || config.AllowedEnvVars[0] != "FROM_ENV" {
+		t.Fatalf("expected ALLOWED_ENV_VARS env to override YAML, got %v", config.AllowedEnvVars)
+	}
+}
+
+func TestInitConfigAllowedEnvVarsEmptyByDefault(t *testing.T) {
+	pythonPath := mustFindTestPython(t)
+	configPath := writeTempConfig(t, "app:\n  port: 8194\npython_path: "+pythonPath+"\n")
+
+	t.Setenv("ALLOWED_ENV_VARS", "")
+
+	if err := InitConfig(configPath); err != nil {
+		t.Fatalf("InitConfig returned error: %v", err)
+	}
+
+	config := GetDifySandboxGlobalConfigurations()
+	if len(config.AllowedEnvVars) != 0 {
+		t.Fatalf("expected AllowedEnvVars to be empty by default, got %v", config.AllowedEnvVars)
+	}
+}

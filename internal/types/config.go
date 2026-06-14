@@ -22,8 +22,10 @@ type DifySandboxGlobalConfigurations struct {
 	AllowedSyscalls          []int    `yaml:"allowed_syscalls"`
 	LogPath                  string   `yaml:"log_path"`
 	Proxy                    struct {
-		Socks5 string `yaml:"socks5"`
-		Https  string `yaml:"https"`
-		Http   string `yaml:"http"`
+		Socks5  string `yaml:"socks5"`
+		Https   string `yaml:"https"`
+		Http    string `yaml:"http"`
+		NoProxy string `yaml:"no_proxy"`
 	} `yaml:"proxy"`
+	AllowedEnvVars []string `yaml:"allowed_env_vars"`
 }

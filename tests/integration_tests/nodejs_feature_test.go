@@ -159,3 +159,63 @@ throw new Error("bad input");
 		t.Fatalf("expected non-zero exit code, got: %d\n", data.ExitCode)
 	}
 }
+func TestNodejsNoProxyEnvPropagation(t *testing.T) {
+	resp := service.RunNodeJsCode(context.TODO(), `
+console.log(process.env.NO_PROXY || '');
+	`, "", &types.RunnerOptions{
+		EnableNetwork: true,
+	})
+	if resp.Code != 0 {
+		t.Fatal(resp)
+	}
+
+	data := resp.Data.(*service.RunCodeResponse)
+	if data.Stderr != "" {
+		t.Fatalf("unexpected stderr: %s\n", data.Stderr)
+	}
+	if !strings.Contains(data.Stdout, "test.no-proxy.internal") {
+		t.Fatalf("expected NO_PROXY to be propagated to subprocess, got: %q\n", data.Stdout)
+	}
+}
+
+func TestNodejsAllowedEnvVarsPropagation(t *testing.T) {
+	t.Setenv("TEST_SANDBOX_ENV_VAR", "hello_from_allowed_env")
+
+	resp := service.RunNodeJsCode(context.TODO(), `
+console.log(process.env.TEST_SANDBOX_ENV_VAR || '');
+	`, "", &types.RunnerOptions{
+		EnableNetwork: true,
+	})
+	if resp.Code != 0 {
+		t.Fatal(resp)
+	}
+
+	data := resp.Data.(*service.RunCodeResponse)
+	if data.Stderr != "" {
+		t.Fatalf("unexpected stderr: %s\n", data.Stderr)
+	}
+	if !strings.Contains(data.Stdout, "hello_from_allowed_env") {
+		t.Fatalf("expected TEST_SANDBOX_ENV_VAR to be propagated to subprocess, got: %q\n", data.Stdout)
+	}
+}
+
+func TestNodejsUnlistedEnvVarNotPropagated(t *testing.T) {
+	t.Setenv("UNLISTED_ENV_VAR", "should_not_appear")
+
+	resp := service.RunNodeJsCode(context.TODO(), `
+console.log(process.env.UNLISTED_ENV_VAR || 'not_found');
+	`, "", &types.RunnerOptions{
+		EnableNetwork: true,
+	})
+	if resp.Code != 0 {
+		t.Fatal(resp)
+	}
+
+	data := resp.Data.(*service.RunCodeResponse)
+	if data.Stderr != "" {
+		t.Fatalf("unexpected stderr: %s\n", data.Stderr)
+	}
+	if strings.Contains(data.Stdout, "should_not_appear") {
+		t.Fatalf("expected UNLISTED_ENV_VAR NOT to be propagated, but it was: %q\n", data.Stdout)
+	}
+}

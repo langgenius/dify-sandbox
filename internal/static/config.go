@@ -178,7 +178,29 @@ func InitConfig(path string) error {
 		if difySandboxGlobalConfigurations.Proxy.Http != "" {
 			slog.Info("using http proxy", "proxy", difySandboxGlobalConfigurations.Proxy.Http)
 		}
+
+		no_proxy := os.Getenv("NO_PROXY")
+		if no_proxy != "" {
+			difySandboxGlobalConfigurations.Proxy.NoProxy = no_proxy
+		}
+
+		if difySandboxGlobalConfigurations.Proxy.NoProxy != "" {
+			slog.Info("using no proxy", "no_proxy", difySandboxGlobalConfigurations.Proxy.NoProxy)
+		}
 	}
+
+	allowed_env_vars := os.Getenv("ALLOWED_ENV_VARS")
+	if allowed_env_vars != "" {
+		parts := strings.Split(allowed_env_vars, ",")
+		difySandboxGlobalConfigurations.AllowedEnvVars = make([]string, 0, len(parts))
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				difySandboxGlobalConfigurations.AllowedEnvVars = append(difySandboxGlobalConfigurations.AllowedEnvVars, trimmed)
+			}
+		}
+	}
+
 	return nil
 }
 
