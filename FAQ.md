@@ -18,7 +18,11 @@ If you still see missing shared-library errors, install the package or shared ob
 
 ### 2. My Python code returns an "operation not permitted" error?
 
-`dify-sandbox` uses Linux seccomp to restrict system calls. It’s recommended to read the source code ([internal/core/lib/python/add_seccomp.go](https://github.com/langgenius/dify-sandbox/blob/main/internal/core/lib/python/add_seccomp.go)). When you encounter this error, it usually means your code executed a restricted system call. The default allowed system calls are configured in [syscalls_amd64](https://github.com/langgenius/dify-sandbox/blob/main/internal/static/python_syscall/syscalls_amd64.go). You can modify this according to your system’s needs (currently, it cannot be modified through the configuration file).
+`dify-sandbox` uses Linux seccomp to restrict system calls. It’s recommended to read the source code ([internal/core/lib/python/add_seccomp.go](https://github.com/langgenius/dify-sandbox/blob/main/internal/core/lib/python/add_seccomp.go)). When you encounter this error, it usually means your code executed a restricted system call. The default allowed system calls are configured in [syscalls_amd64](https://github.com/langgenius/dify-sandbox/blob/main/internal/static/python_syscall/syscalls_amd64.go).
+
+To add extra syscalls without dropping the defaults, set the `ALLOWED_SYSCALLS` environment variable to a comma-separated list of syscall numbers. These numbers are **merged** onto the built-in Python whitelist (and network syscalls when network access is enabled), not substituted for it. For example, `ALLOWED_SYSCALLS=204` keeps `read`/`write`/`exit` and adds `sched_getaffinity`.
+
+If you need to change the default whitelist itself, edit [syscalls_amd64.go](https://github.com/langgenius/dify-sandbox/blob/main/internal/static/python_syscall/syscalls_amd64.go) (and the arm64 file when applicable), then rebuild the image.
 
 To quickly identify the system calls your Python code depends on, here is the recommended method:
 
