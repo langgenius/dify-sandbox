@@ -38,3 +38,21 @@ func TestParseSyscallNumbersIgnoresInvalidEntries(t *testing.T) {
 		t.Fatalf("ParseSyscallNumbers() = %v, want %v", got, want)
 	}
 }
+
+func TestMergeSyscallsKeepsDefaultsWhenExtending(t *testing.T) {
+	// read(0), write(1), and exit(60) are required for basic I/O.
+	defaults := []int{0, 1, 60}
+	custom := []int{204} // sched_getaffinity on amd64
+
+	got := MergeSyscalls(defaults, custom)
+	want := []int{0, 1, 60, 204}
+
+	if len(got) != len(want) {
+		t.Fatalf("MergeSyscalls() len = %d, want %d (%v)", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("MergeSyscalls()[%d] = %d, want %d (full: %v)", i, got[i], want[i], got)
+		}
+	}
+}
