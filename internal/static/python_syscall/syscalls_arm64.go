@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	SYS_RSEQ   = 293
-	SYS_STATX  = 397
-	SYS_CLONE3 = 435
+	SYS_RSEQ        = 293
+	SYS_STATX       = 397
+	SYS_CLONE3      = 435
+	SYS_FACCESSAT2  = 439
 )
 
 var ALLOW_SYSCALLS = []int{
@@ -47,7 +48,7 @@ var ALLOW_SYSCALLS = []int{
 	// get random
 	syscall.SYS_GETRANDOM,
 	syscall.SYS_EVENTFD2, syscall.SYS_PIPE2, syscall.SYS_GETCWD, syscall.SYS_SYSINFO,
-	syscall.SYS_UNAME, SYS_STATX,
+	syscall.SYS_UNAME, SYS_STATX, SYS_FACCESSAT2,
 }
 
 var ALLOW_ERROR_SYSCALLS = []int{

@@ -5,10 +5,9 @@ package nodejs_syscall
 import "syscall"
 
 const (
-	//334
-	SYS_RSEQ = 334
-	// 435
-	SYS_CLONE3 = 435
+	SYS_RSEQ        = 334
+	SYS_CLONE3      = 435
+	SYS_FACCESSAT2  = 439
 )
 
 var ALLOW_SYSCALLS = []int{
@@ -39,6 +38,7 @@ var ALLOW_SYSCALLS = []int{
 	syscall.SYS_READLINK,
 	syscall.SYS_DUP3,
 	syscall.SYS_EVENTFD2,
+	SYS_FACCESSAT2,
 }
 
 var ALLOW_ERROR_SYSCALLS = []int{

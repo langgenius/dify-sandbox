@@ -4,11 +4,14 @@ package nodejs_syscall
 
 import "syscall"
 
+const SYS_FACCESSAT2 = 439
+
 var ALLOW_SYSCALLS = []int{
 	// file
 	syscall.SYS_CLOSE, syscall.SYS_WRITE, syscall.SYS_READ,
 	syscall.SYS_FSTAT, syscall.SYS_FCNTL,
 	syscall.SYS_READLINKAT, syscall.SYS_OPENAT,
+	SYS_FACCESSAT2,
 
 	// process
 	syscall.SYS_GETPID, syscall.SYS_TGKILL, syscall.SYS_FUTEX, syscall.SYS_IOCTL,

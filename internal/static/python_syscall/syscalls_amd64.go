@@ -5,11 +5,12 @@ package python_syscall
 import "syscall"
 
 const (
-	SYS_GETRANDOM = 318
-	SYS_RSEQ      = 334
-	SYS_SENDMMSG  = 307
-	SYS_STATX     = 332
-	SYS_CLONE3    = 435
+	SYS_GETRANDOM   = 318
+	SYS_RSEQ        = 334
+	SYS_SENDMMSG    = 307
+	SYS_STATX       = 332
+	SYS_CLONE3      = 435
+	SYS_FACCESSAT2  = 439
 )
 
 var ALLOW_SYSCALLS = []int{
@@ -41,7 +42,7 @@ var ALLOW_SYSCALLS = []int{
 
 	syscall.SYS_RT_SIGPROCMASK, syscall.SYS_SIGALTSTACK, SYS_GETRANDOM,
 	syscall.SYS_EVENTFD2, syscall.SYS_PIPE2, syscall.SYS_GETCWD, syscall.SYS_SYSINFO,
-	syscall.SYS_UNAME, SYS_STATX,
+	syscall.SYS_UNAME, SYS_STATX, SYS_FACCESSAT2,
 }
 
 var ALLOW_ERROR_SYSCALLS = []int{
