@@ -28,4 +28,20 @@ type DifySandboxGlobalConfigurations struct {
 		NoProxy string `yaml:"no_proxy"`
 	} `yaml:"proxy"`
 	AllowedEnvVars []string `yaml:"allowed_env_vars"`
+
+	// SecretInjection configures the credential-injection outbound proxy.
+	// When enabled, real secrets are replaced with placeholders in the
+	// agent's environment and resolved at the network boundary.  See
+	// internal/core/proxy/ and issue #39278 for design rationale.
+	SecretInjection struct {
+		// Enabled toggles the proxy on/off.
+		Enabled bool `yaml:"enabled"`
+		// ProvidersPath is the path to providers.yaml (absolute or
+		// relative to the config file directory).
+		ProvidersPath string `yaml:"providers_path"`
+		// SecretRoot is the directory containing secret value files
+		// (e.g. /run/secrets/<session-id>/).  Must be outside the
+		// agent's Landlock-restricted workspace.
+		SecretRoot string `yaml:"secret_root"`
+	} `yaml:"secret_injection"`
 }
