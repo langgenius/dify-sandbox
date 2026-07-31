@@ -9,6 +9,24 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/service"
 )
 
+func assertNoUnexpectedNodejsStderr(t *testing.T, stderr string) {
+	t.Helper()
+
+	const jitlessWarning = "Warning: disabling flag --expose_wasm due to conflicting flags"
+	trimmed := strings.TrimSpace(stderr)
+	if trimmed != "" && trimmed != jitlessWarning {
+		t.Fatalf("unexpected stderr: %s\n", stderr)
+	}
+}
+
+func assertSuccessfulNodejsExecution(t *testing.T, data *service.RunCodeResponse) {
+	t.Helper()
+
+	if data.ExitCode != 0 || data.Error != "" {
+		t.Fatalf("expected successful Node.js execution, got: %+v", data)
+	}
+}
+
 func TestNodejsBasicTemplate(t *testing.T) {
 	const code = `// declare main function
 function main({a}) {
@@ -33,6 +51,13 @@ console.log(result)`
 		if resp.Code != 0 {
 			t.Fatal(resp)
 		}
+
+		data := resp.Data.(*service.RunCodeResponse)
+		assertSuccessfulNodejsExecution(t, data)
+		assertNoUnexpectedNodejsStderr(t, data.Stderr)
+		if !strings.Contains(data.Stdout, `<<RESULT>>{"b":"a"}<<RESULT>>`) {
+			t.Fatalf("unexpected output: %q", data.Stdout)
+		}
 	})
 }
 
@@ -49,12 +74,12 @@ console.log(Buffer.from(base64, "base64").toString());
 			t.Fatal(resp)
 		}
 
-		if resp.Data.(*service.RunCodeResponse).Stderr != "" {
-			t.Fatalf("unexpected error: %s\n", resp.Data.(*service.RunCodeResponse).Stderr)
-		}
+		data := resp.Data.(*service.RunCodeResponse)
+		assertSuccessfulNodejsExecution(t, data)
+		assertNoUnexpectedNodejsStderr(t, data.Stderr)
 
-		if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, "hello world") {
-			t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
+		if !strings.Contains(data.Stdout, "hello world") {
+			t.Fatalf("unexpected output: %s\n", data.Stdout)
 		}
 	})
 }
@@ -71,12 +96,12 @@ console.log(JSON.stringify({"hello": "world"}));
 			t.Error(resp)
 		}
 
-		if resp.Data.(*service.RunCodeResponse).Stderr != "" {
-			t.Fatalf("unexpected error: %s\n", resp.Data.(*service.RunCodeResponse).Stderr)
-		}
+		data := resp.Data.(*service.RunCodeResponse)
+		assertSuccessfulNodejsExecution(t, data)
+		assertNoUnexpectedNodejsStderr(t, data.Stderr)
 
-		if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, `{"hello":"world"}`) {
-			t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
+		if !strings.Contains(data.Stdout, `{"hello":"world"}`) {
+			t.Fatalf("unexpected output: %s\n", data.Stdout)
 		}
 	})
 }
@@ -92,12 +117,12 @@ console.log(marker);
 		t.Fatal(resp)
 	}
 
-	if resp.Data.(*service.RunCodeResponse).Stderr != "" {
-		t.Fatalf("unexpected error: %s\n", resp.Data.(*service.RunCodeResponse).Stderr)
-	}
+	data := resp.Data.(*service.RunCodeResponse)
+	assertSuccessfulNodejsExecution(t, data)
+	assertNoUnexpectedNodejsStderr(t, data.Stderr)
 
-	if !strings.Contains(resp.Data.(*service.RunCodeResponse).Stdout, "fd3-transport") {
-		t.Fatalf("unexpected output: %s\n", resp.Data.(*service.RunCodeResponse).Stdout)
+	if !strings.Contains(data.Stdout, "fd3-transport") {
+		t.Fatalf("unexpected output: %s\n", data.Stdout)
 	}
 }
 
@@ -159,6 +184,43 @@ throw new Error("bad input");
 		t.Fatalf("expected non-zero exit code, got: %d\n", data.ExitCode)
 	}
 }
+
+func TestNodejsRunsJitless(t *testing.T) {
+	resp := service.RunNodeJsCode(context.TODO(), `
+console.log(JSON.stringify(process.execArgv));
+	`, "", &types.RunnerOptions{})
+	if resp.Code != 0 {
+		t.Fatal(resp)
+	}
+
+	data := resp.Data.(*service.RunCodeResponse)
+	if data.ExitCode != 0 || data.Error != "" {
+		t.Fatalf("expected successful Node.js execution, got: %+v", data)
+	}
+	assertNoUnexpectedNodejsStderr(t, data.Stderr)
+	if !strings.Contains(data.Stdout, `"--jitless"`) {
+		t.Fatalf("expected --jitless in process.execArgv, got: %q", data.Stdout)
+	}
+}
+
+func TestNodejsWebAssemblyUnavailable(t *testing.T) {
+	resp := service.RunNodeJsCode(context.TODO(), `
+console.log(typeof WebAssembly);
+	`, "", &types.RunnerOptions{})
+	if resp.Code != 0 {
+		t.Fatal(resp)
+	}
+
+	data := resp.Data.(*service.RunCodeResponse)
+	if data.ExitCode != 0 || data.Error != "" {
+		t.Fatalf("expected successful feature check, got: %+v", data)
+	}
+	assertNoUnexpectedNodejsStderr(t, data.Stderr)
+	if strings.TrimSpace(data.Stdout) != "undefined" {
+		t.Fatalf("expected WebAssembly to be unavailable, got: %q", data.Stdout)
+	}
+}
+
 func TestNodejsNoProxyEnvPropagation(t *testing.T) {
 	resp := service.RunNodeJsCode(context.TODO(), `
 console.log(process.env.NO_PROXY || '');
@@ -170,9 +232,8 @@ console.log(process.env.NO_PROXY || '');
 	}
 
 	data := resp.Data.(*service.RunCodeResponse)
-	if data.Stderr != "" {
-		t.Fatalf("unexpected stderr: %s\n", data.Stderr)
-	}
+	assertSuccessfulNodejsExecution(t, data)
+	assertNoUnexpectedNodejsStderr(t, data.Stderr)
 	if !strings.Contains(data.Stdout, "test.no-proxy.internal") {
 		t.Fatalf("expected NO_PROXY to be propagated to subprocess, got: %q\n", data.Stdout)
 	}
@@ -191,9 +252,8 @@ console.log(process.env.TEST_SANDBOX_ENV_VAR || '');
 	}
 
 	data := resp.Data.(*service.RunCodeResponse)
-	if data.Stderr != "" {
-		t.Fatalf("unexpected stderr: %s\n", data.Stderr)
-	}
+	assertSuccessfulNodejsExecution(t, data)
+	assertNoUnexpectedNodejsStderr(t, data.Stderr)
 	if !strings.Contains(data.Stdout, "hello_from_allowed_env") {
 		t.Fatalf("expected TEST_SANDBOX_ENV_VAR to be propagated to subprocess, got: %q\n", data.Stdout)
 	}
@@ -212,10 +272,9 @@ console.log(process.env.UNLISTED_ENV_VAR || 'not_found');
 	}
 
 	data := resp.Data.(*service.RunCodeResponse)
-	if data.Stderr != "" {
-		t.Fatalf("unexpected stderr: %s\n", data.Stderr)
-	}
-	if strings.Contains(data.Stdout, "should_not_appear") {
-		t.Fatalf("expected UNLISTED_ENV_VAR NOT to be propagated, but it was: %q\n", data.Stdout)
+	assertSuccessfulNodejsExecution(t, data)
+	assertNoUnexpectedNodejsStderr(t, data.Stderr)
+	if strings.TrimSpace(data.Stdout) != "not_found" {
+		t.Fatalf("expected unlisted environment fallback, got: %q\n", data.Stdout)
 	}
 }

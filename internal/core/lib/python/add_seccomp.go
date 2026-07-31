@@ -30,7 +30,11 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 	allowed_syscalls = lib.MergeSyscalls(allowed_syscalls, lib.SyscallsFromEnv("ALLOWED_SYSCALLS"))
 	allowed_syscalls = lib.MergeSyscalls(allowed_syscalls, []int{syscall.SYS_SETGROUPS})
 
-	err = lib.Seccomp(allowed_syscalls, allowed_not_kill_syscalls)
+	err = lib.Seccomp(
+		allowed_syscalls,
+		allowed_not_kill_syscalls,
+		[]int{syscall.SYS_MMAP, syscall.SYS_MPROTECT},
+	)
 	if err != nil {
 		return err
 	}

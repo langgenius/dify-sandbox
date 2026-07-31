@@ -4,6 +4,31 @@ import sys
 import traceback
 
 
+def _preload_supported_runtime_modules(enable_network):
+    # These supported features load native extension modules. Import them while
+    # the bootstrap is still trusted so later user imports do not need a new
+    # executable mapping after seccomp is installed.
+    import base64
+    import datetime
+    import json
+    import zoneinfo
+
+    if enable_network:
+        try:
+            import httpx
+        except ModuleNotFoundError:
+            pass
+
+        try:
+            import requests
+        except ModuleNotFoundError:
+            pass
+
+
+_preload_supported_runtime_modules(bool({{enable_network}}))
+del _preload_supported_runtime_modules
+
+
 # setup sys.excepthook
 def excepthook(type, value, tb):
     sys.stderr.write("".join(traceback.format_exception(type, value, tb)))
