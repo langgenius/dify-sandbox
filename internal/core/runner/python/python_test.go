@@ -21,4 +21,17 @@ func TestBuildBootstrapInjectsPreloadButNotUserCode(t *testing.T) {
 	if strings.Contains(bootstrap, "print('user code')") {
 		t.Fatal("bootstrap unexpectedly contains user code")
 	}
+
+	if strings.Contains(bootstrap, "{{enable_network}}") {
+		t.Fatal("bootstrap contains an unresolved network placeholder")
+	}
+
+	if !strings.Contains(bootstrap, "_preload_supported_runtime_modules(bool(1))") {
+		t.Fatal("expected network runtime modules to be preloaded")
+	}
+
+	networkDisabled := buildBootstrap("", &types.RunnerOptions{}, 123)
+	if !strings.Contains(networkDisabled, "_preload_supported_runtime_modules(bool(0))") {
+		t.Fatal("expected network runtime module preload to be disabled")
+	}
 }

@@ -137,17 +137,11 @@ func buildBootstrap(preload string, options *types.RunnerOptions, uid int) strin
 		"{{gid}}", strconv.Itoa(static.SANDBOX_GROUP_ID), 1,
 	)
 
+	enableNetwork := "0"
 	if options.EnableNetwork {
-		script = strings.Replace(
-			script,
-			"{{enable_network}}", "1", 1,
-		)
-	} else {
-		script = strings.Replace(
-			script,
-			"{{enable_network}}", "0", 1,
-		)
+		enableNetwork = "1"
 	}
+	script = strings.ReplaceAll(script, "{{enable_network}}", enableNetwork)
 
 	return strings.Replace(
 		script,

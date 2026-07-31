@@ -154,6 +154,7 @@ func (p *NodeJsRunner) Run(
 
 func buildCommandArgs(scriptPath string, uid int, options *types.RunnerOptions) []string {
 	return []string{
+		"--jitless",
 		scriptPath,
 		strconv.Itoa(uid),
 		strconv.Itoa(static.SANDBOX_GROUP_ID),

@@ -85,3 +85,29 @@ var ALLOW_SYSCALLS = []int{
 If the syscall alias not defined in golang, you can directly use the number instead.
 
 5. Build and Run the whole project again.
+
+### 3. Why are Node.js JIT and WebAssembly unavailable?
+
+Sandboxed Node.js processes always start with V8's `--jitless` option. This is
+part of the memory-execution security boundary: after the trusted bootstrap
+installs seccomp, Node.js and Python may create read/write mappings, but any
+`mmap` or `mprotect` request containing `PROT_EXEC` terminates the sandbox
+process.
+
+Existing native code loaded before seccomp can continue to execute. New `RX`
+and `RWX` mappings, including a staged `RW` to `RX` transition, are denied.
+Native extensions loaded on demand, FFI callbacks, and packages that generate
+machine code at runtime may therefore fail. The trusted Python bootstrap loads
+the native modules required by the sandbox's documented base64, JSON, timezone,
+Requests, and HTTPX features before installing seccomp. Requests and HTTPX are
+loaded only when network access is enabled for that execution.
+
+`ALLOWED_SYSCALLS` cannot override this executable-memory rule and cannot
+enable `pkey_mprotect`, `shmat`, `memfd_create`, `execve`, `execveat`,
+`process_vm_writev`, or `ptrace`.
+
+Without JIT compilation, CPU-intensive JavaScript may run more slowly, and
+WebAssembly and packages that depend on JIT or runtime-generated machine code
+are unsupported. Ordinary interpreted JavaScript, JSON, Buffer, exception
+handling, and network APIs continue to work subject to the existing sandbox
+policies. This behavior cannot be disabled through configuration.
