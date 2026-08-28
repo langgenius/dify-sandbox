@@ -6,8 +6,6 @@ max_workers: 4
 max_requests: 50
 worker_timeout: 5
 python_path: /opt/python/bin/python3
-python_deps_update_interval: 30m
-enable_python_deps_periodic_update: True # set to False to avoid periodic dependency rescans
 enable_network: True # please make sure there is no network risk in your environment
 enable_preload: False # please keep it as False for security purposes
 log_path: "./logs" # path to store log files, default is "./logs"

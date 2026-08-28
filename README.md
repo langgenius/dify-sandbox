@@ -20,7 +20,7 @@ If you want to debug the server, firstly use build script to build the sandbox l
 
 ### Dependency synchronization
 
-Python dependencies are synchronized into the sandbox once at startup. By default, the sandbox also refreshes them every 30 minutes. Configure `python_deps_update_interval` in `conf/config.yaml` (or `PYTHON_DEPS_UPDATE_INTERVAL`) to change the interval. To disable only the periodic refresh, set `enable_python_deps_periodic_update` to `False` (or set `ENABLE_PYTHON_DEPS_PERIODIC_UPDATE=false`); startup initialization and the manual dependency APIs remain available.
+Python dependencies are synchronized into the sandbox once at startup. By default, the sandbox also refreshes them every 30 minutes. Configure `python_deps_update_interval` in `conf/config.yaml` (or `PYTHON_DEPS_UPDATE_INTERVAL`) to change the interval. To disable only the periodic refresh, set `enable_python_deps_periodic_update` to `false` (or set `ENABLE_PYTHON_DEPS_PERIODIC_UPDATE=false`); startup initialization and the manual dependency APIs remain available.
 
 
 ## FAQ
