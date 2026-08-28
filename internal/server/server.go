@@ -9,6 +9,7 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/controller"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/python"
 	"github.com/langgenius/dify-sandbox/internal/static"
+	"github.com/langgenius/dify-sandbox/internal/types"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
 )
 
@@ -74,22 +75,45 @@ func initDependencies() {
 	}
 	slog.Info("python dependencies sandbox initialized")
 
-	// start a ticker to update python dependencies to keep the sandbox up-to-date
-	go func() {
-		updateInterval := static.GetDifySandboxGlobalConfigurations().PythonDepsUpdateInterval
-		tickerDuration, err := time.ParseDuration(updateInterval)
-		if err != nil {
-			slog.Error("failed to parse python dependencies update interval, skip periodic updates", "err", err)
-			return
+	go startPythonDependenciesUpdater(dependencies)
+}
+
+func startPythonDependenciesUpdater(dependencies static.RunnerDependencies) {
+	config := static.GetDifySandboxGlobalConfigurations()
+
+	updateInterval, enabled, err := pythonDependenciesUpdateInterval(config)
+	if err != nil {
+		slog.Error("invalid python dependencies periodic update configuration, skip periodic updates", "err", err)
+		return
+	}
+	if !enabled {
+		slog.Info("python dependencies periodic updates are disabled")
+		return
+	}
+
+	ticker := time.NewTicker(updateInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		if err := updatePythonDependencies(dependencies); err != nil {
+			slog.Error("failed to update Python dependencies", "err", err)
 		}
-		ticker := time.NewTicker(tickerDuration)
-		defer ticker.Stop()
-		for range ticker.C {
-			if err := updatePythonDependencies(dependencies); err != nil {
-				slog.Error("Failed to update Python dependencies", "err", err)
-			}
-		}
-	}()
+	}
+}
+
+func pythonDependenciesUpdateInterval(config types.DifySandboxGlobalConfigurations) (time.Duration, bool, error) {
+	if !config.EnablePythonDepsPeriodicUpdate {
+		return 0, false, nil
+	}
+
+	updateInterval, err := time.ParseDuration(config.PythonDepsUpdateInterval)
+	if err != nil {
+		return 0, false, fmt.Errorf("parse python dependencies update interval: %w", err)
+	}
+	if updateInterval <= 0 {
+		return 0, false, fmt.Errorf("python dependencies update interval must be greater than 0")
+	}
+
+	return updateInterval, true, nil
 }
 
 func updatePythonDependencies(dependencies static.RunnerDependencies) error {

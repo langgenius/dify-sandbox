@@ -98,6 +98,69 @@ func TestInitConfigIgnoresPythonLibPathInputs(t *testing.T) {
 	}
 }
 
+func TestInitConfigDefaultsToPythonDepsPeriodicUpdates(t *testing.T) {
+	pythonPath := mustFindTestPython(t)
+	configPath := writeTempConfig(t, "app:\n  port: 8194\npython_path: "+pythonPath+"\n")
+
+	t.Setenv("PYTHON_DEPS_UPDATE_INTERVAL", "")
+	t.Setenv("ENABLE_PYTHON_DEPS_PERIODIC_UPDATE", "")
+
+	if err := InitConfig(configPath); err != nil {
+		t.Fatalf("InitConfig returned error: %v", err)
+	}
+
+	config := GetDifySandboxGlobalConfigurations()
+	if !config.EnablePythonDepsPeriodicUpdate {
+		t.Fatal("expected periodic Python dependency updates to be enabled by default")
+	}
+	if config.PythonDepsUpdateInterval != "30m" {
+		t.Fatalf("expected default update interval 30m, got %q", config.PythonDepsUpdateInterval)
+	}
+}
+
+func TestInitConfigCanDisablePythonDepsPeriodicUpdates(t *testing.T) {
+	pythonPath := mustFindTestPython(t)
+
+	t.Run("yaml", func(t *testing.T) {
+		configPath := writeTempConfig(t, "app:\n  port: 8194\npython_path: "+pythonPath+"\nenable_python_deps_periodic_update: false\n")
+		t.Setenv("ENABLE_PYTHON_DEPS_PERIODIC_UPDATE", "")
+
+		if err := InitConfig(configPath); err != nil {
+			t.Fatalf("InitConfig returned error: %v", err)
+		}
+		if GetDifySandboxGlobalConfigurations().EnablePythonDepsPeriodicUpdate {
+			t.Fatal("expected periodic Python dependency updates to be disabled")
+		}
+	})
+
+	t.Run("environment", func(t *testing.T) {
+		configPath := writeTempConfig(t, "app:\n  port: 8194\npython_path: "+pythonPath+"\nenable_python_deps_periodic_update: true\n")
+		t.Setenv("ENABLE_PYTHON_DEPS_PERIODIC_UPDATE", "false")
+
+		if err := InitConfig(configPath); err != nil {
+			t.Fatalf("InitConfig returned error: %v", err)
+		}
+		if GetDifySandboxGlobalConfigurations().EnablePythonDepsPeriodicUpdate {
+			t.Fatal("expected environment setting to disable periodic Python dependency updates")
+		}
+	})
+}
+
+func TestInitConfigFailsForInvalidPythonDepsPeriodicUpdatesEnv(t *testing.T) {
+	pythonPath := mustFindTestPython(t)
+	configPath := writeTempConfig(t, "app:\n  port: 8194\npython_path: "+pythonPath+"\n")
+
+	t.Setenv("ENABLE_PYTHON_DEPS_PERIODIC_UPDATE", "not-a-bool")
+
+	err := InitConfig(configPath)
+	if err == nil {
+		t.Fatal("expected InitConfig to fail for invalid ENABLE_PYTHON_DEPS_PERIODIC_UPDATE")
+	}
+	if !strings.Contains(err.Error(), "ENABLE_PYTHON_DEPS_PERIODIC_UPDATE") {
+		t.Fatalf("expected error to mention ENABLE_PYTHON_DEPS_PERIODIC_UPDATE, got %v", err)
+	}
+}
+
 func TestInitConfigFailsForInvalidPythonPath(t *testing.T) {
 	configPath := writeTempConfig(t, "app:\n  port: 8194\npython_path: /definitely/missing/python\n")
 	t.Setenv("PYTHON_PATH", "")

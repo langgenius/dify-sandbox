@@ -118,6 +118,19 @@ func InitConfig(path string) error {
 		difySandboxGlobalConfigurations.PythonDepsUpdateInterval = "30m"
 	}
 
+	// Keep periodic updates enabled for existing deployments unless the option is
+	// explicitly set to false in YAML or the environment.
+	if _, ok := rawConfig["enable_python_deps_periodic_update"]; !ok {
+		difySandboxGlobalConfigurations.EnablePythonDepsPeriodicUpdate = true
+	}
+	if enablePeriodicUpdates := os.Getenv("ENABLE_PYTHON_DEPS_PERIODIC_UPDATE"); enablePeriodicUpdates != "" {
+		parsed, err := strconv.ParseBool(enablePeriodicUpdates)
+		if err != nil {
+			return fmt.Errorf("parse ENABLE_PYTHON_DEPS_PERIODIC_UPDATE: %w", err)
+		}
+		difySandboxGlobalConfigurations.EnablePythonDepsPeriodicUpdate = parsed
+	}
+
 	nodejs_path := os.Getenv("NODEJS_PATH")
 	if nodejs_path != "" {
 		difySandboxGlobalConfigurations.NodejsPath = nodejs_path
