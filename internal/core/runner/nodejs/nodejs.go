@@ -57,97 +57,96 @@ func (p *NodeJsRunner) Run(
 	output_handler := runner.NewOutputCaptureRunner()
 	output_handler.SetTimeout(timeout)
 
-	err = p.WithTempDir("/", REQUIRED_FS, func(root_path string) error {
-		cleanupRootPath := true
-		defer func() {
-			if cleanupRootPath {
-				os.RemoveAll(root_path)
-			}
-		}()
+	root_path, err := p.PrepareTempDir("/", REQUIRED_FS)
+	if err != nil {
+		uidpool.ReleaseUID(uid)
+		return nil, err
+	}
 
-		// initialize the environment
-		script_path, err := p.InitializeEnvironment(preload, root_path)
-		if err != nil {
-			return err
-		}
-
-		codeReader, codeWriter, err := os.Pipe()
-		if err != nil {
-			return err
-		}
-		output_handler.SetAfterExitHook(func() {
-			codeReader.Close()
-			codeWriter.Close()
+	cleanupRootPath := true
+	defer func() {
+		if cleanupRootPath {
 			os.RemoveAll(root_path)
-			uidpool.ReleaseUID(uid)
-		})
-
-		// create a new process
-		cmd := exec.Command(configuration.NodejsPath, buildCommandArgs(script_path, uid, options)...)
-		cmd.Env = []string{
-			// The sandbox child loads a Go c-shared library to install seccomp.
-			// Disable Go runtime features that may issue housekeeping syscalls after
-			// the seccomp filter is active; the prescript removes this before running
-			// user code.
-			"GODEBUG=decoratemappings=0,containermaxprocs=0,updatemaxprocs=0",
 		}
-		cmd.ExtraFiles = []*os.File{codeReader}
+	}()
 
-		if configuration.Proxy.Socks5 != "" {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Socks5))
-			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Socks5))
-		} else if configuration.Proxy.Https != "" || configuration.Proxy.Http != "" {
-			if configuration.Proxy.Https != "" {
-				cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Https))
-			}
-			if configuration.Proxy.Http != "" {
-				cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Http))
-			}
-		}
+	// initialize the environment
+	script_path, err := p.InitializeEnvironment(preload, root_path)
+	if err != nil {
+		return nil, err
+	}
 
-		if configuration.Proxy.NoProxy != "" {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("NO_PROXY=%s", configuration.Proxy.NoProxy))
-		}
-
-		for _, envVar := range configuration.AllowedEnvVars {
-			if val := os.Getenv(envVar); val != "" {
-				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", envVar, val))
-			}
-		}
-
-		if len(configuration.AllowedSyscalls) > 0 {
-			cmd.Env = append(
-				cmd.Env,
-				fmt.Sprintf("ALLOWED_SYSCALLS=%s", strings.Trim(
-					strings.Join(strings.Fields(fmt.Sprint(configuration.AllowedSyscalls)), ","), "[]",
-				)),
-			)
-		}
-
-		go func() {
-			_, _ = io.WriteString(codeWriter, code)
-			codeWriter.Close()
-		}()
-
-		// capture the output
-		err = output_handler.CaptureOutput(ctx, cmd)
-		if err != nil {
-			codeReader.Close()
-			codeWriter.Close()
-			return err
-		}
-		releaseUID = false
-		cleanupRootPath = false
-
-		return nil
+	codeReader, codeWriter, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	output_handler.SetAfterExitHook(func() {
+		codeReader.Close()
+		codeWriter.Close()
+		os.RemoveAll(root_path)
+		uidpool.ReleaseUID(uid)
 	})
 
+	// create a new process
+	cmd := exec.Command(configuration.NodejsPath, buildCommandArgs(script_path, uid, options)...)
+	cmd.Dir = root_path
+	cmd.Env = []string{
+		// The sandbox child loads a Go c-shared library to install seccomp.
+		// Disable Go runtime features that may issue housekeeping syscalls after
+		// the seccomp filter is active; the prescript removes this before running
+		// user code.
+		"GODEBUG=decoratemappings=0,containermaxprocs=0,updatemaxprocs=0",
+	}
+	cmd.ExtraFiles = []*os.File{codeReader}
+
+	if configuration.Proxy.Socks5 != "" {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Socks5))
+		cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Socks5))
+	} else if configuration.Proxy.Https != "" || configuration.Proxy.Http != "" {
+		if configuration.Proxy.Https != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTPS_PROXY=%s", configuration.Proxy.Https))
+		}
+		if configuration.Proxy.Http != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("HTTP_PROXY=%s", configuration.Proxy.Http))
+		}
+	}
+
+	if configuration.Proxy.NoProxy != "" {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("NO_PROXY=%s", configuration.Proxy.NoProxy))
+	}
+
+	for _, envVar := range configuration.AllowedEnvVars {
+		if val := os.Getenv(envVar); val != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", envVar, val))
+		}
+	}
+
+	if len(configuration.AllowedSyscalls) > 0 {
+		cmd.Env = append(
+			cmd.Env,
+			fmt.Sprintf("ALLOWED_SYSCALLS=%s", strings.Trim(
+				strings.Join(strings.Fields(fmt.Sprint(configuration.AllowedSyscalls)), ","), "[]",
+			)),
+		)
+	}
+
+	go func() {
+		_, _ = io.WriteString(codeWriter, code)
+		codeWriter.Close()
+	}()
+
+	err = output_handler.CaptureOutput(ctx, cmd)
 	if err != nil {
+		codeReader.Close()
+		codeWriter.Close()
 		if releaseUID {
 			uidpool.ReleaseUID(uid)
 		}
 		return nil, err
 	}
+
+	releaseUID = false
+	cleanupRootPath = false
 
 	return output_handler.Result(), nil
 }
