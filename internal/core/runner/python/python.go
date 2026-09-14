@@ -174,6 +174,8 @@ func (p *PythonRunner) InitializeEnvironment(preload string, options *types.Runn
 	}
 	err = os.WriteFile(bootstrapPath, []byte(script), 0600)
 	if err != nil {
+		// WriteFile may leave a partially written file on failure.
+		_ = os.Remove(bootstrapPath)
 		return "", err
 	}
 	if err = syscall.Chown(bootstrapPath, uid, static.SANDBOX_GROUP_ID); err != nil {
