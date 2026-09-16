@@ -16,12 +16,15 @@ type DifySandboxGlobalConfigurations struct {
 	PythonLibPaths           []string `yaml:"-"`
 	PythonPipMirrorURL       string   `yaml:"python_pip_mirror_url"`
 	PythonDepsUpdateInterval string   `yaml:"python_deps_update_interval"`
-	NodejsPath               string   `yaml:"nodejs_path"`
-	EnableNetwork            bool     `yaml:"enable_network"`
-	EnablePreload            bool     `yaml:"enable_preload"`
-	AllowedSyscalls          []int    `yaml:"allowed_syscalls"`
-	LogPath                  string   `yaml:"log_path"`
-	Proxy                    struct {
+	// EnablePythonDepsPeriodicUpdate controls only the background updater;
+	// startup initialization and explicit dependency refresh APIs stay enabled.
+	EnablePythonDepsPeriodicUpdate bool   `yaml:"enable_python_deps_periodic_update"`
+	NodejsPath                     string `yaml:"nodejs_path"`
+	EnableNetwork                  bool   `yaml:"enable_network"`
+	EnablePreload                  bool   `yaml:"enable_preload"`
+	AllowedSyscalls                []int  `yaml:"allowed_syscalls"`
+	LogPath                        string `yaml:"log_path"`
+	Proxy                          struct {
 		Socks5  string `yaml:"socks5"`
 		Https   string `yaml:"https"`
 		Http    string `yaml:"http"`
