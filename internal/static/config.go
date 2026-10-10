@@ -351,7 +351,8 @@ func configurationNodeMode(node *yaml.Node, seen map[*yaml.Node]bool) (string, b
 		// decode successfully; any restricted value keeps diagnostics fixed.
 		mode, found := "", false
 		for i := 0; i+1 < len(node.Content); i += 2 {
-			if node.Content[i].Value != "mode" {
+			key := configurationScalarNode(node.Content[i])
+			if key == nil || key.Kind != yaml.ScalarNode || key.Value != "mode" {
 				continue
 			}
 			found = true
@@ -425,13 +426,18 @@ func validateRestrictedIntegerNodes(document *yaml.Node) error {
 	}
 	walkConfigurationMappings(document, make(map[*yaml.Node]bool), func(mapping *yaml.Node) {
 		for i := 0; i+1 < len(mapping.Content); i += 2 {
-			switch mapping.Content[i].Value {
+			key := configurationScalarNode(mapping.Content[i])
+			if key == nil || key.Kind != yaml.ScalarNode {
+				continue
+			}
+			switch key.Value {
 			case "max_workers", "max_requests", "worker_timeout":
 				checkInteger(mapping.Content[i+1])
 			case "app":
 				walkConfigurationMappings(mapping.Content[i+1], make(map[*yaml.Node]bool), func(app *yaml.Node) {
 					for j := 0; j+1 < len(app.Content); j += 2 {
-						if app.Content[j].Value == "port" {
+						key := configurationScalarNode(app.Content[j])
+						if key != nil && key.Kind == yaml.ScalarNode && key.Value == "port" {
 							checkInteger(app.Content[j+1])
 						}
 					}

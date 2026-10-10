@@ -132,10 +132,32 @@ func TestRestrictedConfigurationRejectsOverrides(t *testing.T) {
 			})
 		}
 	}
+	// yaml.v3 resolves alias keys before selecting struct fields; the node
+	// gate must inspect that same scalar name rather than the anchor name.
+	for _, field := range []struct{ name, value string }{
+		{"max_workers", "1"}, {"max_requests", "1"}, {"worker_timeout", "5"},
+	} {
+		t.Run("fractional_aliased_key/"+field.name, func(t *testing.T) {
+			cleanConfigEnvironment(t)
+			content := strings.Replace(restrictedYAML, "  port: 8194\n", "  port: 8194\n  key: &integer_name "+field.name+"\n", 1)
+			content = strings.Replace(content, field.name+": "+field.value+"\n", "*integer_name : "+field.value+".9\n", 1)
+			err := InitConfig(configPath(t, content))
+			if err == nil || err.Error() != "invalid_restricted_numeric_setting" {
+				t.Fatalf("expected fixed numeric diagnostic for aliased key, got %v", err)
+			}
+			// A valid integer under the same aliased key remains supported.
+			content = strings.Replace(content, "*integer_name : "+field.value+".9\n", "*integer_name : "+field.value+"\n", 1)
+			if err := InitConfig(configPath(t, content)); err != nil {
+				t.Fatalf("valid aliased integer key rejected: %v", err)
+			}
+		})
+	}
 	for name, content := range map[string]string{
-		"fractional_alias":      strings.Replace(strings.Replace(restrictedYAML, "max_workers: 1\n", "max_workers: &fractional 1.9\n", 1), "max_requests: 1\n", "max_requests: *fractional\n", 1),
-		"fractional_root_merge": strings.Replace(restrictedYAML, "max_workers: 1\n", "<<: {max_workers: 1.9}\n", 1),
-		"fractional_app_merge":  strings.Replace(restrictedYAML, "  port: 8194\n", "  <<: {port: 8194.9}\n", 1),
+		"fractional_alias":        strings.Replace(strings.Replace(restrictedYAML, "max_workers: 1\n", "max_workers: &fractional 1.9\n", 1), "max_requests: 1\n", "max_requests: *fractional\n", 1),
+		"fractional_root_merge":   strings.Replace(restrictedYAML, "max_workers: 1\n", "<<: {max_workers: 1.9}\n", 1),
+		"fractional_app_merge":    strings.Replace(restrictedYAML, "  port: 8194\n", "  <<: {port: 8194.9}\n", 1),
+		"fractional_aliased_app":  "log_path: &app_name app\n" + strings.Replace(strings.Replace(restrictedYAML, "app:\n", "*app_name :\n", 1), "  port: 8194\n", "  port: 8194.9\n", 1),
+		"fractional_aliased_port": strings.Replace(restrictedYAML, "  port: 8194\n", "  key: &port_name port\n  *port_name : 8194.9\n", 1),
 	} {
 		t.Run(name, func(t *testing.T) {
 			cleanConfigEnvironment(t)
@@ -143,12 +165,19 @@ func TestRestrictedConfigurationRejectsOverrides(t *testing.T) {
 			if err == nil || err.Error() != "invalid_restricted_numeric_setting" {
 				t.Fatalf("expected fixed numeric diagnostic, got %v", err)
 			}
+			if name == "fractional_aliased_app" || name == "fractional_aliased_port" {
+				content = strings.Replace(content, "8194.9\n", "8194\n", 1)
+				if err := InitConfig(configPath(t, content)); err != nil {
+					t.Fatalf("valid aliased app/port key rejected: %v", err)
+				}
+			}
 		})
 	}
 	const marker = "synthetic_secret_duplicate_key"
 	for name, content := range map[string]string{
-		"duplicate_after_mode":  restrictedYAML + marker + ": first\n" + marker + ": second\n",
-		"duplicate_before_mode": marker + ": first\n" + marker + ": second\n" + restrictedYAML,
+		"duplicate_after_mode":   restrictedYAML + marker + ": first\n" + marker + ": second\n",
+		"duplicate_before_mode":  marker + ": first\n" + marker + ": second\n" + restrictedYAML,
+		"duplicate_aliased_mode": "app:\n  key: &mode_name mode\n*mode_name : restricted\n" + marker + ": first\n" + marker + ": second\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			cleanConfigEnvironment(t)
@@ -186,9 +215,18 @@ func TestOrdinaryConfigurationDefaultsPreserved(t *testing.T) {
 		t.Fatalf("ordinary numeric decoding changed: %d", c.MaxWorkers)
 	}
 	const marker = "synthetic_secret_duplicate_key"
-	err := InitConfig(configPath(t, "mode: ordinary\n"+marker+": first\n"+marker+": second\n"))
-	if err == nil || !strings.Contains(err.Error(), marker) {
-		t.Fatalf("ordinary duplicate diagnostic changed: %v", err)
+	for name, content := range map[string]string{
+		"ordinary_direct_mode":                  "mode: ordinary\n",
+		"ordinary_aliased_mode":                 "app:\n  key: &mode_name mode\n*mode_name : ordinary\n",
+		"ordinary_aliased_mode_overrides_merge": "app:\n  key: &mode_name mode\n*mode_name : ordinary\n<<: {mode: restricted}\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			cleanConfigEnvironment(t)
+			err := InitConfig(configPath(t, content+marker+": first\n"+marker+": second\n"))
+			if err == nil || !strings.Contains(err.Error(), marker) {
+				t.Fatalf("ordinary duplicate diagnostic changed: %v", err)
+			}
+		})
 	}
 	t.Setenv("MAX_WORKERS", "secret-invalid")
 	t.Setenv("ENABLE_NETWORK", "secret-invalid")
