@@ -41,7 +41,9 @@ passed, packages, started = set(), set(), set()
 for line in open(sys.argv[2]):
     event = json.loads(line)
     action, package, test = event.get('Action'), event.get('Package'), event.get('Test')
-    if action == 'fail' or (action == 'skip' and (package, test) in expected):
+    # All skips in the explicitly selected contract packages are incomplete
+    # coverage, including nested cases whose parent still reports pass.
+    if action == 'fail' or (action == 'skip' and package in required_packages):
         raise SystemExit('failed or skipped required coverage')
     if (package, test) in expected:
         if action == 'run': started.add((package, test))
@@ -78,6 +80,32 @@ PY
     echo 'coverage verifier accepted missing required test' >&2; exit 1
   fi
   echo 'coverage verifier missing-test self-test passed'
+  # Turn one actual required nested pass into a skip while retaining its
+  # successful parent/package events. This is verifier-only negative evidence;
+  # none of the contract tests intentionally skip.
+  python3 - "$stage" "$results" "$workdir/nested-skip.jsonl" <<'PY'
+import json, sys
+inventory = json.load(open('build/restricted-contract-tests.json'))[sys.argv[1]]
+expected = {('github.com/langgenius/dify-sandbox' + package[1:], test)
+            for package, tests in inventory.items() for test in tests}
+changed = False
+with open(sys.argv[3], 'w') as output:
+    for line in open(sys.argv[2]):
+        event = json.loads(line)
+        test = event.get('Test')
+        if (not changed and event.get('Action') == 'pass' and isinstance(test, str)
+                and '/' in test and (event.get('Package'), test.split('/', 1)[0]) in expected):
+            event['Action'] = 'skip'
+            line = json.dumps(event) + chr(10)
+            changed = True
+        output.write(line)
+if not changed:
+    raise SystemExit('missing required nested pass for verifier self-test')
+PY
+  if verify_results "$workdir/nested-skip.jsonl"; then
+    echo 'coverage verifier accepted skipped required nested case' >&2; exit 1
+  fi
+  echo 'coverage verifier nested-skip self-test passed'
 else
   [[ $# == 0 ]] || { echo 'unsupported harness argument' >&2; exit 1; }
   printf 'Contract fixture stage=%s architecture=%s\n' "$stage" "$arch"

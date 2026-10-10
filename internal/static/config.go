@@ -29,7 +29,9 @@ func InitConfig(path string) error {
 	decoder := yaml.NewDecoder(configFile)
 	err = decoder.Decode(&difySandboxGlobalConfigurations)
 	if err != nil {
-		if difySandboxGlobalConfigurations.Mode == "restricted" || os.Getenv("SANDBOX_MODE") == "restricted" {
+		// A duplicate root key can fail before typed decoding populates Mode.
+		// Probe parsed nodes independently for the fixed restricted diagnostic.
+		if difySandboxGlobalConfigurations.Mode == "restricted" || os.Getenv("SANDBOX_MODE") == "restricted" || restrictedConfigurationIntent(configFile) {
 			return errors.New("invalid_restricted_configuration")
 		}
 		return err
@@ -51,6 +53,16 @@ func InitConfig(path string) error {
 	difySandboxGlobalConfigurations.Mode = mode
 	if mode == "restricted" {
 		// Re-decode strictly before any overrides can erase unsafe file settings.
+		if _, err := configFile.Seek(0, io.SeekStart); err != nil {
+			return errors.New("invalid_restricted_configuration")
+		}
+		var document yaml.Node
+		if err := yaml.NewDecoder(configFile).Decode(&document); err != nil {
+			return errors.New("invalid_restricted_configuration")
+		}
+		if err := validateRestrictedIntegerNodes(&document); err != nil {
+			return err
+		}
 		if _, err := configFile.Seek(0, io.SeekStart); err != nil {
 			return errors.New("invalid_restricted_configuration")
 		}
@@ -302,6 +314,133 @@ func applyRestrictedEnvironment(config *types.DifySandboxGlobalConfigurations) e
 		if value := os.Getenv(field.key); value != "" {
 			*field.target = value
 		}
+	}
+	return nil
+}
+
+// restrictedConfigurationIntent is diagnostic classification only. It is
+// independent of failed typed decoding and never supplies the configured mode.
+func restrictedConfigurationIntent(file *os.File) bool {
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return false
+	}
+	var document yaml.Node
+	if err := yaml.NewDecoder(file).Decode(&document); err != nil {
+		return false
+	}
+	mode, _ := configurationNodeMode(&document, make(map[*yaml.Node]bool))
+	return mode == "restricted"
+}
+
+func configurationNodeMode(node *yaml.Node, seen map[*yaml.Node]bool) (string, bool) {
+	if node == nil || seen[node] {
+		return "", false
+	}
+	seen[node] = true
+	switch node.Kind {
+	case yaml.DocumentNode, yaml.SequenceNode:
+		for _, child := range node.Content {
+			if mode, found := configurationNodeMode(child, seen); found {
+				return mode, true
+			}
+		}
+	case yaml.AliasNode:
+		return configurationNodeMode(node.Alias, seen)
+	case yaml.MappingNode:
+		// A direct mode overrides merge defaults. Duplicate direct modes cannot
+		// decode successfully; any restricted value keeps diagnostics fixed.
+		mode, found := "", false
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			if node.Content[i].Value != "mode" {
+				continue
+			}
+			found = true
+			value := configurationScalarNode(node.Content[i+1])
+			if value != nil && value.Kind == yaml.ScalarNode {
+				mode = value.Value
+				if mode == "restricted" {
+					return mode, true
+				}
+			}
+		}
+		if found {
+			return mode, true
+		}
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			if node.Content[i].Tag == "!!merge" {
+				if mode, found := configurationNodeMode(node.Content[i+1], seen); found {
+					return mode, true
+				}
+			}
+		}
+	}
+	return "", false
+}
+
+func configurationScalarNode(node *yaml.Node) *yaml.Node {
+	seen := make(map[*yaml.Node]bool)
+	for node != nil && node.Kind == yaml.AliasNode {
+		if seen[node] {
+			return nil
+		}
+		seen[node] = true
+		node = node.Alias
+	}
+	return node
+}
+
+// walkConfigurationMappings follows document/alias/merge wrappers only. It
+// visits the current mapping without descending into arbitrary nested settings.
+func walkConfigurationMappings(node *yaml.Node, seen map[*yaml.Node]bool, visit func(*yaml.Node)) {
+	if node == nil || seen[node] {
+		return
+	}
+	seen[node] = true
+	switch node.Kind {
+	case yaml.DocumentNode, yaml.SequenceNode:
+		for _, child := range node.Content {
+			walkConfigurationMappings(child, seen, visit)
+		}
+	case yaml.AliasNode:
+		walkConfigurationMappings(node.Alias, seen, visit)
+	case yaml.MappingNode:
+		visit(node)
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			if node.Content[i].Tag == "!!merge" {
+				walkConfigurationMappings(node.Content[i+1], seen, visit)
+			}
+		}
+	}
+}
+
+// yaml.v3 can convert !!float values to integer fields. Check the four current
+// restricted integer settings as actual integers before strict typed decoding.
+func validateRestrictedIntegerNodes(document *yaml.Node) error {
+	valid := true
+	checkInteger := func(node *yaml.Node) {
+		node = configurationScalarNode(node)
+		if node == nil || node.Kind != yaml.ScalarNode || node.Tag != "!!int" {
+			valid = false
+		}
+	}
+	walkConfigurationMappings(document, make(map[*yaml.Node]bool), func(mapping *yaml.Node) {
+		for i := 0; i+1 < len(mapping.Content); i += 2 {
+			switch mapping.Content[i].Value {
+			case "max_workers", "max_requests", "worker_timeout":
+				checkInteger(mapping.Content[i+1])
+			case "app":
+				walkConfigurationMappings(mapping.Content[i+1], make(map[*yaml.Node]bool), func(app *yaml.Node) {
+					for j := 0; j+1 < len(app.Content); j += 2 {
+						if app.Content[j].Value == "port" {
+							checkInteger(app.Content[j+1])
+						}
+					}
+				})
+			}
+		}
+	})
+	if !valid {
+		return errors.New("invalid_restricted_numeric_setting")
 	}
 	return nil
 }

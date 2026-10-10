@@ -64,6 +64,13 @@ func TestRestrictedResultStates(t *testing.T) {
 	canceled := terminal("canceled", "canceled", 0)
 	canceled.EnforcementReasons = []StopReason{"canceled"}
 	cases = append(cases, canceled)
+	// Unknown cleanup retains valid prelaunch observations, without converting
+	// them to a known blocked outcome or discarding the observed reason set.
+	for _, reasons := range [][]StopReason{{"input_limit"}, {"canceled"}, {"canceled", "input_limit"}} {
+		r := prelaunch("unknown", "cleanup_failed", reasons...)
+		r.CleanupState = "unknown"
+		cases = append(cases, r)
+	}
 	for i, r := range cases {
 		if err := ValidateExecutionResult(r); err != nil {
 			t.Errorf("row %d %+v: %v", i, r, err)
@@ -137,6 +144,13 @@ func TestRestrictedResultRejectsUnsetAndContradictoryFields(t *testing.T) {
 	r = terminal("child_failed", "child_exit", 1)
 	r.StdoutReadBytes = 1
 	cases = append(cases, r)
+	// A known not-started process cannot have child-only observations, even
+	// when cleanup is unknown and takes precedence over outcome presentation.
+	for _, reason := range []StopReason{"seccomp_or_sigsys", "cpu_limit", "file_size_limit", "stdout_limit", "stderr_limit", "wall_limit"} {
+		r = prelaunch("unknown", "cleanup_failed", reason)
+		r.CleanupState = "unknown"
+		cases = append(cases, r)
+	}
 	for i, r := range cases {
 		if err := ValidateExecutionResult(r); err == nil {
 			t.Errorf("accepted contradiction %d %+v", i, r)

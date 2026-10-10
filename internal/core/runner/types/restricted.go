@@ -149,6 +149,14 @@ func ValidateExecutionResult(r ExecutionResult) error {
 			return invalid()
 		}
 	}
+	// Outcome precedence never makes impossible prelaunch facts valid.
+	if r.ProcessState == ProcessNotStarted {
+		for _, reason := range r.EnforcementReasons {
+			if reason != ReasonInputLimit && reason != ReasonCanceled {
+				return invalid()
+			}
+		}
+	}
 	has := func(reason StopReason) bool {
 		for _, v := range r.EnforcementReasons {
 			if v == reason {
@@ -186,13 +194,6 @@ func ValidateExecutionResult(r ExecutionResult) error {
 	}
 	if r.CleanupState == CleanupUnknown {
 		return matches(OutcomeUnknown, ReasonCleanupFailed)
-	}
-	if r.ProcessState == ProcessNotStarted {
-		for _, reason := range r.EnforcementReasons {
-			if reason != ReasonInputLimit && reason != ReasonCanceled {
-				return invalid()
-			}
-		}
 	}
 	for _, reason := range []StopReason{ReasonSeccompOrSIGSYS, ReasonInputLimit, ReasonWallLimit, ReasonStdoutLimit, ReasonStderrLimit, ReasonCPULimit, ReasonFileSizeLimit, ReasonCanceled} {
 		if !has(reason) {

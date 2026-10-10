@@ -105,11 +105,59 @@ func TestRestrictedConfigurationRejectsOverrides(t *testing.T) {
 			}
 		})
 	}
-	for _, extra := range []string{"unknown_setting: true\n", "restricted_mode: true\n", "enable_network: true\n", "enable_preload: true\n", "allowed_syscalls: [0]\n", "python_deps_update_interval: 30m\n", "max_workers: garbage\n", "---\nmode: ordinary\n"} {
+	for _, extra := range []string{"unknown_setting: true\n", "restricted_mode: true\n", "enable_network: true\n", "enable_preload: true\n", "allowed_syscalls: [0]\n", "python_deps_update_interval: 30m\n", "---\nmode: ordinary\n"} {
 		t.Run(extra, func(t *testing.T) {
 			cleanConfigEnvironment(t)
 			if err := InitConfig(configPath(t, restrictedYAML+extra)); err == nil {
 				t.Fatal("accepted invalid YAML")
+			}
+		})
+	}
+	// Replace the existing scalar: adding a second key would test duplicate
+	// rejection while leaving fractional-to-integer coercion unexercised.
+	for _, field := range []struct{ name, value string }{
+		{"max_workers", "1"}, {"max_requests", "1"}, {"worker_timeout", "5"}, {"port", "8194"},
+	} {
+		for _, value := range []struct{ scalar, diagnostic string }{
+			{field.value + ".9", "invalid_restricted_numeric_setting"},
+			{"synthetic_invalid_number", "invalid_restricted_configuration"},
+		} {
+			t.Run(field.name+"/"+value.scalar, func(t *testing.T) {
+				cleanConfigEnvironment(t)
+				content := strings.Replace(restrictedYAML, field.name+": "+field.value+"\n", field.name+": "+value.scalar+"\n", 1)
+				err := InitConfig(configPath(t, content))
+				if err == nil || err.Error() != value.diagnostic {
+					t.Fatalf("expected fixed %s diagnostic, got %v", value.diagnostic, err)
+				}
+			})
+		}
+	}
+	for name, content := range map[string]string{
+		"fractional_alias":      strings.Replace(strings.Replace(restrictedYAML, "max_workers: 1\n", "max_workers: &fractional 1.9\n", 1), "max_requests: 1\n", "max_requests: *fractional\n", 1),
+		"fractional_root_merge": strings.Replace(restrictedYAML, "max_workers: 1\n", "<<: {max_workers: 1.9}\n", 1),
+		"fractional_app_merge":  strings.Replace(restrictedYAML, "  port: 8194\n", "  <<: {port: 8194.9}\n", 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			cleanConfigEnvironment(t)
+			err := InitConfig(configPath(t, content))
+			if err == nil || err.Error() != "invalid_restricted_numeric_setting" {
+				t.Fatalf("expected fixed numeric diagnostic, got %v", err)
+			}
+		})
+	}
+	const marker = "synthetic_secret_duplicate_key"
+	for name, content := range map[string]string{
+		"duplicate_after_mode":  restrictedYAML + marker + ": first\n" + marker + ": second\n",
+		"duplicate_before_mode": marker + ": first\n" + marker + ": second\n" + restrictedYAML,
+	} {
+		t.Run(name, func(t *testing.T) {
+			cleanConfigEnvironment(t)
+			err := InitConfig(configPath(t, content))
+			if err == nil || err.Error() != "invalid_restricted_configuration" {
+				t.Fatalf("expected fixed parse diagnostic, got %v", err)
+			}
+			if strings.Contains(err.Error(), marker) {
+				t.Fatal("leaked synthetic key marker")
 			}
 		})
 	}
@@ -128,6 +176,19 @@ func TestOrdinaryConfigurationDefaultsPreserved(t *testing.T) {
 	c := GetDifySandboxGlobalConfigurations()
 	if c.Mode != "ordinary" || c.RestrictedMode || !c.EnableNetwork || c.PythonPath != "/opt/python/bin/python3" || c.NodejsPath != "/usr/local/bin/node" || c.PythonDepsUpdateInterval != "30m" || len(c.PythonLibPaths) == 0 {
 		t.Fatalf("ordinary defaults changed: %+v", c)
+	}
+	// Ordinary YAML keeps its existing fractional decoding and raw duplicate
+	// diagnostic behavior; strict node validation is restricted-only.
+	if err := InitConfig(configPath(t, "mode: ordinary\nmax_workers: 1.9\n")); err != nil {
+		t.Fatal(err)
+	}
+	if c := GetDifySandboxGlobalConfigurations(); c.MaxWorkers != 1 {
+		t.Fatalf("ordinary numeric decoding changed: %d", c.MaxWorkers)
+	}
+	const marker = "synthetic_secret_duplicate_key"
+	err := InitConfig(configPath(t, "mode: ordinary\n"+marker+": first\n"+marker+": second\n"))
+	if err == nil || !strings.Contains(err.Error(), marker) {
+		t.Fatalf("ordinary duplicate diagnostic changed: %v", err)
 	}
 	t.Setenv("MAX_WORKERS", "secret-invalid")
 	t.Setenv("ENABLE_NETWORK", "secret-invalid")
