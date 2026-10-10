@@ -26,6 +26,8 @@ The supplied local arm64 diagnostic's direct full filter calls returned `42`/cle
 
 The sandbox deployment mode is `restricted-v1` (default off). Dify's externally named capability remains `network-disabled-v1`. These labels are selectors, never proof. Support only `python3` and `nodejs`; Jinja uses Python. All restricted generated code executes with network false, no caller preload, no mutable dependencies, no inherited service credentials/handles, no writable filesystem directory, and no generated subprocesses. Runtime libraries/imports needed for deterministic Python/JS/Jinja remain usable.
 
+The server configuration has one mode authority: `Mode string` accepts `ordinary` or `restricted`, with absent/empty meaning ordinary. Validation derives internal `RestrictedMode bool` (`yaml:"-"`) for later consumers; users cannot set that internal flag independently. Ordinary parsing/default behavior is preserved, and restricted unknown/invalid/spoofed configuration refuses startup. Selecting restricted config does not establish readiness or a trusted capability.
+
 Deploy one service replica, one admitted request, no queue. Parallel HTTP requests still exercise admission/cancellation races; this profile makes no claim of two simultaneously executing children. A second replica or increased concurrency is a different deployment configuration requiring new resource/UID/neighbor conformance.
 
 ### Exact candidate limits
@@ -97,6 +99,8 @@ func (p *NodeJsRunner) RunRestricted(ctx context.Context, code string,
 ```
 
 Finalized enum values, process/null invariants, the bounded eight-reason monotonic set, outcome/code precedence and strict response schema are binding in joint contract §§2–5. Empty enums and contradictory fields refuse finalization. Capture returns intermediate cleanup unknown; only RunRestricted finalizes it through the existing root/UID owners.
+
+Task 1 validates the pure finalized outcome/reason/process/cleanup/limit invariants. Numeric HTTP envelope codes are mapped and tested by the Task 6 service owner; ExecutionResult itself has no HTTP code field or mapper. All joint outcome rows and the fixed later HTTP code matrix remain mandatory coverage.
 
 `LimitedCommand` selects the fixed interpreter/bootstrap argument form from language, validates paths belong to the root/immutable asset tree and verifies the language's exact limits. It does not accept client executable paths. `CaptureBounded` owns creation of code pipe FD3, stdio pipes, Start, exactly one Wait, cancellation, input writer, counters and closure. `terminate` references `cmd.Process` only after Start succeeds and kills its separately created process group; it must never emit output before killing. A start/cancel race checks cancellation both before Start and immediately after it. Return is allowed only when readers/writer have stopped and the child has been reaped or the environment is marked unhealthy. `MaxRSSBytes` normalizes Linux wait4 KiB to bytes. AS/NPROC enforcement observations come from trusted harness/launcher checks, not this result's prose.
 

@@ -82,9 +82,9 @@ Task 7's full integration harness extends the Task 1 workflow/script ownership; 
 
 **Files:** Create `internal/core/runner/types/restricted.go`, `restricted_test.go`; modify `internal/types/config.go`, `internal/static/config.go`; create `conf/restricted.yaml`, `internal/static/restricted_config_test.go`. Also create the early CI bootstrap files in the map and add the narrow `restricted-contract` generator target in `docker/generate.sh`.
 
-**Consumes:** Validated literal language values `python3`/`nodejs`; no client budget fields. **Produces:** Spec `Language`, `ExecutionLimits`, `ExecutionOutcome`, `StopReason`, `ProcessState`, `CleanupState`, `ExecutionResult`, `ValidateExecutionResult`, `RestrictedLimits(Language)`; config mode default ordinary and `ValidateRestrictedConfiguration(config) error` in `internal/static`.
+**Consumes:** Validated literal language values `python3`/`nodejs`; no client budget fields. **Produces:** Spec `Language`, `ExecutionLimits`, `ExecutionOutcome`, `StopReason`, `ProcessState`, `CleanupState`, `ExecutionResult`, `ValidateExecutionResult`, `RestrictedLimits(Language)`; config mode default ordinary and `ValidateRestrictedConfiguration(config) error` in `internal/static`. One server-owned `Mode string` accepts `ordinary`/`restricted`; absent or empty defaults ordinary. After valid configuration, derive internal `RestrictedMode bool` with `yaml:"-"`; it is not a second configurable authority. Preserve ordinary parsing/defaults, while rejecting restricted unknown/invalid/spoofed settings.
 
-- [ ] Add pure result-contract tests from joint contract §§2–5: `TestRestrictedResultStates`, `TestRestrictedResultRejectsUnsetAndContradictoryFields`, `TestRestrictedReasonSetBounds`, `TestRestrictedOutcomePrecedence`. Assert nullable exit/signal, all outcome/code rows, sorted unique maximum-eight observed reasons, truthful cleanup and rejection of empty/unknown enum values; register these in stage 1. Define no universal local-error coverage field or gate.
+- [ ] Add pure result-contract tests from joint contract §§2–5: `TestRestrictedResultStates`, `TestRestrictedResultRejectsUnsetAndContradictoryFields`, `TestRestrictedReasonSetBounds`, `TestRestrictedOutcomePrecedence`. Assert nullable exit/signal, all finalized outcome/reason/process/cleanup rows, sorted unique maximum-eight observed reasons, truthful cleanup and rejection of empty/unknown enum values; register these in stage 1. Numeric HTTP envelope-code mapping remains Task 6 service coverage, since the frozen Go ExecutionResult has no HTTP code field. Define no unused code mapper or universal local-error coverage field/gate.
 
 - [ ] Before any later Linux GREEN gate, add the feature-branch workflow bootstrap, initially stage 1. Ground it in existing Actions checkout/setup/build machinery, but give it no publication or deployment steps:
 ```yaml
@@ -158,7 +158,7 @@ if config.RestrictedMode {
     if err != nil { return err }
 } else if err := bootstrap.InitializeOrdinaryAssets(); err != nil { return err }
 ```
-`RestrictedMode bool` is the added parsed mode field; assetDir/manifest are trusted image paths. Lock build inputs only from resolved authorized sources/checksums; unresolved base/wheel/archive inputs block image production, not pure code work.
+`RestrictedMode bool` is derived internally from Task 1's validated `Mode string` and excluded from YAML; assetDir/manifest are trusted image paths. Lock build inputs only from resolved authorized sources/checksums; unresolved base/wheel/archive inputs block image production, not pure code work.
 - [ ] Bump contract stage to 2 and register each new named test, then obtain GREEN exact targeted tests and existing ordinary initialization checks in the Task 1 CI harness. Review initialization order, asset syscall/library compatibility and image path closure. Contract fixtures do not authorize a restricted image; parent capability stays disabled.
 
 ## Task 3: Fresh roots, leased UIDs and cleanup health
