@@ -1,6 +1,8 @@
 package static
 
 import (
+	"errors"
+	"io"
 	"log/slog"
 	"os"
 	"strconv"
@@ -27,7 +29,54 @@ func InitConfig(path string) error {
 	decoder := yaml.NewDecoder(configFile)
 	err = decoder.Decode(&difySandboxGlobalConfigurations)
 	if err != nil {
+		if difySandboxGlobalConfigurations.Mode == "restricted" || os.Getenv("SANDBOX_MODE") == "restricted" {
+			return errors.New("invalid_restricted_configuration")
+		}
 		return err
+	}
+
+	mode := difySandboxGlobalConfigurations.Mode
+	if mode != "" && mode != "ordinary" && mode != "restricted" {
+		return errors.New("invalid_sandbox_mode")
+	}
+	if value := os.Getenv("SANDBOX_MODE"); value != "" {
+		mode = value
+	}
+	if mode == "" {
+		mode = "ordinary"
+	}
+	if mode != "ordinary" && mode != "restricted" {
+		return errors.New("invalid_sandbox_mode")
+	}
+	difySandboxGlobalConfigurations.Mode = mode
+	if mode == "restricted" {
+		// Re-decode strictly before any overrides can erase unsafe file settings.
+		if _, err := configFile.Seek(0, io.SeekStart); err != nil {
+			return errors.New("invalid_restricted_configuration")
+		}
+		var config types.DifySandboxGlobalConfigurations
+		strict := yaml.NewDecoder(configFile)
+		strict.KnownFields(true)
+		if err := strict.Decode(&config); err != nil {
+			return errors.New("invalid_restricted_configuration")
+		}
+		var extra interface{}
+		if err := strict.Decode(&extra); err != io.EOF {
+			return errors.New("invalid_restricted_configuration")
+		}
+		config.Mode = mode
+		if err := ValidateRestrictedConfiguration(config); err != nil {
+			return err
+		}
+		if err := applyRestrictedEnvironment(&config); err != nil {
+			return err
+		}
+		if err := ValidateRestrictedConfiguration(config); err != nil {
+			return err
+		}
+		config.RestrictedMode = true
+		difySandboxGlobalConfigurations = config
+		return nil
 	}
 
 	debug, err := strconv.ParseBool(os.Getenv("DEBUG"))
@@ -183,5 +232,76 @@ func SetupRunnerDependencies() error {
 
 	runnerDependencies.PythonRequirements = string(file)
 
+	return nil
+}
+
+// ValidateRestrictedConfiguration validates server settings only. It does not
+// validate assets, establish readiness, or authorize a capability receipt.
+func ValidateRestrictedConfiguration(config types.DifySandboxGlobalConfigurations) error {
+	if config.Mode != "" && config.Mode != "ordinary" && config.Mode != "restricted" {
+		return errors.New("invalid_sandbox_mode")
+	}
+	if config.Mode != "restricted" {
+		return nil
+	}
+	if config.App.Port < 1 || config.App.Port > 65535 || config.MaxWorkers != 1 || config.MaxRequests != 1 || config.WorkerTimeout != 5 {
+		return errors.New("invalid_restricted_numeric_setting")
+	}
+	if config.App.Debug || config.EnableNetwork || config.EnablePreload {
+		return errors.New("unsafe_restricted_setting")
+	}
+	if len(config.AllowedSyscalls) != 0 {
+		return errors.New("restricted_syscall_override")
+	}
+	if config.Proxy.Socks5 != "" || config.Proxy.Http != "" || config.Proxy.Https != "" {
+		return errors.New("restricted_proxy_setting")
+	}
+	if len(config.PythonLibPaths) != 0 || config.PythonPipMirrorURL != "" || config.PythonDepsUpdateInterval != "" {
+		return errors.New("restricted_dependency_mutation")
+	}
+	if config.PythonPath != "/opt/python/bin/python3" || config.NodejsPath != "/usr/local/bin/node" {
+		return errors.New("restricted_interpreter_override")
+	}
+	return nil
+}
+
+func applyRestrictedEnvironment(config *types.DifySandboxGlobalConfigurations) error {
+	for _, field := range []struct {
+		key    string
+		target *int
+	}{{"MAX_WORKERS", &config.MaxWorkers}, {"MAX_REQUESTS", &config.MaxRequests}, {"SANDBOX_PORT", &config.App.Port}, {"WORKER_TIMEOUT", &config.WorkerTimeout}} {
+		if value := os.Getenv(field.key); value != "" {
+			parsed, err := strconv.Atoi(value)
+			if err != nil {
+				return errors.New("invalid_restricted_numeric_setting")
+			}
+			*field.target = parsed
+		}
+	}
+	for _, field := range []struct {
+		key    string
+		target *bool
+	}{{"DEBUG", &config.App.Debug}, {"ENABLE_NETWORK", &config.EnableNetwork}, {"ENABLE_PRELOAD", &config.EnablePreload}} {
+		if value := os.Getenv(field.key); value != "" {
+			parsed, err := strconv.ParseBool(value)
+			if err != nil {
+				return errors.New("invalid_restricted_boolean_setting")
+			}
+			*field.target = parsed
+		}
+	}
+	for _, key := range []string{"ALLOWED_SYSCALLS", "SOCKS5_PROXY", "HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "NO_PROXY", "socks5_proxy", "https_proxy", "http_proxy", "all_proxy", "no_proxy", "PYTHON_LIB_PATH", "PIP_MIRROR_URL", "PYTHON_DEPS_UPDATE_INTERVAL"} {
+		if os.Getenv(key) != "" {
+			return errors.New("unsafe_restricted_environment")
+		}
+	}
+	for _, field := range []struct {
+		key    string
+		target *string
+	}{{"API_KEY", &config.App.Key}, {"PYTHON_PATH", &config.PythonPath}, {"NODEJS_PATH", &config.NodejsPath}} {
+		if value := os.Getenv(field.key); value != "" {
+			*field.target = value
+		}
+	}
 	return nil
 }

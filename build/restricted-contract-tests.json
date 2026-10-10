@@ -1,0 +1,17 @@
+{
+  "1": {
+    "./internal/core/runner/types": [
+      "TestRestrictedLimitsPerLanguage",
+      "TestRestrictedResultStates",
+      "TestRestrictedResultRejectsUnsetAndContradictoryFields",
+      "TestRestrictedReasonSetBounds",
+      "TestRestrictedOutcomePrecedence"
+    ],
+    "./internal/static": [
+      "TestRestrictedConfiguration",
+      "TestRestrictedConfigurationRejectsUnsafeSettings",
+      "TestRestrictedConfigurationRejectsOverrides",
+      "TestOrdinaryConfigurationDefaultsPreserved"
+    ]
+  }
+}

@@ -1,7 +1,10 @@
 package types
 
 type DifySandboxGlobalConfigurations struct {
-	App struct {
+	Mode string `yaml:"mode"`
+	// RestrictedMode is derived from validated Mode; it is not another setting.
+	RestrictedMode bool `yaml:"-"`
+	App            struct {
 		Port  int    `yaml:"port"`
 		Debug bool   `yaml:"debug"`
 		Key   string `yaml:"key"`

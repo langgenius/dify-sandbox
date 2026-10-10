@@ -1,0 +1,23 @@
+# Server-owned profile only; this configuration does not establish readiness or
+# authorize restricted execution. Immutable assets and conformance are required.
+mode: restricted
+app:
+  port: 8194
+  debug: false
+  key: dify-sandbox
+max_workers: 1
+max_requests: 1
+worker_timeout: 5
+python_path: /opt/python/bin/python3
+nodejs_path: /usr/local/bin/node
+enable_network: false
+enable_preload: false
+python_lib_path: []
+python_pip_mirror_url: ''
+python_deps_update_interval: ''
+allowed_syscalls: []
+log_path: './logs'
+proxy:
+  socks5: ''
+  http: ''
+  https: ''

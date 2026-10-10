@@ -2,7 +2,7 @@
 
 # Docker build generation script
 # Purpose: Generate final Dockerfiles from version configuration and templates
-# Usage: ./generate.sh [production|test] [amd64|arm64]
+# Usage: ./generate.sh [production|test|restricted-contract] [amd64|arm64]
 
 set -e
 
@@ -15,15 +15,15 @@ OUTPUT_DIR="${SCRIPT_DIR}"
 ENVIRONMENT="${1:-production}"
 ARCHITECTURE="${2:-amd64}"
 
-if [[ ! "$ENVIRONMENT" =~ ^(production|test)$ ]]; then
-    echo "Error: Environment type must be 'production' or 'test'"
-    echo "Usage: $0 [production|test] [amd64|arm64]"
+if [[ ! "$ENVIRONMENT" =~ ^(production|test|restricted-contract)$ ]]; then
+    echo "Error: Environment type must be 'production', 'test' or 'restricted-contract'"
+    echo "Usage: $0 [production|test|restricted-contract] [amd64|arm64]"
     exit 1
 fi
 
 if [[ ! "$ARCHITECTURE" =~ ^(amd64|arm64)$ ]]; then
     echo "Error: Architecture must be 'amd64' or 'arm64'"
-    echo "Usage: $0 [production|test] [amd64|arm64]"
+    echo "Usage: $0 [production|test|restricted-contract] [amd64|arm64]"
     exit 1
 fi
 
@@ -41,7 +41,7 @@ fi
 
 # Read version configuration
 echo "Reading version configuration..."
-if [[ "$ENVIRONMENT" != "test" ]]; then
+if [[ "$ENVIRONMENT" == "production" ]]; then
     PYTHON_VERSION=$(yq eval '.versions.python' "$VERSIONS_FILE")
 fi
 GOLANG_VERSION=$(yq eval '.versions.golang' "$VERSIONS_FILE")
@@ -79,7 +79,7 @@ esac
 
 # Generate Dockerfile
 sed_args=()
-if [[ "$ENVIRONMENT" != "test" ]]; then
+if [[ "$ENVIRONMENT" == "production" ]]; then
     sed_args+=("-e" "s#\${PYTHON_VERSION}#${PYTHON_VERSION}#g")
 fi
 sed_args+=(
