@@ -24,6 +24,7 @@ type Supervisor struct {
 	profile   Profile
 	reserve   ReservationResolver
 	launch    LaunchFactory
+	verify    func(context.Context, string, string) error
 	admission *admission
 	registry  *registry
 	intake    *admission
@@ -62,6 +63,10 @@ func NewSupervisor(p Profile, reserve ReservationResolver, launch LaunchFactory,
 		observer = observers[0]
 	}
 	s := &Supervisor{profile: p, reserve: reserve, launch: launch, admission: newAdmission(p.MaxConcurrent, p.MaxQueueDepth, p.MaxQueuedBytes), registry: newRegistry(p.MaxExecutions), intake: newAdmission(p.MaxConcurrent, p.MaxQueueDepth, p.MaxQueuedBytes), observer: observer, origin: time.Now()}
+	s.verify = func(ctx context.Context, root, digest string) error {
+		_, err := environment.LoadAndVerifyContext(ctx, root, digest)
+		return err
+	}
 	var err error
 	s.journal, err = openJournal(p)
 	if err != nil {
@@ -76,27 +81,29 @@ func NewSupervisor(p Profile, reserve ReservationResolver, launch LaunchFactory,
 func newRequestRoot(base string) (string, error) { return os.MkdirTemp(base, "request-") }
 
 type Execution struct {
-	mu          sync.Mutex
-	state       string
-	termination string
-	cancel      context.CancelFunc
-	journal     *journal
-	WorkDir     string
-	spec        InvocationSpec
-	profile     Profile
-	cmd         *exec.Cmd
-	gate        *os.File
-	cgroup      string
-	ownedPID    int
-	ownedStart  string
-	done        chan struct{}
-	result      ExecutionResult
-	release     func()
-	quarantine  func()
-	finishOnce  sync.Once
-	observer    Observer
-	observation Observation
-	origin      time.Time
+	mu               sync.Mutex
+	state            string
+	termination      string
+	cancel           context.CancelFunc
+	journal          *journal
+	WorkDir          string
+	spec             InvocationSpec
+	profile          Profile
+	cmd              *exec.Cmd
+	gate             *os.File
+	cgroup           string
+	ownedPID         int
+	ownedStart       string
+	done             chan struct{}
+	result           ExecutionResult
+	release          func()
+	quarantine       func()
+	finishOnce       sync.Once
+	observer         Observer
+	observation      Observation
+	origin           time.Time
+	admittedAt       time.Time
+	verificationDone <-chan struct{}
 }
 
 func (s *Supervisor) Start(ctx context.Context, spec InvocationSpec, input io.Reader) (*Execution, error) {
@@ -145,9 +152,11 @@ func (s *Supervisor) startValidatedInput(ctx context.Context, spec InvocationSpe
 		if err != nil {
 			return nil, err
 		}
-		runCtx, cancel := context.WithCancel(ctx)
+		admittedAt := time.Now()
+		runCtx, cancel := context.WithDeadline(ctx, admittedAt.Add(time.Duration(spec.Budget.WallMillis)*time.Millisecond))
 		e := &Execution{state: "queued", cancel: cancel, journal: s.journal, spec: spec, profile: s.profile, done: make(chan struct{}), observer: s.observer, origin: s.origin, result: ExecutionResult{ExecutionID: spec.ExecutionID, InvocationDigest: spec.InvocationDigest, ExitCode: -1, CleanupState: "clean"}}
 		executionCtx = runCtx
+		e.admittedAt = admittedAt
 		if err = e.saveJournal("queued"); err != nil {
 			cancel()
 			ticket.release()
@@ -162,7 +171,7 @@ func (s *Supervisor) startValidatedInput(ctx context.Context, spec InvocationSpe
 		release, err := ticket.wait(executionCtx, time.Duration(spec.Budget.QueueMillis)*time.Millisecond)
 		if err != nil {
 			if executionCtx.Err() != nil {
-				owned.complete("cancelled", "")
+				owned.FailBeforeStart(executionCtx.Err())
 			} else {
 				owned.complete("failed", "queue_full")
 			}
@@ -175,8 +184,11 @@ func (s *Supervisor) startValidatedInput(ctx context.Context, spec InvocationSpe
 			owned.complete("failed", "input_limit")
 			return
 		}
-		if _, err := environment.LoadAndVerify(s.profile.EnvironmentRoot, s.profile.EnvironmentDigest); err != nil {
-			owned.complete("configuration_required", "environment_mismatch")
+		if !owned.verifyBeforeLaunch(executionCtx, func() error { return s.verify(executionCtx, s.profile.EnvironmentRoot, s.profile.EnvironmentDigest) }, ticket.quarantineRetainingPayload) {
+			return
+		}
+		if err := executionCtx.Err(); err != nil {
+			owned.FailBeforeStart(err)
 			return
 		}
 		launch, err := s.launch(spec, parsed)
@@ -206,6 +218,9 @@ func (e *Execution) Wait(ctx context.Context) (ExecutionResult, error) {
 }
 func (e *Execution) complete(status, reason string) {
 	e.finishOnce.Do(func() {
+		if !e.admittedAt.IsZero() {
+			e.result.Usage.WallMillis = time.Since(e.admittedAt).Milliseconds()
+		}
 		e.result.Status = status
 		e.result.FailureReason = reason
 		e.mu.Lock()
@@ -284,7 +299,10 @@ func (e *Execution) ReleaseStartGate() error {
 	return closeErr
 }
 func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
-	start := time.Now()
+	if err := ctx.Err(); err != nil {
+		e.FailBeforeStart(err)
+		return
+	}
 	var err error
 	var random [16]byte
 	if _, err = rand.Read(random[:]); err != nil {
@@ -315,8 +333,7 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 		e.FailBeforeStart(err)
 		return
 	}
-	runCtx, cancel := context.WithTimeout(ctx, time.Duration(e.spec.Budget.WallMillis)*time.Millisecond)
-	defer cancel()
+	runCtx := ctx
 	cmd := exec.Command(e.profile.WorkerPath)
 	e.cmd = cmd
 	cmd.Dir = e.WorkDir
@@ -329,6 +346,10 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	cmd.WaitDelay = time.Duration(e.spec.Budget.CleanupMillis) * time.Millisecond
+	if err := runCtx.Err(); err != nil {
+		e.FailBeforeStart(err)
+		return
+	}
 	if err = cmd.Start(); err != nil {
 		e.FailBeforeStart(err)
 		return
@@ -373,7 +394,8 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 	// before Wait can release its PID for reuse.
 	exitReady := make(chan error, 1)
 	go func() { exitReady <- waitUnreaped(cmd.Process.Pid) }()
-	waitTimer := time.NewTimer(time.Duration(e.spec.Budget.WallMillis+2*e.spec.Budget.CleanupMillis) * time.Millisecond)
+	deadline, _ := runCtx.Deadline() // Set once by authoritative admission.
+	waitTimer := time.NewTimer(time.Until(deadline.Add(2 * time.Duration(e.spec.Budget.CleanupMillis) * time.Millisecond)))
 	defer waitTimer.Stop()
 	var waitErr error
 	select {
@@ -403,7 +425,6 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 	e.result.Stderr = stderr.String()
 	e.result.Usage = e.readUsage()
 	e.observeEvents()
-	e.result.Usage.WallMillis = time.Since(start).Milliseconds()
 	status, reason := "succeeded", ""
 	if err != nil {
 		status = "failed"

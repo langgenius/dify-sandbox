@@ -171,6 +171,15 @@ func (a *admission) acquire(ctx context.Context, bytes int64, wait time.Duration
 
 // Quarantine frees retained payload accounting, but never returns the slot.
 func (t *admissionTicket) quarantine() {
+	t.quarantineWithPayload(false)
+}
+
+// A live verification operation retains its whole admission reservation. Even
+// after it eventually exits, only supervisor replacement reconciles capacity.
+func (t *admissionTicket) quarantineRetainingPayload() {
+	t.quarantineWithPayload(true)
+}
+func (t *admissionTicket) quarantineWithPayload(retain bool) {
 	a := t.owner
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -183,6 +192,8 @@ func (t *admissionTicket) quarantine() {
 		a.running++
 	}
 	a.quarantined++
-	a.bytes -= t.bytes
+	if !retain {
+		a.bytes -= t.bytes
+	}
 	a.notify()
 }

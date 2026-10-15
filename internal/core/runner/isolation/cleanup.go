@@ -76,6 +76,16 @@ func (s *Supervisor) Close() error {
 	s.registry.mu.Lock()
 	defer s.registry.mu.Unlock()
 	for _, v := range s.registry.entries {
+		v.execution.mu.Lock()
+		verificationDone := v.execution.verificationDone
+		v.execution.mu.Unlock()
+		if verificationDone != nil {
+			select {
+			case <-verificationDone:
+			default:
+				return fmt.Errorf("environment verification still active")
+			}
+		}
 		select {
 		case <-v.execution.done:
 		default:

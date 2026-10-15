@@ -3,6 +3,7 @@
 package environment
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -44,6 +45,13 @@ func hashJSON(v any) string {
 // Category digests are informational; TreeDigest also covers the interpreter,
 // certificates, licenses and every other file, including empty directories.
 func BuildManifest(root string, metadata EnvironmentManifest) (EnvironmentManifest, error) {
+	return buildManifest(context.Background(), root, metadata)
+}
+
+func buildManifest(ctx context.Context, root string, metadata EnvironmentManifest) (EnvironmentManifest, error) {
+	if err := ctx.Err(); err != nil {
+		return metadata, err
+	}
 	info, err := os.Lstat(root)
 	if err != nil {
 		return metadata, err
@@ -54,6 +62,9 @@ func BuildManifest(root string, metadata EnvironmentManifest) (EnvironmentManife
 	var all, python, node, native []entry
 	var total int64
 	err = filepath.WalkDir(root, func(name string, d os.DirEntry, walkErr error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if walkErr != nil {
 			return walkErr
 		}
@@ -92,7 +103,7 @@ func BuildManifest(root string, metadata EnvironmentManifest) (EnvironmentManife
 				return fmt.Errorf("environment changed during verification")
 			}
 			h := sha256.New()
-			n, err := io.Copy(h, f)
+			n, err := io.Copy(h, contextReader{ctx: ctx, reader: f})
 			after, statErr := f.Stat()
 			f.Close()
 			if err != nil {
@@ -122,7 +133,7 @@ func BuildManifest(root string, metadata EnvironmentManifest) (EnvironmentManife
 			if resolved == ".." || strings.HasPrefix(resolved, "../") {
 				return fmt.Errorf("environment symlink escapes root: %s", rel)
 			}
-			if err := validateLink(root, rel, 0); err != nil {
+			if err := validateLink(ctx, root, rel, 0); err != nil {
 				return err
 			}
 		default:
@@ -143,6 +154,9 @@ func BuildManifest(root string, metadata EnvironmentManifest) (EnvironmentManife
 	if err != nil {
 		return metadata, err
 	}
+	if err := ctx.Err(); err != nil {
+		return metadata, err
+	}
 	metadata.SchemaVersion = 1
 	metadata.TreeDigest = hashJSON(all)
 	metadata.PythonTreeDigest = hashJSON(python)
@@ -157,13 +171,16 @@ func BuildManifest(root string, metadata EnvironmentManifest) (EnvironmentManife
 
 // Resolve links component-by-component using chroot semantics. EvalSymlinks on
 // the host would incorrectly follow absolute links into the service filesystem.
-func validateLink(root, rel string, depth int) error {
+func validateLink(ctx context.Context, root, rel string, depth int) error {
 	if depth > 40 {
 		return fmt.Errorf("symlink loop")
 	}
 	parts := strings.Split(rel, "/")
 	current := ""
 	for i, p := range parts {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		current = path.Join(current, p)
 		info, err := os.Lstat(filepath.Join(root, current))
 		if err != nil {
@@ -185,10 +202,25 @@ func validateLink(root, rel string, depth int) error {
 			if i+1 < len(parts) {
 				next = path.Join(next, path.Join(parts[i+1:]...))
 			}
-			return validateLink(root, next, depth+1)
+			return validateLink(ctx, root, next, depth+1)
 		}
 	}
 	return nil
+}
+
+// Checkpoints bound cooperative hashing work, not a kernel read already in
+// progress. The supervisor separately bounds waiting and retains ownership if
+// an operation cannot stop; it must never assume cancellation killed this read.
+type contextReader struct {
+	ctx    context.Context
+	reader io.Reader
+}
+
+func (r contextReader) Read(p []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return r.reader.Read(p)
 }
 func WriteManifest(root string, m EnvironmentManifest) error {
 	b, err := json.MarshalIndent(m, "", "  ")
