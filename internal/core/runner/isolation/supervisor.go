@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/environment"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/network"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/uidpool"
 	"io"
 	"os"
 	"os/exec"
@@ -32,6 +34,7 @@ type Supervisor struct {
 	origin    time.Time
 	journal   *journal
 	closed    bool
+	uidPool   *uidpool.UIDPool
 }
 
 func NewSupervisor(p Profile, reserve ReservationResolver, launch LaunchFactory, observers ...Observer) (*Supervisor, error) {
@@ -72,6 +75,18 @@ func NewSupervisor(p Profile, reserve ReservationResolver, launch LaunchFactory,
 	if err != nil {
 		return nil, err
 	}
+	if p.HTTPProxyQualified {
+		gateway, statErr := os.Lstat(filepath.Join(p.EnvironmentRoot, network.GatewayPath))
+		if statErr != nil || !gateway.Mode().IsRegular() || gateway.Mode().Perm()&0022 != 0 || gateway.Mode().Perm()&0111 == 0 {
+			s.journal.close()
+			return nil, fmt.Errorf("measured gateway executable required")
+		}
+		s.uidPool, err = uidpool.NewPersistentUIDPool(p.HostUIDMin, p.HostUIDMax, s.journal.root+".uids")
+		if err != nil {
+			s.journal.close()
+			return nil, err
+		}
+	}
 	if err = s.reconcile(); err != nil {
 		s.journal.close()
 		return nil, err
@@ -104,6 +119,11 @@ type Execution struct {
 	origin           time.Time
 	admittedAt       time.Time
 	verificationDone <-chan struct{}
+	uidPool          *uidpool.UIDPool
+	hostUID          int
+	gateway          *network.Gateway
+	networkNS        *os.File
+	NetworkReceipt   network.NetworkReceipt
 }
 
 func (s *Supervisor) Start(ctx context.Context, spec InvocationSpec, input io.Reader) (*Execution, error) {
@@ -128,6 +148,10 @@ func (s *Supervisor) Start(ctx context.Context, spec InvocationSpec, input io.Re
 // Both entry points hold intake memory until validation and admission transfer
 // finish. Replays undergo the same authority and payload checks as new calls.
 func (s *Supervisor) startValidatedInput(ctx context.Context, spec InvocationSpec, payload []byte) (*Execution, error) {
+	spec.Network.Destinations = append([]network.Destination(nil), spec.Network.Destinations...)
+	for i := range spec.Network.Destinations {
+		spec.Network.Destinations[i].Addresses = append([]string(nil), spec.Network.Destinations[i].Addresses...)
+	}
 	if err := spec.Budget.Validate(); err != nil {
 		return nil, err
 	}
@@ -153,7 +177,11 @@ func (s *Supervisor) startValidatedInput(ctx context.Context, spec InvocationSpe
 			return nil, err
 		}
 		admittedAt := time.Now()
-		runCtx, cancel := context.WithDeadline(ctx, admittedAt.Add(time.Duration(spec.Budget.WallMillis)*time.Millisecond))
+		deadline := admittedAt.Add(time.Duration(spec.Budget.WallMillis) * time.Millisecond)
+		if spec.Network.Mode == "scoped" && time.Unix(spec.Network.ExpiresAt, 0).Before(deadline) {
+			deadline = time.Unix(spec.Network.ExpiresAt, 0)
+		}
+		runCtx, cancel := context.WithDeadline(ctx, deadline)
 		e := &Execution{state: "queued", cancel: cancel, journal: s.journal, spec: spec, profile: s.profile, done: make(chan struct{}), observer: s.observer, origin: s.origin, result: ExecutionResult{ExecutionID: spec.ExecutionID, InvocationDigest: spec.InvocationDigest, ExitCode: -1, CleanupState: "clean"}}
 		executionCtx = runCtx
 		e.admittedAt = admittedAt
@@ -177,8 +205,13 @@ func (s *Supervisor) startValidatedInput(ctx context.Context, spec InvocationSpe
 			}
 			return
 		}
+		owned.uidPool = s.uidPool
 		owned.release = release
 		owned.quarantine = ticket.quarantine
+		if !s.profile.Supports(spec.Network) {
+			owned.complete("configuration_required", "network_capability")
+			return
+		}
 		var parsed Payload
 		if err = decodeStrict(payload, &parsed); err != nil {
 			owned.complete("failed", "input_limit")
@@ -200,13 +233,28 @@ func (s *Supervisor) startValidatedInput(ctx context.Context, spec InvocationSpe
 			owned.complete("configuration_required", "environment_mismatch")
 			return
 		}
+		if spec.Network.Mode == "scoped" {
+			if launch.ScopedBootstrap == "" || len(launch.ScopedArgs) == 0 {
+				owned.complete("configuration_required", "network_capability")
+				return
+			}
+			launch.Bootstrap = launch.ScopedBootstrap
+			launch.Args = launch.ScopedArgs
+		}
+		launch.ScopedBootstrap = ""
+		launch.ScopedArgs = nil
 		owned.run(executionCtx, launch, parsed)
 	}()
 	return owned, nil
 }
 
 func (e *Execution) ChildEnv() []string {
-	return []string{"PATH=/usr/local/bin:/usr/bin:/bin", "HOME=/work", "TMPDIR=/work/tmp", "LANG=C.UTF-8", "PYTHONDONTWRITEBYTECODE=1", "PYTHONHOME=/usr/local", "LD_LIBRARY_PATH=/usr/local/lib", "NODE_PATH=/opt/node/node_modules", "XDG_CACHE_HOME=/work/tmp"}
+	env := []string{"PATH=/usr/local/bin:/usr/bin:/bin", "HOME=/work", "TMPDIR=/work/tmp", "LANG=C.UTF-8", "PYTHONDONTWRITEBYTECODE=1", "PYTHONHOME=/usr/local", "LD_LIBRARY_PATH=/usr/local/lib", "NODE_PATH=/opt/node/node_modules", "XDG_CACHE_HOME=/work/tmp"}
+	if e.spec.Network.Mode == "scoped" {
+		proxy := "http://" + network.ProxyAddress
+		env = append(env, "HTTP_PROXY="+proxy, "HTTPS_PROXY="+proxy, "http_proxy="+proxy, "https_proxy="+proxy, "NO_PROXY=", "no_proxy=")
+	}
+	return env
 }
 func (e *Execution) Wait(ctx context.Context) (ExecutionResult, error) {
 	select {
@@ -236,6 +284,25 @@ func (e *Execution) complete(status, reason string) {
 			e.result.CleanupState = "quarantined"
 		}
 		e.mu.Unlock()
+		if e.gateway != nil {
+			e.gateway.Close()
+			e.NetworkReceipt = e.gateway.Receipt()
+			e.result.NetworkReceipt = &e.NetworkReceipt
+		}
+		if e.networkNS != nil {
+			e.networkNS.Close()
+		}
+		if e.result.CleanupState == "clean" && e.hostUID != 0 && e.uidPool != nil {
+			if err := e.uidPool.ReleaseChecked(e.hostUID); err != nil {
+				e.mu.Lock()
+				e.state = "quarantined"
+				e.result.Status = "unknown"
+				e.result.FailureReason = "cleanup_failed"
+				e.result.CleanupState = "quarantined"
+				_ = e.saveJournal(e.state)
+				e.mu.Unlock()
+			}
+		}
 		e.observeCompletion()
 		if e.result.CleanupState == "quarantined" && e.quarantine != nil {
 			e.quarantine()
@@ -250,6 +317,9 @@ func (e *Execution) complete(status, reason string) {
 	})
 }
 func (e *Execution) FailBeforeStart(cause error) error {
+	if e.gateway != nil {
+		e.gateway.Close()
+	}
 	if e.gate != nil {
 		e.gate.Close()
 	}
@@ -285,7 +355,11 @@ func (e *Execution) FailBeforeStart(cause error) error {
 			}
 			e.complete(status, reason)
 		} else {
-			e.complete("configuration_required", "environment_mismatch")
+			if errors.Is(cause, network.ErrCapability) {
+				e.complete("configuration_required", "network_capability")
+			} else {
+				e.complete("configuration_required", "environment_mismatch")
+			}
 		}
 	}
 	return cause
@@ -304,6 +378,22 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 		return
 	}
 	var err error
+	if e.spec.Network.Mode == "scoped" {
+		if e.uidPool == nil {
+			e.complete("configuration_required", "network_capability")
+			return
+		}
+		e.hostUID, err = e.uidPool.Acquire(ctx)
+		if err != nil {
+			e.FailBeforeStart(err)
+			return
+		}
+		e.gateway, err = network.NewGateway(ctx, e.spec.ExecutionID, e.spec.Network)
+		if err != nil {
+			e.FailBeforeStart(err)
+			return
+		}
+	}
 	var random [16]byte
 	if _, err = rand.Read(random[:]); err != nil {
 		e.FailBeforeStart(err)
@@ -314,6 +404,16 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 	if err = e.saveJournal("queued"); err != nil {
 		e.FailBeforeStart(err)
 		return
+	}
+	if e.hostUID != 0 {
+		if err = e.uidPool.TrackResource(e.hostUID, e.WorkDir); err != nil {
+			e.FailBeforeStart(err)
+			return
+		}
+		if err = e.uidPool.TrackResource(e.hostUID, e.cgroup); err != nil {
+			e.FailBeforeStart(err)
+			return
+		}
 	}
 	err = os.Mkdir(e.WorkDir, 0700)
 	if err != nil {
@@ -341,6 +441,20 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 	cmd.ExtraFiles = []*os.File{gateRead}
 	cmd.Stdin = bytes.NewReader(encoded)
 	setNamespaces(cmd)
+	var networkReady chan error
+	if e.gateway != nil {
+		setScopedNamespaces(cmd, e.hostUID)
+		parent, child, err := network.NewChannel()
+		if err != nil {
+			e.FailBeforeStart(err)
+			return
+		}
+		defer parent.Close()
+		defer child.Close()
+		cmd.ExtraFiles = append(cmd.ExtraFiles, child)
+		networkReady = make(chan error, 1)
+		go e.gateway.ServeChannel(parent, networkReady)
+	}
 	stdout := &limitedBuffer{limit: e.spec.Budget.StdoutBytes, observe: e.observeStdout, overflow: func() { e.RequestTermination("stdout_limit") }}
 	stderr := &limitedBuffer{limit: e.spec.Budget.StderrBytes, overflow: func() { e.RequestTermination("stderr_limit") }}
 	cmd.Stdout = stdout
@@ -369,6 +483,36 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 		e.FailBeforeStart(err)
 		return
 	}
+	var exitReady chan error
+	if e.gateway != nil {
+		exitReady = make(chan error, 1)
+		go func() { exitReady <- waitUnreaped(cmd.Process.Pid) }()
+		if _, err = e.gate.Write([]byte{2}); err != nil {
+			e.FailBeforeStart(err)
+			return
+		}
+		select {
+		case err = <-networkReady:
+		case <-exitReady:
+			err = network.ErrCapability
+		case <-runCtx.Done():
+			err = runCtx.Err()
+		}
+		if err != nil {
+			e.FailBeforeStart(err)
+			return
+		}
+	}
+	e.networkNS, err = os.Open(fmt.Sprintf("/proc/%d/ns/net", cmd.Process.Pid))
+	if err != nil {
+		e.FailBeforeStart(err)
+		return
+	}
+	e.NetworkReceipt, err = network.ApplyScope(runCtx, e.NetworkHandle(), e.spec.Network)
+	if err != nil {
+		e.FailBeforeStart(err)
+		return
+	}
 	if err = e.observeStart(); err != nil {
 		e.FailBeforeStart(err)
 		return
@@ -392,8 +536,10 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 	go e.terminationMonitor(runCtx, monitorDone, terminationStopped)
 	// Observe exit without reaping the group leader. Termination signals stop
 	// before Wait can release its PID for reuse.
-	exitReady := make(chan error, 1)
-	go func() { exitReady <- waitUnreaped(cmd.Process.Pid) }()
+	if exitReady == nil {
+		exitReady = make(chan error, 1)
+		go func() { exitReady <- waitUnreaped(cmd.Process.Pid) }()
+	}
 	deadline, _ := runCtx.Deadline() // Set once by authoritative admission.
 	waitTimer := time.NewTimer(time.Until(deadline.Add(2 * time.Duration(e.spec.Budget.CleanupMillis) * time.Millisecond)))
 	defer waitTimer.Stop()
@@ -416,6 +562,9 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 	<-monitorStopped
 	<-terminationStopped
 	err = cmd.Wait()
+	if e.gateway != nil {
+		e.gateway.Close()
+	}
 	if waitErr != nil && err == nil {
 		err = waitErr
 	}
@@ -533,6 +682,7 @@ func (s *Supervisor) StartRequest(ctx context.Context, input io.Reader) (*Execut
 // A sink must be bounded and safe for concurrent lifecycle/stdout callbacks.
 type Observer func(Observation)
 type Observation struct {
+	HostUID       int               `json:"host_uid,omitempty"`
 	ObservedNanos int64             `json:"observed_nanos"`
 	StartedNanos  int64             `json:"started_nanos"`
 	ExitedNanos   int64             `json:"exited_nanos"`
@@ -592,4 +742,15 @@ func (e *Execution) openStartGate(ctx context.Context) error {
 	}
 	e.state = "running"
 	return nil
+}
+
+func (e *Execution) NetworkHandle() network.NamespaceHandle {
+	fd := -1
+	if e.networkNS != nil {
+		fd = int(e.networkNS.Fd())
+	}
+	if e.gateway != nil {
+		return e.gateway.NamespaceHandle(e.ownedPID, fd)
+	}
+	return network.NamespaceHandle{PID: e.ownedPID, NetNSFD: fd, ExecutionID: e.spec.ExecutionID}
 }

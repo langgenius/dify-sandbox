@@ -184,5 +184,8 @@ func IsolatedLaunch(executable string) isolation.Launch {
 	script := buildBootstrap("", &types.RunnerOptions{}, static.SANDBOX_USER_UID)
 	script = strings.Replace(script, `ctypes.CDLL("./python.so")`, `ctypes.CDLL("/var/sandbox/sandbox-python/python.so")`, 1)
 	script = strings.ReplaceAll(script, "DifySeccomp", "DifySeccompIsolated")
-	return isolation.Launch{Executable: executable, Args: []string{"/work/bootstrap", "/"}, BootstrapPath: "/work/bootstrap", Bootstrap: script}
+	scoped := buildBootstrap("", &types.RunnerOptions{EnableNetwork: true}, static.SANDBOX_USER_UID)
+	scoped = strings.Replace(scoped, `ctypes.CDLL("./python.so")`, `ctypes.CDLL("/var/sandbox/sandbox-python/python.so")`, 1)
+	scoped = strings.ReplaceAll(scoped, "DifySeccomp", "DifySeccompIsolatedScoped")
+	return isolation.Launch{Executable: executable, Args: []string{"/work/bootstrap", "/"}, BootstrapPath: "/work/bootstrap", Bootstrap: script, ScopedBootstrap: scoped, ScopedArgs: []string{"/work/bootstrap", "/"}}
 }

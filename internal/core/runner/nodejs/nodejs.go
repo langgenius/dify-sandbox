@@ -171,5 +171,5 @@ func IsolatedLaunch(executable string) isolation.Launch {
 	script := buildBootstrap("")
 	script = strings.Replace(script, "require('koffi')", "require('/var/sandbox/sandbox-nodejs/nodejs-project/node_temp/node_modules/koffi')", 1)
 	script = strings.ReplaceAll(script, "DifySeccomp", "DifySeccompIsolated")
-	return isolation.Launch{Executable: executable, Args: buildCommandArgs("/work/bootstrap", static.SANDBOX_USER_UID, &types.RunnerOptions{}), BootstrapPath: "/work/bootstrap", Bootstrap: script}
+	return isolation.Launch{Executable: executable, Args: buildCommandArgs("/work/bootstrap", static.SANDBOX_USER_UID, &types.RunnerOptions{}), BootstrapPath: "/work/bootstrap", Bootstrap: script, ScopedBootstrap: strings.ReplaceAll(script, "DifySeccompIsolated", "DifySeccompIsolatedScoped"), ScopedArgs: buildCommandArgs("/work/bootstrap", static.SANDBOX_USER_UID, &types.RunnerOptions{EnableNetwork: true})}
 }

@@ -163,3 +163,18 @@ func ReleaseUIDChecked(uid int) error {
 	ReleaseUID(uid)
 	return nil
 }
+
+// ReleaseChecked preserves the lease on any process/resource ambiguity.
+func (p *UIDPool) ReleaseChecked(uid int) error {
+	if uid < p.min || uid >= p.max {
+		return fmt.Errorf("UID outside pool")
+	}
+	if p.persistent == nil {
+		return fmt.Errorf("persistent UID owner required")
+	}
+	if err := p.persistent.release(uid); err != nil {
+		return err
+	}
+	p.pool <- uid
+	return nil
+}

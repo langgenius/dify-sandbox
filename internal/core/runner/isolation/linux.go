@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/environment"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/network"
 	"golang.org/x/sys/unix"
 	"io"
 	"os"
@@ -128,12 +129,20 @@ func WorkerMain() error {
 	}
 	var token [1]byte
 	_, err := io.ReadFull(gate, token[:])
-	gate.Close()
-	if err != nil || token[0] != 1 {
+	if token[0] == 1 {
+		gate.Close()
+	}
+	if err != nil || (token[0] != 1 && token[0] != 2) {
 		return fmt.Errorf("start gate refused")
 	}
 	var cfg workerConfig
 	if err = json.NewDecoder(os.Stdin).Decode(&cfg); err != nil {
+		return err
+	}
+	if (token[0] == 2) != (cfg.Spec.Network.Mode == "scoped") {
+		return fmt.Errorf("network setup gate mismatch")
+	}
+	if err = network.ValidateScope(cfg.Spec.Network); err != nil {
 		return err
 	}
 	if err = cfg.Spec.Budget.Validate(); err != nil {
@@ -181,6 +190,15 @@ func WorkerMain() error {
 	code := cfg.Payload.Preload + "\n" + cfg.Payload.Code
 	if err = os.WriteFile("/work/code", []byte(code), 0444); err != nil {
 		return err
+	}
+	if token[0] == 2 {
+		if err = prepareScopedFrontend(); err != nil {
+			return err
+		}
+		if _, err = io.ReadFull(gate, token[:]); err != nil || token[0] != 1 {
+			return fmt.Errorf("payload gate refused")
+		}
+		gate.Close()
 	}
 	codeFile, err := os.Open("/work/code")
 	if err != nil {
@@ -233,7 +251,12 @@ func applyRlimits(b Budget) error {
 
 func (e *Execution) observeStart() error {
 	o := Observation{ExecutionID: e.spec.ExecutionID, ObservedNanos: e.elapsedNanos(), Phase: "gated", Root: e.WorkDir, Cgroup: e.cgroup, Namespaces: map[string]string{}, Controls: map[string]string{}}
-	for _, ns := range []string{"mnt", "pid", "ipc", "uts", "net"} {
+	namespaces := []string{"mnt", "pid", "ipc", "uts", "net"}
+	if e.gateway != nil {
+		namespaces = append(namespaces, "user")
+		o.HostUID = e.hostUID
+	}
+	for _, ns := range namespaces {
 		id, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/%s", e.cmd.Process.Pid, ns))
 		if err != nil {
 			return err
@@ -246,6 +269,15 @@ func (e *Execution) observeStart() error {
 			return err
 		}
 		o.Controls[control] = strings.TrimSpace(string(value))
+	}
+	if e.gateway != nil {
+		for _, name := range []string{"uid_map", "gid_map"} {
+			data, err := os.ReadFile(fmt.Sprintf("/proc/%d/%s", e.cmd.Process.Pid, name))
+			if err != nil {
+				return err
+			}
+			o.Controls[name] = strings.TrimSpace(string(data))
+		}
 	}
 	e.observation = o
 	if e.observer != nil {
@@ -376,4 +408,79 @@ func (e *Execution) reapOwned() error {
 		}
 		time.Sleep(time.Millisecond)
 	}
+}
+
+// UID 0 is trusted setup only. The payload's fixed namespace UID maps to the
+// persistent per-execution host lease, never another concurrent payload UID.
+func setScopedNamespaces(cmd *exec.Cmd, hostUID int) {
+	setNamespaces(cmd)
+	cmd.SysProcAttr.Cloneflags |= syscall.CLONE_NEWUSER
+	cmd.SysProcAttr.UidMappings = []syscall.SysProcIDMap{{ContainerID: 0, HostID: os.Geteuid(), Size: 1}, {ContainerID: 65537, HostID: hostUID, Size: 1}}
+	cmd.SysProcAttr.GidMappings = []syscall.SysProcIDMap{{ContainerID: 0, HostID: os.Getegid(), Size: 1}}
+	cmd.SysProcAttr.GidMappingsEnableSetgroups = true
+}
+func prepareScopedFrontend() error {
+	// Only this fresh request namespace is changed; no service/host setns or
+	// network capability is requested or added to the parent.
+	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM|unix.SOCK_CLOEXEC, 0)
+	if err != nil {
+		return err
+	}
+	request, err := unix.NewIfreq("lo")
+	if err == nil {
+		err = unix.IoctlIfreq(fd, unix.SIOCGIFFLAGS, request)
+	}
+	if err == nil {
+		request.SetUint16(request.Uint16() | unix.IFF_UP)
+		err = unix.IoctlIfreq(fd, unix.SIOCSIFFLAGS, request)
+	}
+	unix.Close(fd)
+	if err != nil {
+		return err
+	}
+	// Prevent UID0 exec semantics from reacquiring NET_ADMIN during bootstrap.
+	if err = unix.Prctl(unix.PR_CAPBSET_DROP, unix.CAP_NET_ADMIN, 0, 0, 0); err != nil {
+		return err
+	}
+	header := unix.CapUserHeader{Version: unix.LINUX_CAPABILITY_VERSION_3}
+	var caps [2]unix.CapUserData
+	if err = unix.Capget(&header, &caps[0]); err != nil {
+		return err
+	}
+	bit := uint32(1) << unix.CAP_NET_ADMIN
+	caps[0].Effective &^= bit
+	caps[0].Permitted &^= bit
+	caps[0].Inheritable &^= bit
+	if err = unix.Capset(&header, &caps[0]); err != nil {
+		return err
+	}
+	if err = unix.Prctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
+		return err
+	}
+	channel := os.NewFile(4, "gateway-channel")
+	helper := exec.Command(network.GatewayPath)
+	helper.Env = []string{}
+	if err = os.WriteFile("/work/gateway-stdin", nil, 0400); err != nil {
+		channel.Close()
+		return err
+	}
+	empty, err := os.Open("/work/gateway-stdin")
+	if err != nil {
+		channel.Close()
+		return err
+	}
+	defer empty.Close()
+	helper.Stdin = empty
+	helper.Stdout = os.Stdout
+	helper.Stderr = os.Stderr
+	helper.ExtraFiles = []*os.File{channel}
+	helper.SysProcAttr = &syscall.SysProcAttr{Credential: &syscall.Credential{Uid: 65537, Gid: 0, Groups: []uint32{}}}
+	err = helper.Start()
+	channel.Close()
+	if err != nil {
+		return err
+	}
+	// The worker becomes payload PID1. Kernel PID-namespace teardown plus owned
+	// cgroup cleanup kills/reaps the helper; no service-side child PID is reused.
+	return nil
 }

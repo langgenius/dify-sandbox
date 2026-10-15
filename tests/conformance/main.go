@@ -15,6 +15,8 @@ func main() {
 	flag.Parse()
 	var err error
 	switch *name {
+	case "network":
+		err = cases.Network(*endpoint, *profile, *observations)
 	case "dependencies":
 		err = cases.Dependencies(*endpoint, *profile, *observations)
 	case "lifecycle":
@@ -22,7 +24,7 @@ func main() {
 	case "roots-and-budgets":
 		err = cases.RootsAndBudgets(*endpoint, *profile, *observations)
 	default:
-		err = fmt.Errorf("unknown or missing case %q; required cases: roots-and-budgets, lifecycle, dependencies", *name)
+		err = fmt.Errorf("unknown or missing case %q; required cases: roots-and-budgets, lifecycle, dependencies, network", *name)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

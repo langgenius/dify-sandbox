@@ -62,3 +62,51 @@ func TestBuilderDenialCannotBeOverriddenByAllowList(t *testing.T) {
 		t.Fatal("socket allow override accepted")
 	}
 }
+
+func TestScopedClientSocketsAreRestricted(t *testing.T) {
+	mode := os.Getenv("CS4_SECCOMP_CHILD")
+	if mode != "" {
+		allowed := []int{}
+		for n := 0; n <= 450; n++ {
+			if n != syscall.SYS_SOCKET && n != syscall.SYS_SOCKETPAIR {
+				allowed = append(allowed, n)
+			}
+		}
+		SetNoNewPrivs()
+		if SeccompIsolatedScoped(allowed, nil) != nil {
+			os.Exit(2)
+		}
+		family, kind := uintptr(syscall.AF_INET), uintptr(syscall.SOCK_STREAM)
+		switch mode {
+		case "ipv6":
+			family = syscall.AF_INET6
+		case "unix":
+			family = syscall.AF_UNIX
+		case "udp":
+			kind = syscall.SOCK_DGRAM
+		case "raw":
+			kind = syscall.SOCK_RAW
+		}
+		fd, _, errno := syscall.RawSyscall(syscall.SYS_SOCKET, family, kind, 0)
+		if errno != 0 {
+			os.Exit(3)
+		}
+		syscall.Close(int(fd))
+		os.Exit(0)
+	}
+	for _, mode := range []string{"ipv4", "ipv6", "unix", "udp", "raw"} {
+		cmd := exec.Command(os.Args[0], "-test.run=^TestScopedClientSocketsAreRestricted$")
+		cmd.Env = append(os.Environ(), "CS4_SECCOMP_CHILD="+mode)
+		output, err := cmd.CombinedOutput()
+		if mode == "ipv4" || mode == "ipv6" {
+			if err != nil {
+				t.Fatalf("TCP client socket failed: %s %v %s", mode, err, output)
+			}
+		} else {
+			exit, ok := err.(*exec.ExitError)
+			if !ok || exit.Sys().(syscall.WaitStatus).Signal() != syscall.SIGSYS {
+				t.Fatalf("forbidden socket not killed: %s %v %s", mode, err, output)
+			}
+		}
+	}
+}

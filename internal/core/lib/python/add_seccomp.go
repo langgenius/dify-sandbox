@@ -22,7 +22,8 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 
 // InitSeccompIsolated enters the already isolated environment and private cwd
 // before installing the same native filter. Network remains disabled.
-func InitSeccompIsolated(uid, gid int) error { return initSeccomp(uid, gid, false, true) }
+func InitSeccompIsolated(uid, gid int) error       { return initSeccomp(uid, gid, false, true) }
+func InitSeccompIsolatedScoped(uid, gid int) error { return initSeccomp(uid, gid, true, true) }
 
 func initSeccomp(uid int, gid int, enable_network bool, isolated bool) error {
 	root, cwd := ".", "/"
@@ -44,7 +45,10 @@ func initSeccomp(uid int, gid int, enable_network bool, isolated bool) error {
 	allowed_not_kill_syscalls := []int{}
 	allowed_not_kill_syscalls = append(allowed_not_kill_syscalls, python_syscall.ALLOW_ERROR_SYSCALLS...)
 
-	allowed_syscall := os.Getenv("ALLOWED_SYSCALLS")
+	allowed_syscall := ""
+	if !isolated {
+		allowed_syscall = os.Getenv("ALLOWED_SYSCALLS")
+	}
 	if allowed_syscall != "" {
 		nums := strings.Split(allowed_syscall, ",")
 		for num := range nums {
@@ -57,7 +61,7 @@ func initSeccomp(uid int, gid int, enable_network bool, isolated bool) error {
 		allowed_syscalls = append(allowed_syscalls, syscall.SYS_SETGROUPS)
 	} else {
 		allowed_syscalls = append(allowed_syscalls, python_syscall.ALLOW_SYSCALLS...)
-		if enable_network {
+		if enable_network && !isolated {
 			allowed_syscalls = append(allowed_syscalls, python_syscall.ALLOW_NETWORK_SYSCALLS...)
 		}
 	}
@@ -77,7 +81,9 @@ func initSeccomp(uid int, gid int, enable_network bool, isolated bool) error {
 			}
 		}
 	}
-	if isolated {
+	if isolated && enable_network {
+		err = lib.SeccompIsolatedScoped(allowed_syscalls, allowed_not_kill_syscalls)
+	} else if isolated {
 		err = lib.SeccompIsolated(allowed_syscalls, allowed_not_kill_syscalls)
 	} else {
 		err = lib.Seccomp(allowed_syscalls, allowed_not_kill_syscalls)

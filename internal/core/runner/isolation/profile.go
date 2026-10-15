@@ -53,25 +53,34 @@ func (b Budget) within(cap Budget) bool {
 }
 
 type Profile struct {
-	Digest            string
-	EnvironmentDigest string
-	EnvironmentRoot   string
-	WorkRoot          string
-	CgroupRoot        string
-	JournalRoot       string
-	WorkerPath        string
-	Languages         []string
-	Limits            Budget
-	MaxConcurrent     int64
-	MaxQueueDepth     int64
-	MaxQueuedBytes    int64
-	MaxExecutions     int64
+	Digest                string
+	EnvironmentDigest     string
+	EnvironmentRoot       string
+	WorkRoot              string
+	CgroupRoot            string
+	JournalRoot           string
+	WorkerPath            string
+	Languages             []string
+	Limits                Budget
+	MaxConcurrent         int64
+	MaxQueueDepth         int64
+	MaxQueuedBytes        int64
+	MaxExecutions         int64
+	HTTPProxyQualified    bool
+	HostUIDMin            int
+	HostUIDMax            int
+	MaxNetworkEgressBytes int64
 }
 
 var digestPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 var idPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$`)
 
 func (p Profile) Validate() error {
+	if p.HTTPProxyQualified {
+		if p.HostUIDMin < 11000 || p.HostUIDMax <= p.HostUIDMin || p.HostUIDMax > 1<<30 || p.HostUIDMax-p.HostUIDMin > 4096 || (p.HostUIDMin <= 65537 && p.HostUIDMax > 65537) || p.MaxNetworkEgressBytes <= 0 || p.MaxNetworkEgressBytes > 1<<40 {
+			return fmt.Errorf("finite distinct scoped UID range and network budget required")
+		}
+	}
 	if err := p.Limits.Validate(); err != nil {
 		return err
 	}
@@ -107,7 +116,13 @@ func (p Profile) Validate() error {
 	return nil
 }
 func (p Profile) Supports(scope network.NetworkScope) bool {
-	return network.ValidateScope(scope) == nil
+	if network.ValidateScope(scope) != nil {
+		return false
+	}
+	if scope.Mode == "none" {
+		return true
+	}
+	return p.HTTPProxyQualified && scope.MaxEgressBytes <= p.MaxNetworkEgressBytes && network.SupportsHTTP(scope)
 }
 func (p Profile) ValidateInvocation(s InvocationSpec, payload []byte, reservation Budget) error {
 	if s.Version != 1 || !idPattern.MatchString(s.ExecutionID) || s.BudgetReservationRef == "" || len(s.BudgetReservationRef) > 256 {

@@ -20,4 +20,13 @@ func DifySeccompIsolated(uid int, gid int, enable_network bool) {
 	}
 }
 
+//export DifySeccompIsolatedScoped
+func DifySeccompIsolatedScoped(uid int, gid int, enable_network bool) {
+	if !enable_network {
+		panic("scoped client mode required")
+	}
+	if err := nodejs.InitSeccompIsolatedScoped(uid, gid); err != nil {
+		panic(err)
+	}
+}
 func main() {}

@@ -1,0 +1,127 @@
+package isolation
+
+import (
+	"context"
+	"fmt"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/network"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/uidpool"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestScopedCapabilityRefusedBeforeLaunch(t *testing.T) {
+	p := testProfile(t)
+	sup, err := NewSupervisor(p, func(context.Context, InvocationSpec) (Budget, error) { return p.Limits, nil }, func(InvocationSpec, Payload) (Launch, error) {
+		t.Error("unsupported scope reached launch")
+		return Launch{}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sup.Close()
+	spec := testSpec(p)
+	spec.Network = network.NetworkScope{Mode: "scoped", Destinations: []network.Destination{{Protocol: "tcp", Host: "canary.example", Port: 443, Addresses: []string{"192.0.2.10"}}}, InputManifestDigest: strings.Repeat("a", 64), MaxEgressBytes: 1024, ExpiresAt: time.Now().Add(time.Minute).Unix()}
+	spec.Network.ScopeDigest = network.ScopeDigest(spec.Network)
+	payload := `{"code":"must not launch","preload":""}`
+	spec.InvocationDigest = InvocationDigest(spec, []byte(payload))
+	e, err := sup.Start(context.Background(), spec, strings.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := e.Wait(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != "configuration_required" || result.FailureReason != "network_capability" || e.WorkDir != "" || e.cmd != nil {
+		t.Fatalf("unsupported scope not refused before launch: %+v", result)
+	}
+}
+
+func TestQualifiedHTTPProfileBoundsEgressAndUIDRange(t *testing.T) {
+	p := testProfile(t)
+	p.HTTPProxyQualified = true
+	p.HostUIDMin = 20000
+	p.HostUIDMax = 20004
+	p.MaxNetworkEgressBytes = 4096
+	s := network.NetworkScope{Mode: "scoped", Destinations: []network.Destination{{Protocol: "http", Host: "canary.example", Port: 80, Addresses: []string{"192.0.2.10"}}}, InputManifestDigest: strings.Repeat("a", 64), MaxEgressBytes: 1024, ExpiresAt: time.Now().Add(time.Minute).Unix()}
+	s.ScopeDigest = network.ScopeDigest(s)
+	if !p.Supports(s) {
+		t.Fatal("qualified bounded HTTP profile unsupported")
+	}
+	s.MaxEgressBytes = 4097
+	s.ScopeDigest = network.ScopeDigest(s)
+	if p.Supports(s) {
+		t.Fatal("scope expanded profile egress budget")
+	}
+	for _, bounds := range [][2]int{{0, 10}, {10000, 11000}, {65536, 65538}, {20000, 20000}, {20000, 30000}} {
+		p.HostUIDMin, p.HostUIDMax = bounds[0], bounds[1]
+		if p.Validate() == nil {
+			t.Fatal("unsafe UID range accepted")
+		}
+	}
+}
+
+func TestServerReservationDeniesRecomputedClientHashesBeforeOwnership(t *testing.T) {
+	p := testProfile(t)
+	original := testSpec(p)
+	payload := `{"code":"approved opaque script","preload":""}`
+	original.Network = network.NetworkScope{Mode: "scoped", Destinations: []network.Destination{{Protocol: "http", Host: "canary.example", Port: 80, Addresses: []string{"192.0.2.10"}}}, InputManifestDigest: strings.Repeat("a", 64), MaxEgressBytes: 1024, ExpiresAt: time.Now().Add(time.Minute).Unix()}
+	original.Network.ScopeDigest = network.ScopeDigest(original.Network)
+	original.InvocationDigest = InvocationDigest(original, []byte(payload))
+	sup, err := NewSupervisor(p, func(_ context.Context, s InvocationSpec) (Budget, error) {
+		if s.InvocationDigest != original.InvocationDigest {
+			return Budget{}, fmt.Errorf("server reservation mismatch")
+		}
+		return p.Limits, nil
+	}, func(InvocationSpec, Payload) (Launch, error) {
+		t.Error("unapproved payload reached launch")
+		return Launch{}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sup.Close()
+	changed := original
+	changed.Network.InputManifestDigest = strings.Repeat("b", 64)
+	changed.Network.ScopeDigest = network.ScopeDigest(changed.Network)
+	changedPayload := `{"code":"different opaque script","preload":""}`
+	changed.InvocationDigest = InvocationDigest(changed, []byte(changedPayload))
+	if _, err = sup.Start(context.Background(), changed, strings.NewReader(changedPayload)); err == nil {
+		t.Fatal("client digest recomputation minted approval")
+	}
+	if _, err = sup.Lookup(changed.ExecutionID, changed.InvocationDigest); err == nil {
+		t.Fatal("unauthorized execution acquired identity")
+	}
+	entries, err := os.ReadDir(p.WorkRoot)
+	if err != nil || len(entries) != 0 {
+		t.Fatal("unauthorized execution allocated root")
+	}
+}
+func TestUIDLeaseRetainedWhenFinalReleaseCannotProveAbsence(t *testing.T) {
+	root := t.TempDir()
+	pool, err := uidpool.NewPersistentUIDPool(20000, 20001, filepath.Join(root, "leases"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, err := pool.Acquire(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	resource := filepath.Join(root, "residual")
+	if err = pool.TrackResource(uid, resource); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Mkdir(resource, 0700); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { os.Remove(resource); pool.ReleaseChecked(uid) }()
+	released, quarantined := false, false
+	e := &Execution{done: make(chan struct{}), hostUID: uid, uidPool: pool, result: ExecutionResult{CleanupState: "clean"}, release: func() { released = true }, quarantine: func() { quarantined = true }}
+	e.complete("succeeded", "")
+	if e.result.Status != "unknown" || e.result.CleanupState != "quarantined" || released || !quarantined || pool.Len() != 0 {
+		t.Fatalf("uncertain UID was recycled: %+v", e.result)
+	}
+}

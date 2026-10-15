@@ -38,23 +38,26 @@ type Usage struct {
 	MemoryPeakBytes int64 `json:"memory_peak_bytes"`
 }
 type ExecutionResult struct {
-	ExecutionID      string `json:"execution_id"`
-	InvocationDigest string `json:"invocation_digest"`
-	Status           string `json:"status"`
-	FailureReason    string `json:"failure_reason,omitempty"`
-	CleanupState     string `json:"cleanup_state"`
-	Stdout           string `json:"stdout"`
-	Stderr           string `json:"stderr"`
-	ExitCode         int    `json:"exit_code"`
-	Usage            Usage  `json:"usage"`
+	ExecutionID      string                  `json:"execution_id"`
+	InvocationDigest string                  `json:"invocation_digest"`
+	Status           string                  `json:"status"`
+	FailureReason    string                  `json:"failure_reason,omitempty"`
+	CleanupState     string                  `json:"cleanup_state"`
+	Stdout           string                  `json:"stdout"`
+	Stderr           string                  `json:"stderr"`
+	ExitCode         int                     `json:"exit_code"`
+	Usage            Usage                   `json:"usage"`
+	NetworkReceipt   *network.NetworkReceipt `json:"network_receipt,omitempty"`
 }
 
 // Launch is supplied by the existing language runner, not by the HTTP caller.
 type Launch struct {
-	Executable    string
-	Args          []string
-	Bootstrap     string
-	BootstrapPath string
+	Executable      string
+	Args            []string
+	Bootstrap       string
+	BootstrapPath   string
+	ScopedBootstrap string
+	ScopedArgs      []string
 }
 type Failure struct {
 	Reason string
