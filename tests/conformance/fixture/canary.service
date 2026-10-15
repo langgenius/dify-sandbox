@@ -1,0 +1,25 @@
+[Unit]
+Description=Disposable Builder controlled traffic collector
+[Service]
+Type=simple
+User=65534
+Group=65534
+RootDirectory=/var/lib/dify-builder-ci/image
+NetworkNamespacePath=/run/netns/dify-builder-ci
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+MemoryMax=128M
+TasksMax=32
+CPUQuota=25%
+LimitNOFILE=128
+RuntimeMaxSec=1200
+TimeoutStopSec=5
+KillMode=control-group
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+BindReadOnlyPaths=/var/lib/dify-builder-ci/qualification/network.json:/qualification/network.json
+ExecStart=/conformance-canary

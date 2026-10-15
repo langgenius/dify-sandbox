@@ -39,7 +39,11 @@ func main() {
 		log.Fatal("candidate requires baked environment root")
 	}
 	recorder := cases.NewObservationRecorder("/observations", p.MaxExecutions)
+	resources := cases.NewResourceRecorder("/observations", int(p.MaxExecutions))
 	observer := func(o isolation.Observation) {
+		if err := resources.Observe(o); err != nil {
+			log.Fatal("resource observation failed: ", err)
+		}
 		if err := recorder.Observe(o); err != nil {
 			log.Fatal("conformance observation failed: ", err)
 		}

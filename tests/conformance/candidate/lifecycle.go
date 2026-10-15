@@ -166,12 +166,19 @@ func reconcileProbe(p isolation.Profile, resolver isolation.ReservationResolver,
 		return err
 	}
 	var activeRoot string
+	var quarantinedCustody, peerCustody cases.Evidence
 	var rootMu sync.Mutex
 	readySignal := make(chan struct{}, 1)
 	observer := func(o isolation.Observation) {
 		if o.Phase == "gated" && o.ExecutionID == "cs1-lifecycle-quarantine" {
 			rootMu.Lock()
 			activeRoot = o.Root
+			quarantinedCustody = cases.Evidence{Observation: o}
+			rootMu.Unlock()
+		}
+		if o.Phase == "gated" && o.ExecutionID == "cs1-lifecycle-quarantine-peer" {
+			rootMu.Lock()
+			peerCustody = cases.Evidence{Observation: o}
 			rootMu.Unlock()
 		}
 		if o.Phase == "stdout" && strings.Contains(o.StdoutChunk, "CS1_READY") {
@@ -221,7 +228,9 @@ func reconcileProbe(p isolation.Profile, resolver isolation.ReservationResolver,
 		return err
 	}
 	proof.PeerSucceeded = peerResult.Status == "succeeded" && peerResult.CleanupState == "clean"
-	proof.UIDReuseVerified = strings.TrimSpace(peerResult.Stdout) == orphan.UID
+	rootMu.Lock()
+	proof.UIDReuseVerified = strings.TrimSpace(peerResult.Stdout) == "65537" && cases.RequireLifecycleCustody(orphan.UID, quarantinedCustody, peerCustody) == nil
+	rootMu.Unlock()
 	if err = s.Close(); err != nil {
 		return err
 	}

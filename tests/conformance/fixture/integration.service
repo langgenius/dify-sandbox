@@ -1,0 +1,31 @@
+[Unit]
+Description=Disposable Builder actual-image test client
+Requires=dify-builder-candidate.service dify-builder-canary.service
+After=dify-builder-candidate.service dify-builder-canary.service
+[Service]
+Type=oneshot
+User=65534
+Group=65534
+RootDirectory=/var/lib/dify-builder-ci/image
+NetworkNamespacePath=/run/netns/dify-builder-ci
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+MemoryMax=256M
+TasksMax=32
+CPUQuota=50%
+LimitNOFILE=128
+TimeoutStartSec=1200
+TimeoutStopSec=5
+KillMode=control-group
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+BindReadOnlyPaths=/var/lib/dify-builder-ci/qualification:/qualification
+BindReadOnlyPaths=/var/lib/dify-builder-ci/observations:/observations
+BindPaths=/var/lib/dify-builder-ci/artifacts:/artifacts
+ReadWritePaths=/artifacts
+EnvironmentFile=/var/lib/dify-builder-ci/client.env
+ExecStart=/conformance --case all --endpoint http://127.0.0.1:8194 --ordinary-endpoint http://127.0.0.1:8195 --output /artifacts/case-report.json --junit /artifacts/junit.xml

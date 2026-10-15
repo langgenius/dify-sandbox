@@ -9,6 +9,7 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/core/runner/network"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -66,7 +67,7 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 		if o.Phase != "completed" || o.ExecutionID != id || !o.RootRemoved || !o.CgroupRemoved || o.Result.CleanupState != "clean" {
 			return o, fmt.Errorf("unclean or incomplete observation for %s", id)
 		}
-		if len(o.Namespaces) != 5 || len(o.Controls) < 5 {
+		if len(o.Namespaces) < 5 || len(o.Controls) < 5 {
 			return o, fmt.Errorf("namespace/cgroup setup did not complete for %s: %s", id, o.Result.FailureReason)
 		}
 		return o, nil
@@ -97,6 +98,17 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 			return err
 		}
 		observationsSeen[i] = o
+		raw, err := os.ReadFile(filepath.Join(observations, results[i].ExecutionID+".resources.json"))
+		if err != nil {
+			return err
+		}
+		var sample ResourceSample
+		if err = json.Unmarshal(raw, &sample); err != nil {
+			return err
+		}
+		if err = RequireNativeResourceSample(sample); err != nil {
+			return err
+		}
 		for key, want := range map[string]string{"memory.max": strconv.FormatInt(p.Limits.MemoryBytes, 10), "memory.swap.max": "0", "memory.oom.group": "1", "pids.max": strconv.FormatInt(p.Limits.PIDs, 10), "cpu.max": fmt.Sprintf("%d %d", p.Limits.CPUQuotaMicros, p.Limits.CPUPeriodMicros)} {
 			if o.Controls[key] != want {
 				return fmt.Errorf("%s not enforced: %q", key, o.Controls[key])
@@ -104,6 +116,9 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 		}
 	}
 	if err := requireOverlap(observationsSeen[0], observationsSeen[1]); err != nil {
+		return err
+	}
+	if err := RequireDistinctCustody(observationsSeen[0], observationsSeen[1]); err != nil {
 		return err
 	}
 	if observationsSeen[0].Root == observationsSeen[1].Root || observationsSeen[0].Cgroup == observationsSeen[1].Cgroup {

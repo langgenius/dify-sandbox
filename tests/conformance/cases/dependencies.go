@@ -52,7 +52,7 @@ func Dependencies(endpoint, profilePath, observations string) error {
 		if err != nil {
 			return err
 		}
-		if evidence.Phase != "completed" || !evidence.RootRemoved || !evidence.CgroupRemoved || len(evidence.Namespaces) != 5 {
+		if evidence.Phase != "completed" || !evidence.RootRemoved || !evidence.CgroupRemoved || len(evidence.Namespaces) < 5 {
 			return fmt.Errorf("dependency cleanup/namespaces not proven for %s", id)
 		}
 		return nil

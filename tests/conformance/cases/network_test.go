@@ -1,8 +1,11 @@
 package cases
 
 import (
+	"encoding/json"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/network"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -115,5 +118,20 @@ func TestExpiryEvidenceRejectsSetupAndWallTimeoutFalsePositives(t *testing.T) {
 				t.Fatal("false expiry evidence accepted")
 			}
 		})
+	}
+}
+
+func TestCollectorRequiresReceivedBytesForEveryTarget(t *testing.T) {
+	target := NetworkTarget{Protocol: "http", Address: "192.0.2.10", Host: "192.0.2.10", Port: 19004}
+	data := NetworkCounters{BootID: "real-boot", Counters: map[string]uint64{target.key(): 1}, Active: map[string]uint64{target.key(): 0}}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { json.NewEncoder(w).Encode(data) }))
+	defer server.Close()
+	fixture := NetworkFixture{CollectorURL: server.URL, Targets: []NetworkTarget{target}}
+	if _, err := collectNetwork(server.Client(), fixture); err == nil {
+		t.Fatal("missing received_bytes accepted")
+	}
+	data.ReceivedBytes = map[string]uint64{target.key(): 42}
+	if _, err := collectNetwork(server.Client(), fixture); err != nil {
+		t.Fatal(err)
 	}
 }

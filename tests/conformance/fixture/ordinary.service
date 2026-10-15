@@ -1,0 +1,31 @@
+[Unit]
+Description=Unchanged ordinary sandbox endpoint regression fixture
+After=dify-builder-canary.service
+[Service]
+Type=simple
+User=root
+Group=root
+RootDirectory=/var/lib/dify-builder-ci/image
+MountAPIVFS=yes
+NetworkNamespacePath=/run/netns/dify-builder-ci
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_SYS_CHROOT CAP_SETUID CAP_SETGID CAP_DAC_OVERRIDE
+AppArmorProfile=dify-builder-ordinary-ci
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+MemoryMax=1G
+TasksMax=128
+CPUQuota=100%
+LimitNOFILE=1024
+RuntimeMaxSec=1200
+TimeoutStopSec=5
+KillMode=control-group
+BindReadOnlyPaths=/var/lib/dify-builder-ci/ordinary-conf:/conf
+BindPaths=/var/lib/dify-builder-ci/ordinary-state:/var/sandbox
+BindPaths=/var/lib/dify-builder-ci/ordinary-dependencies:/dependencies
+ReadWritePaths=/var/sandbox /dependencies
+WorkingDirectory=/
+Environment=SANDBOX_PROFILE=ordinary PYTHON_PATH=/usr/local/bin/python3 NODEJS_PATH=/usr/local/bin/node
+EnvironmentFile=/var/lib/dify-builder-ci/ordinary.env
+ExecStart=/main

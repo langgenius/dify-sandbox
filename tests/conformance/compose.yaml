@@ -1,4 +1,29 @@
 services:
+  fixture-check:
+    build:
+      context: ../..
+      dockerfile: tests/conformance/fixture-check.dockerfile
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    pids_limit: 32
+    tmpfs: [/tmp:size=16m]
+  verifier:
+    build:
+      context: ../..
+      dockerfile: tests/conformance/verifier.dockerfile
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    pids_limit: 32
+    environment:
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTEST_ADDOPTS: '-p no:cacheprovider'
+    tmpfs: [/tmp:size=16m]
   unit:
     build:
       context: ../..
@@ -21,30 +46,8 @@ services:
       - observations:/observations:ro
       - qualification:/qualification:ro
     networks: [conformance]
-  # CS3/CS5 build and qualify this actual image. A missing image/profile or
-  # delegation is a failed prerequisite, never an alternate successful path.
-  candidate-service:
-    image: ${CS1_CANDIDATE_IMAGE:-cs1-qualified-candidate:missing}
-    profiles: [qualified-linux]
-    entrypoint: [/conformance-candidate]
-    cap_drop: [ALL]
-    cap_add: [SYS_ADMIN, SYS_CHROOT, SETUID, SETGID, DAC_OVERRIDE]
-    security_opt: [no-new-privileges:true]
-    mem_limit: 1g
-    pids_limit: 256
-    volumes:
-      - observations:/observations
-      - qualification:/qualification:ro
-    networks: [conformance]
-  canary:
-    image: busybox:1.37.0
-    profiles: [qualified-linux]
-    command: [httpd, -f, -p, '8080']
-    read_only: true
-    cap_drop: [ALL]
-    mem_limit: 16m
-    pids_limit: 8
-    networks: [conformance]
+  # Runtime qualification uses the reviewed dedicated systemd services in
+  # fixture/, never a Docker-default privileged capability/profile shortcut.
 volumes:
   observations:
   qualification:

@@ -1,0 +1,103 @@
+name: Builder actual-image conformance
+on:
+  workflow_call:
+    inputs:
+      candidate_index:
+        type: string
+        required: true
+      source_revision:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      candidate_index:
+        description: Immutable published index from the normal attested build job
+        required: true
+      source_revision:
+        description: Exact source commit authenticated by that build
+        required: true
+permissions:
+  contents: read
+  attestations: read
+concurrency:
+  group: builder-conformance-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  # The normal build/release owner produces the signed multi-platform index in
+  # a separate job. This execution job has no registry push or OIDC permission.
+  qualify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_revision }}
+          persist-credentials: false
+      - name: Verify decision/schema tests in isolated Linux container
+        run: |
+          docker compose -f tests/conformance/compose.yaml build verifier
+          docker compose -f tests/conformance/compose.yaml run --rm verifier
+      - name: Create protected normal-build attestation policy
+        env:
+          TRUSTED_REPOSITORY: ${{ github.repository }}
+          TRUSTED_WORKFLOW: ${{ vars.BUILDER_TRUSTED_BUILD_WORKFLOW }}
+          TRUSTED_REVISION: ${{ vars.BUILDER_TRUSTED_BUILD_REVISION }}
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib,re
+          workflow=os.environ['TRUSTED_WORKFLOW']
+          revision=os.environ['TRUSTED_REVISION']
+          assert workflow and re.fullmatch('[0-9a-f]{40}',revision), 'protected build owner policy required'
+          policy=pathlib.Path(os.environ['RUNNER_TEMP'])/'builder-build-policy.json'
+          policy.write_text(json.dumps(dict(repository=os.environ['TRUSTED_REPOSITORY'],signer_workflow=workflow,signer_revision=revision)))
+          policy.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'],'a') as env:
+              env.write('CS5_BUILD_POLICY='+str(policy)+'\n')
+          PY
+      - name: Authenticate and provision actual artifact fixture
+        env:
+          CANDIDATE_INDEX: ${{ inputs.candidate_index }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/builder-conformance-ci.sh provision "$CANDIDATE_INDEX" "$ARCHITECTURE"
+      - name: Measure useful actual workloads
+        run: |
+          mkdir -p artifacts
+          scripts/builder-conformance.sh --measure --output artifacts/budget-candidate.json
+      - name: Freeze measured profile in a fresh owned generation
+        run: scripts/builder-conformance-ci.sh freeze
+      - name: Run all six groups and assemble unsigned release evidence
+        run: scripts/builder-conformance.sh --verify --output artifacts/qualification.json
+      - name: Retain bounded evidence
+        if: always()
+        run: |
+          mkdir -p artifacts
+          scripts/builder-conformance-ci.sh logs > artifacts/fixture.log 2>&1
+          if sudo test -d /var/lib/dify-builder-ci/artifacts; then
+            sudo cp -a /var/lib/dify-builder-ci/artifacts/. artifacts/
+            sudo chown -R "$(id -u):$(id -g)" artifacts
+          fi
+          if sudo test -d /var/lib/dify-builder-ci/observations; then
+            sudo cp -a /var/lib/dify-builder-ci/observations artifacts/final-observations
+            sudo chown -R "$(id -u):$(id -g)" artifacts/final-observations
+          fi
+          if test -f "$RUNNER_TEMP/cs5-build-attestation.json"; then
+            cp "$RUNNER_TEMP/cs5-build-attestation.json" artifacts/build-attestation.json
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: builder-conformance-${{ matrix.architecture }}
+          path: artifacts/
+          if-no-files-found: error
+      - name: Tear down only this run's owned services and namespace
+        if: always()
+        run: scripts/builder-conformance-ci.sh cleanup

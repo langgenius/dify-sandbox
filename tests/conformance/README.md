@@ -1,4 +1,51 @@
-# CS1 request isolation conformance
+# Builder actual-image conformance
+
+The normal CI entry point is `.github/workflows/builder-conformance.yml`, backed
+by the reviewed `fixture/` systemd services and `scripts/builder-conformance-ci.sh`.
+It requires a published immutable multi-platform image and authenticated normal
+build provenance, a fresh native Ubuntu 24.04 VM for each architecture, protected
+build signer policy, and reviewed namespace/cgroup/LSM setup. No runtime fixture
+has been activated or qualified by source/component checks alone.
+
+The provisioner exports the exact published image filesystem without patching
+installed code, creates a dedicated nonroot supervisor account and a route-less
+outer namespace, and starts the same baked `/conformance-candidate`, language
+workers, `/network-gateway`, `/conformance-canary` and `/conformance` artifacts.
+The ordinary `/main` endpoint has a separate service and unchanged native filter.
+See [the setup and release contract](../../docs/builder-release-contract.md) for
+the exact capabilities, delegation, ownership, counters, trust and risk limits.
+
+After protected provisioning on that disposable runner:
+
+```sh
+scripts/builder-conformance.sh --measure --output artifacts/budget-candidate.json
+scripts/builder-conformance-ci.sh freeze
+scripts/builder-conformance.sh --verify --output artifacts/qualification.json
+```
+
+Measurement uses three repetitions of each cold serial and four-way Python,
+Node and Jinja workload. Memory/CPU use kernel counters; PID/FD/tmpfs peaks are
+2ms sampled lower bounds, with explicit headroom. Samples before native readiness
+cannot qualify. Live payload CapEff/CapPrm/CapAmb must be zero. The measured
+profile is frozen in a fresh service generation and all six groups are rerun.
+JSON/JUnit contain exactly twelve platform/language/group IDs. Failed groups
+mark both language entries failed conservatively; no missing/skipped group passes.
+Bounded network snapshots and independent supervisor observations are retained.
+
+`--verify` assembles unsigned evidence only after the complete kernel suite
+passes. The normal release owner must sign canonical evidence using its trusted
+signing dependency, and the deployment/controller owner must issue the actual
+endpoint receipt. `verify-builder-release.py` runs maintained cosign and GitHub
+attestation verification against protected keys/identities and protected expected
+deployment bindings. Synthetic verifier tests exercise decision logic only.
+Missing signing policy, endpoint evidence or actual native architecture evidence
+is configuration pending, never an activation flag.
+
+The old `qualified-linux` Compose candidate shortcut is removed. Compose remains
+the constrained component/parser/schema harness and an explicit missing-fixture
+integration check; Docker defaults do not qualify the supervisor runtime.
+
+## Component checks
 
 The unit target uses Linux Go 1.24.11 pinned by the multi-platform manifest
 `sha256:656be510c8b4d33acf4eac8575b7f04a3e30b705c152dc6bde112dbe1a87b602`.
@@ -45,11 +92,10 @@ user stdout cannot stand in for namespace/cgroup evidence.
   least 2 and enough wall time for two language starts. CPUTimeMillis must be
   low enough for a busy process to exceed it before WallMillis at CPUQuotaMicros
   / CPUPeriodMicros. These fixtures are not service release budget measurements.
-* Mount the separate `observations` volume writable in the candidate and read-only
+* Mount the separate `observations` directory writable in the candidate and read-only
   in the harness. Only synthetic observation JSON is written there. There is no
-  public introspection route. Start the candidate/canary using the
-  `qualified-linux` compose profile after provisioning; keep their network
-  internal. CS4 extends the otherwise unused canary with network-scope assertions.
+  public introspection route. Start only the reviewed normal CI fixture, which
+  provides all fourteen controlled listeners and independent socket counters.
 
 The enumerated case checks mixed Python/Node cwd and independent roots,
 mount/PID/IPC/UTS/network namespace IDs, cgroup controls, serial reuse, resource

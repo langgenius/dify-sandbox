@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
@@ -37,6 +38,24 @@ type NetworkCounters struct {
 	ReceivedBytes map[string]uint64 `json:"received_bytes"`
 }
 
+var trafficEvidence = struct {
+	sync.Mutex
+	Snapshots []struct {
+		ObservedAt string          `json:"observed_at"`
+		Evidence   NetworkCounters `json:"evidence"`
+	}
+}{}
+
+func WriteNetworkEvidence(path string) error {
+	trafficEvidence.Lock()
+	defer trafficEvidence.Unlock()
+	raw, err := json.MarshalIndent(trafficEvidence.Snapshots, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(raw, '\n'), 0600)
+}
+
 func (t NetworkTarget) key() string {
 	return t.Protocol + "/" + t.Address + "/" + strconv.Itoa(int(t.Port))
 }
@@ -46,6 +65,9 @@ func (t NetworkTarget) url(path string) string {
 func (f NetworkFixture) validate() error {
 	if f.CollectorURL == "" {
 		return fmt.Errorf("independent collector required")
+	}
+	if len(f.Targets) != 10 || len(f.AlternateTargets) != 4 {
+		return fmt.Errorf("exactly ten primary and four alternate targets required")
 	}
 	seen := map[string]bool{}
 	for _, target := range f.Targets {
@@ -109,7 +131,7 @@ func collectNetwork(client *http.Client, fixture NetworkFixture) (NetworkCounter
 	if err = json.NewDecoder(io.LimitReader(response.Body, 64<<10)).Decode(&result); err != nil {
 		return result, err
 	}
-	if result.BootID == "" || result.Counters == nil || result.Active == nil {
+	if result.BootID == "" || result.Counters == nil || result.Active == nil || result.ReceivedBytes == nil {
 		return result, fmt.Errorf("missing independent traffic evidence")
 	}
 	for _, target := range append(append([]NetworkTarget{}, fixture.Targets...), fixture.AlternateTargets...) {
@@ -119,7 +141,19 @@ func collectNetwork(client *http.Client, fixture NetworkFixture) (NetworkCounter
 		if _, ok := result.Active[target.key()]; !ok {
 			return result, fmt.Errorf("missing active count %s", target.key())
 		}
+		if _, ok := result.ReceivedBytes[target.key()]; !ok {
+			return result, fmt.Errorf("missing received bytes %s", target.key())
+		}
 	}
+	trafficEvidence.Lock()
+	defer trafficEvidence.Unlock()
+	if len(trafficEvidence.Snapshots) >= 4096 {
+		return result, fmt.Errorf("bounded network evidence capacity exhausted")
+	}
+	trafficEvidence.Snapshots = append(trafficEvidence.Snapshots, struct {
+		ObservedAt string          `json:"observed_at"`
+		Evidence   NetworkCounters `json:"evidence"`
+	}{time.Now().UTC().Format(time.RFC3339Nano), result})
 	return result, nil
 }
 func compareNetwork(before, after NetworkCounters, targets []NetworkTarget, positive bool) error {

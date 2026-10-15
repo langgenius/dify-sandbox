@@ -1,0 +1,17 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema",
+ "$id":"https://dify.ai/schemas/builder-budget-v1.json",
+ "type":"object","additionalProperties":false,
+ "required":["input_bytes","code_bytes","stdout_bytes","stderr_bytes","disk_bytes","memory_bytes","pids","fds","concurrent","queue_depth","cpu_quota_micros","cpu_period_micros","cpu_time_millis","wall_millis","queue_millis","cleanup_millis"],
+ "$defs":{"positive":{"type":"integer","minimum":1,"maximum":9007199254740991}},
+ "properties":{
+  "input_bytes":{"$ref":"#/$defs/positive"},"code_bytes":{"$ref":"#/$defs/positive"},
+  "stdout_bytes":{"$ref":"#/$defs/positive"},"stderr_bytes":{"$ref":"#/$defs/positive"},
+  "disk_bytes":{"$ref":"#/$defs/positive"},"memory_bytes":{"$ref":"#/$defs/positive"},
+  "pids":{"$ref":"#/$defs/positive"},"fds":{"$ref":"#/$defs/positive"},
+  "concurrent":{"type":"integer","minimum":4},"queue_depth":{"$ref":"#/$defs/positive"},
+  "cpu_quota_micros":{"type":"integer","minimum":1000},"cpu_period_micros":{"type":"integer","minimum":1000,"maximum":1000000},
+  "cpu_time_millis":{"$ref":"#/$defs/positive"},"wall_millis":{"$ref":"#/$defs/positive"},
+  "queue_millis":{"$ref":"#/$defs/positive"},"cleanup_millis":{"$ref":"#/$defs/positive"}
+ }
+}

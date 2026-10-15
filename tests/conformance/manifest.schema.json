@@ -1,0 +1,27 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema",
+ "$id":"https://dify.ai/schemas/sandbox-qualification-v1.json",
+ "title":"SandboxQualificationV1 (authentication is an external mandatory check)",
+ "type":"object","additionalProperties":false,
+ "required":["schema_version","profile_version","qualification_id","revocation_id","issued_at","expires_at","source_revision","image","runtime","effective","budget","measurements","required_case_ids","case_results","skipped","failed","xfailed","ci"],
+ "$defs":{
+  "digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+  "revision":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+  "identity":{"type":"string","minLength":1,"maxLength":512}
+ },
+ "properties":{
+  "schema_version":{"const":1},"profile_version":{"const":"builder-native-test-v1"},
+  "qualification_id":{"$ref":"#/$defs/identity"},"revocation_id":{"$ref":"#/$defs/identity"},
+  "issued_at":{"type":"integer","minimum":1},"expires_at":{"type":"integer","minimum":1},
+  "source_revision":{"$ref":"#/$defs/revision"},
+  "image":{"type":"object","additionalProperties":false,"required":["index_digest","platform_digest","config_digest"],"properties":{"index_digest":{"$ref":"#/$defs/digest"},"platform_digest":{"$ref":"#/$defs/digest"},"config_digest":{"$ref":"#/$defs/digest"}}},
+  "runtime":{"type":"object","additionalProperties":false,"required":["os","architecture","host_architecture","kernel","runtime","seccomp_digest","cgroup_version","environment_digest","profile_digest"],"properties":{"os":{"const":"linux"},"architecture":{"enum":["amd64","arm64"]},"host_architecture":{"enum":["amd64","arm64"]},"kernel":{"$ref":"#/$defs/identity"},"runtime":{"$ref":"#/$defs/identity"},"seccomp_digest":{"$ref":"#/$defs/digest"},"cgroup_version":{"const":2},"environment_digest":{"$ref":"#/$defs/digest"},"profile_digest":{"$ref":"#/$defs/digest"}}},
+  "effective":{"type":"object","additionalProperties":false,"required":["configuration","mounts","network","resources"],"properties":{"configuration":{"$ref":"#/$defs/digest"},"mounts":{"$ref":"#/$defs/digest"},"network":{"$ref":"#/$defs/digest"},"resources":{"$ref":"#/$defs/digest"}}},
+  "budget":{"$ref":"budget.schema.json"},
+  "measurements":{"type":"array","minItems":6,"maxItems":6,"items":{"type":"object","required":["language","mode","sample_count","sample_interval_micros","source","cold_start","memory_bytes","cpu_time_millis","pids","fds","disk_bytes","stdout_bytes","stderr_bytes","wall_millis"],"properties":{"language":{"enum":["python3","nodejs","jinja2"]},"mode":{"enum":["serial","four-way"]},"sample_count":{"type":"integer","minimum":3},"sample_interval_micros":{"type":"integer","minimum":1},"source":{"const":"supervisor-cgroup-proc"},"cold_start":{"const":true},"memory_bytes":{"type":"integer","minimum":1},"cpu_time_millis":{"type":"integer","minimum":1},"pids":{"type":"integer","minimum":1},"fds":{"type":"integer","minimum":1},"disk_bytes":{"type":"integer","minimum":0},"stdout_bytes":{"type":"integer","minimum":0},"stderr_bytes":{"type":"integer","minimum":0},"wall_millis":{"type":"integer","minimum":1}}}},
+  "required_case_ids":{"type":"array","minItems":12,"maxItems":12,"uniqueItems":true,"items":{"type":"string","pattern":"^linux/(amd64|arm64)/(python3|nodejs)/(roots-and-budgets|lifecycle|dependencies|network|qualification|ordinary-regression)$"}},
+  "case_results":{"type":"array","minItems":12,"maxItems":12,"items":{"type":"object","required":["case_id","status"],"properties":{"case_id":{"type":"string"},"status":{"const":"passed"}}}},
+  "skipped":{"const":0},"failed":{"const":0},"xfailed":{"const":0},
+  "ci":{"type":"object","additionalProperties":false,"required":["run_id","test_revision"],"properties":{"run_id":{"$ref":"#/$defs/identity"},"test_revision":{"$ref":"#/$defs/revision"}}}
+ }
+}
