@@ -16,27 +16,32 @@ import (
 var ErrCapability = errors.New("network_capability: qualified HTTP mediation required")
 
 type NetworkReceipt struct {
-	ExecutionID  string `json:"execution_id"`
-	PolicyDigest string `json:"policy_digest"`
-	EgressBytes  int64  `json:"egress_bytes"`
-	Revoked      bool   `json:"revoked"`
+	ExecutionID       string `json:"execution_id"`
+	PolicyDigest      string `json:"policy_digest"`
+	EgressBytes       int64  `json:"egress_bytes"`
+	Revoked           bool   `json:"revoked"`
+	RevocationReason  string `json:"revocation_reason,omitempty"`
+	DeniedEgressBytes int64  `json:"denied_egress_bytes,omitempty"`
 }
 
 // Gateway owns one authenticated execution policy. A private inherited channel
 // supplies connected client FDs, never rules. No rule-management endpoint exists.
 type Gateway struct {
-	scope        NetworkScope
-	executionID  string
-	ctx          context.Context
-	cancel       context.CancelFunc
-	mu           sync.Mutex
-	connections  map[net.Conn]struct{}
-	closed       bool
-	channelReady bool
-	budgetMu     sync.Mutex
-	used         int64
-	active       chan struct{}
-	dial         func(context.Context, string, string) (net.Conn, error)
+	scope            NetworkScope
+	executionID      string
+	ctx              context.Context
+	cancel           context.CancelFunc
+	mu               sync.Mutex
+	connections      map[net.Conn]struct{}
+	closed           bool
+	revocationReason string
+	scopeDeadline    bool
+	channelReady     bool
+	budgetMu         sync.Mutex
+	used             int64
+	denied           int64
+	active           chan struct{}
+	dial             func(context.Context, string, string) (net.Conn, error)
 }
 
 func NewGateway(ctx context.Context, executionID string, scope NetworkScope) (*Gateway, error) {
@@ -51,27 +56,44 @@ func NewGateway(ctx context.Context, executionID string, scope NetworkScope) (*G
 	for i := range scope.Destinations {
 		scope.Destinations[i].Addresses = append([]string(nil), scope.Destinations[i].Addresses...)
 	}
+	parentDeadline, hasParentDeadline := ctx.Deadline()
+	scopeDeadline := !hasParentDeadline || !parentDeadline.Before(time.Unix(scope.ExpiresAt, 0))
 	ctx, cancel := context.WithDeadline(ctx, time.Unix(scope.ExpiresAt, 0))
-	g := &Gateway{scope: scope, executionID: executionID, ctx: ctx, cancel: cancel, connections: map[net.Conn]struct{}{}, active: make(chan struct{}, 16)}
+	g := &Gateway{scope: scope, executionID: executionID, ctx: ctx, cancel: cancel, connections: map[net.Conn]struct{}{}, active: make(chan struct{}, 16), scopeDeadline: scopeDeadline}
 	g.dial = (&net.Dialer{Timeout: 5 * time.Second}).DialContext
 	go func() { <-ctx.Done(); g.Close() }()
 	return g, nil
 }
 func (g *Gateway) Receipt() NetworkReceipt {
 	g.budgetMu.Lock()
-	used := g.used
+	used, denied := g.used, g.denied
 	g.budgetMu.Unlock()
 	g.mu.Lock()
-	closed := g.closed
+	closed, reason := g.closed, g.revocationReason
 	g.mu.Unlock()
-	return NetworkReceipt{ExecutionID: g.executionID, PolicyDigest: g.scope.ScopeDigest, EgressBytes: used, Revoked: closed}
+	return NetworkReceipt{ExecutionID: g.executionID, PolicyDigest: g.scope.ScopeDigest, EgressBytes: used, Revoked: closed, RevocationReason: reason, DeniedEgressBytes: denied}
 }
 func (g *Gateway) Close() error {
-	g.cancel()
+	reason := "closed"
+	if g.ctx.Err() == context.DeadlineExceeded {
+		reason = "deadline"
+		if g.scopeDeadline {
+			reason = "scope_expired"
+		}
+	} else if g.ctx.Err() != nil {
+		reason = "cancelled"
+	}
+	return g.revoke(reason)
+}
+
+// First revocation wins: routine final cleanup must preserve the enforcing cause.
+func (g *Gateway) revoke(reason string) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if !g.closed {
 		g.closed = true
+		g.revocationReason = reason
+		g.cancel()
 		for c := range g.connections {
 			c.Close()
 		}
@@ -177,8 +199,11 @@ func (c *egressConn) Write(p []byte) (int, error) {
 	}
 	remaining := g.scope.MaxEgressBytes - g.used
 	if int64(len(p)) > remaining {
+		if g.denied == 0 {
+			g.denied = int64(len(p))
+		}
 		g.budgetMu.Unlock()
-		g.Close()
+		g.revoke("egress_quota")
 		return 0, fmt.Errorf("network egress quota exceeded")
 	}
 	// Reserve before writing; failed/partial writes conservatively consume the

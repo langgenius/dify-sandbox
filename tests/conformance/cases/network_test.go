@@ -1,6 +1,11 @@
 package cases
 
-import "testing"
+import (
+	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/network"
+	"testing"
+	"time"
+)
 
 func TestNetworkEvidenceRequiresPositiveControlForEveryTarget(t *testing.T) {
 	targets := []NetworkTarget{{Protocol: "tcp", Address: "192.0.2.10", Port: 8080}, {Protocol: "udp", Address: "2001:db8::10", Port: 8081}}
@@ -46,5 +51,69 @@ func TestNetworkFixtureRequiresAllProtocolsAndFamilies(t *testing.T) {
 	fixture.Targets = fixture.Targets[:len(fixture.Targets)-1]
 	if fixture.validate() == nil {
 		t.Fatal("missing HTTPS/v6 positive control accepted")
+	}
+}
+
+func TestQuotaEvidenceRejectsUnexercisedOrRoutineCompletion(t *testing.T) {
+	target := NetworkTarget{Protocol: "http", Address: "192.0.2.10", Port: 80}
+	before := NetworkCounters{BootID: "one", Counters: map[string]uint64{target.key(): 1}, ReceivedBytes: map[string]uint64{target.key(): 100}}
+	after := NetworkCounters{BootID: "one", Counters: map[string]uint64{target.key(): 2}, ReceivedBytes: map[string]uint64{target.key(): 120}}
+	positive := isolation.ExecutionResult{Status: "succeeded", Stdout: "QUOTA_ATTEMPT_4096\nQUOTA_EXERCISED\n", NetworkReceipt: &network.NetworkReceipt{EgressBytes: 20, Revoked: true, RevocationReason: "egress_quota", DeniedEgressBytes: 4096}}
+	if err := quotaEvidence(positive, before, after, target, 128); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"pre-request-failure", "missing-marker", "routine-close", "no-rejected-write", "no-canary-connection", "over-ceiling", "missing-bytes", "regressed-bytes", "restarted"} {
+		t.Run(name, func(t *testing.T) {
+			r := positive
+			receipt := *positive.NetworkReceipt
+			r.NetworkReceipt = &receipt
+			a := after
+			switch name {
+			case "pre-request-failure":
+				r.Status = "failed"
+			case "missing-marker":
+				r.Stdout = ""
+			case "routine-close":
+				receipt.RevocationReason = "closed"
+			case "no-rejected-write":
+				receipt.DeniedEgressBytes = 0
+			case "no-canary-connection":
+				a.Counters = before.Counters
+			case "over-ceiling":
+				a.ReceivedBytes = map[string]uint64{target.key(): 229}
+			case "missing-bytes":
+				a.ReceivedBytes = nil
+			case "regressed-bytes":
+				a.ReceivedBytes = map[string]uint64{target.key(): 99}
+			case "restarted":
+				a.BootID = "two"
+			}
+			if quotaEvidence(r, before, a, target, 128) == nil {
+				t.Fatal("invalid quota evidence accepted")
+			}
+		})
+	}
+}
+func TestExpiryEvidenceRejectsSetupAndWallTimeoutFalsePositives(t *testing.T) {
+	result := isolation.ExecutionResult{Status: "failed", FailureReason: "deadline"}
+	if err := expiryEvidence(result, true, true, time.Second, 3500*time.Millisecond, 3*time.Second, time.Second, 8*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name                   string
+		ready, live            bool
+		liveAt, finished, wall time.Duration
+	}{
+		{"setup-timeout", false, false, 0, 3 * time.Second, 8 * time.Second},
+		{"no-live-hold", true, false, time.Second, 3 * time.Second, 8 * time.Second},
+		{"late-live", true, true, 3 * time.Second, 3500 * time.Millisecond, 8 * time.Second},
+		{"wall-only", true, true, time.Second, 8 * time.Second, 8 * time.Second},
+		{"indistinguishable-wall", true, true, time.Second, 3500 * time.Millisecond, 4 * time.Second},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if expiryEvidence(result, test.ready, test.live, test.liveAt, test.finished, 3*time.Second, time.Second, test.wall) == nil {
+				t.Fatal("false expiry evidence accepted")
+			}
+		})
 	}
 }

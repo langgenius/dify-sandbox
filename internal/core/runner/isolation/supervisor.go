@@ -442,6 +442,7 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 	cmd.Stdin = bytes.NewReader(encoded)
 	setNamespaces(cmd)
 	var networkReady chan error
+	var frontend *os.File
 	if e.gateway != nil {
 		setScopedNamespaces(cmd, e.hostUID)
 		parent, child, err := network.NewChannel()
@@ -451,6 +452,7 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 		}
 		defer parent.Close()
 		defer child.Close()
+		frontend = child
 		cmd.ExtraFiles = append(cmd.ExtraFiles, child)
 		networkReady = make(chan error, 1)
 		go e.gateway.ServeChannel(parent, networkReady)
@@ -464,7 +466,7 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 		e.FailBeforeStart(err)
 		return
 	}
-	if err = cmd.Start(); err != nil {
+	if err = startWorker(cmd, frontend); err != nil {
 		e.FailBeforeStart(err)
 		return
 	}
@@ -753,4 +755,17 @@ func (e *Execution) NetworkHandle() network.NamespaceHandle {
 		return e.gateway.NamespaceHandle(e.ownedPID, fd)
 	}
 	return network.NamespaceHandle{PID: e.ownedPID, NetNSFD: fd, ExecutionID: e.spec.ExecutionID}
+}
+
+// On successful exec the worker owns its inherited endpoint. Retaining the
+// parent's duplicate would hide helper death from the broker. On start failure
+// the existing caller defer retains responsibility for closing the endpoint.
+func startWorker(cmd *exec.Cmd, frontend *os.File) error {
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	if frontend != nil {
+		frontend.Close()
+	}
+	return nil
 }

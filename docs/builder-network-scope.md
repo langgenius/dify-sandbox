@@ -63,9 +63,9 @@ Any related mutation requires a new common-owner decision before launch.
 ## Runtime boundary
 
 The supervisor owns one immutable gateway policy per execution. It creates a
-private Unix datagram socketpair, passes only its frontend side as worker FD 4,
+private Unix sequenced-packet socketpair, passes only its frontend side as worker FD 4,
 and retains FD 3 as the payload gate. No management listener or credential is
-available to the child. The worker is attached to its cgroup before the parent
+available to the child. The parent closes its duplicate frontend endpoint immediately after successful worker start, so helper endpoint loss delivers EOF and revokes handed-off streams. On start failure, the caller retains endpoint cleanup ownership. The worker is attached to its cgroup before the parent
 sends trusted-setup byte `2`. Scoped workers add a fresh user namespace: namespace
 UID 0 maps to the trusted supervisor UID, namespace UID 65537 maps to a durable
 per-execution host UID lease, and GID 0 maps to the existing supervisor GID with
@@ -108,7 +108,7 @@ so partial/failed writes conservatively consume their reservation. IP/TCP packet
 headers and handshake packets are not application stream bytes. No DNS traffic
 occurs at runtime. Quota exhaustion, expiry, cancellation or channel failure
 closes all active broker sockets. Receipts contain identity, policy digest,
-reserved egress bytes and revocation state, never packet contents or credentials.
+reserved egress bytes, the first revocation reason and the rejected write byte count, never packet contents or credentials. Routine final close preserves a prior quota, expiry or channel-loss cause.
 
 The finite host UID pool uses private durable leases at the canonical execution
 journal path plus `.uids`. Requested profile ranges are explicit, exclusive,
@@ -148,7 +148,7 @@ and `/qualification/network.json`. The latter contains `CollectorURL`, ten
 `Targets` (TCP/UDP/DNS/HTTP/HTTPS × IPv4/IPv6), and four `AlternateTargets`
 (HTTP/HTTPS × IPv4/IPv6), each with `Protocol`, `Address`, `Host`, `Port`. Controlled
 addresses are synthetic documentation addresses within the isolated CI fixture.
-Collector GET returns `boot_id`, monotonic `counters`, and live `active` maps keyed
+Collector GET returns `boot_id`, monotonic `counters`, actual accepted-stream `received_bytes`, and live `active` maps keyed
 `protocol/address/port`; all keys must be independently present. HTTP paths are
 `/ok`, `/redirect-unapproved`, `/bytes?count=N` (at most 1 MiB), and `/hold` with
 bounded heartbeat traffic. The DNS canary changes `rebind.fixture.test` from the
@@ -157,7 +157,7 @@ primary address to an alternate after its initial query.
 The case first requires traffic on every permissive control, then zero traffic
 from actual none execution. It checks approved proxy traffic, rejected alternate
 and redirect destinations, simultaneous separate scopes, immutable DNS pins,
-quota, expiry, cancellation and independent live-connection settlement. Synthetic
+quota, expiry, cancellation and independent live-connection settlement. Quota requires successful workload completion, attempt/completion markers, a nonroutine egress-quota receipt, an observed canary connection and independent received bytes within the approved ceiling. Expiry requires readiness and an independently live hold before scope cutoff; elapsed time through actual connection settlement must remain within expiry plus twice CleanupMillis and 250ms of harness allowance. The ordinary wall limit must be strictly later than this bound. Scope UTC expiry is converted once and subsequent duration checks use the harness monotonic clock. Synthetic
 TLS certificate skipping exists only in the test client, not the production
 broker. Missing fixture/profile/capability/evidence fails; it never skips or
 manufactures a qualification pass. Actual image, UID/GID/setgroups, namespace,

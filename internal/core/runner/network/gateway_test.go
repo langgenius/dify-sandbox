@@ -201,3 +201,43 @@ func TestAuthenticatedPinsNeverUseRuntimeDNS(t *testing.T) {
 		t.Fatalf("authenticated pins re-resolved: HTTP%d DNS calls%d", w.Code, dnsCalls.Load())
 	}
 }
+
+func TestQuotaReceiptPreservesNonroutineCause(t *testing.T) {
+	s := validNetworkTestScope()
+	s.MaxEgressBytes = 128
+	s.ScopeDigest = testDigest(s)
+	g, err := NewGateway(context.Background(), "quota-cause", s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g.Close()
+	a, b := net.Pipe()
+	defer b.Close()
+	if err = g.track(a); err != nil {
+		t.Fatal(err)
+	}
+	c := &egressConn{Conn: a, g: g}
+	if _, err = c.Write(make([]byte, 4096)); err == nil {
+		t.Fatal("oversize write accepted")
+	}
+	g.Close() // routine final close must not erase the enforcement cause
+	receipt := g.Receipt()
+	if receipt.RevocationReason != "egress_quota" || receipt.DeniedEgressBytes != 4096 || receipt.EgressBytes != 0 {
+		t.Fatalf("quota indistinguishable from final close: %+v", receipt)
+	}
+}
+
+func TestScopeExpiryReceiptSurvivesRoutineClose(t *testing.T) {
+	s := validNetworkTestScope()
+	s.ExpiresAt = time.Now().Add(time.Second).Unix()
+	s.ScopeDigest = testDigest(s)
+	g, err := NewGateway(context.Background(), "expiry-cause", s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-g.ctx.Done()
+	g.Close()
+	if r := g.Receipt(); !r.Revoked || r.RevocationReason != "scope_expired" {
+		t.Fatalf("expiry cause lost: %+v", r)
+	}
+}

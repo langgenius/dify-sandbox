@@ -88,7 +88,7 @@ func ApplyScope(ctx context.Context, handle NamespaceHandle, scope NetworkScope)
 	return NetworkReceipt{ExecutionID: handle.ExecutionID, PolicyDigest: ScopeDigest(scope)}, nil
 }
 func NewChannel() (*os.File, *os.File, error) {
-	fds, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_DGRAM|unix.SOCK_CLOEXEC, 0)
+	fds, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_SEQPACKET|unix.SOCK_CLOEXEC, 0)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -163,7 +163,11 @@ func (g *Gateway) ServeChannel(file *os.File, ready chan<- error) (result error)
 		if !notified {
 			ready <- result
 		}
-		g.Close()
+		if g.ctx.Err() != nil {
+			g.Close()
+		} else {
+			g.revoke("channel_lost")
+		}
 	}()
 	channel, err := unixChannel(file)
 	if err != nil {

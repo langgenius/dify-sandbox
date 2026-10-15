@@ -2,10 +2,13 @@ package isolation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/network"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/uidpool"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -123,5 +126,62 @@ func TestUIDLeaseRetainedWhenFinalReleaseCannotProveAbsence(t *testing.T) {
 	e.complete("succeeded", "")
 	if e.result.Status != "unknown" || e.result.CleanupState != "quarantined" || released || !quarantined || pool.Len() != 0 {
 		t.Fatalf("uncertain UID was recycled: %+v", e.result)
+	}
+}
+
+func TestWorkerStartTransfersFrontendOwnership(t *testing.T) {
+	if os.Getenv("CS4_START_CHILD") == "1" {
+		f := os.NewFile(3, "frontend")
+		b := make([]byte, 1)
+		if _, err := f.Read(b); err != nil || b[0] != 7 {
+			os.Exit(2)
+		}
+		f.Close()
+		os.Stdout.Write([]byte("closed\n"))
+		time.Sleep(2 * time.Second)
+		os.Exit(0)
+	}
+	parent, child, err := network.NewChannel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer parent.Close()
+	defer child.Close()
+	cmd := exec.Command(os.Args[0], "-test.run=^TestWorkerStartTransfersFrontendOwnership$")
+	cmd.Env = append(os.Environ(), "CS4_START_CHILD=1")
+	cmd.ExtraFiles = []*os.File{child}
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = startWorker(cmd, child); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { cmd.Process.Kill(); cmd.Wait() }()
+	if _, err = parent.Write([]byte{7}); err != nil {
+		t.Fatal(err)
+	}
+	b := make([]byte, 7)
+	if _, err = io.ReadFull(out, b); err != nil || string(b) != "closed\n" {
+		t.Fatalf("inherited endpoint unavailable: %q %v", b, err)
+	}
+	if _, err = child.Stat(); !errors.Is(err, os.ErrClosed) {
+		t.Fatalf("parent retained frontend after worker start: %v", err)
+	}
+}
+func TestFailedWorkerStartRetainsFrontendForCallerCleanup(t *testing.T) {
+	parent, child, err := network.NewChannel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer parent.Close()
+	defer child.Close()
+	cmd := exec.Command("/nonexistent-cs4-worker")
+	cmd.ExtraFiles = []*os.File{child}
+	if err = startWorker(cmd, child); err == nil {
+		t.Fatal("missing worker started")
+	}
+	if _, err = child.Stat(); err != nil {
+		t.Fatal("failed-start endpoint ownership lost")
 	}
 }

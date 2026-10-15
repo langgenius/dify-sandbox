@@ -31,9 +31,10 @@ type NetworkFixture struct {
 	Targets, AlternateTargets []NetworkTarget
 }
 type NetworkCounters struct {
-	BootID   string            `json:"boot_id"`
-	Counters map[string]uint64 `json:"counters"`
-	Active   map[string]uint64 `json:"active"`
+	BootID        string            `json:"boot_id"`
+	Counters      map[string]uint64 `json:"counters"`
+	Active        map[string]uint64 `json:"active"`
+	ReceivedBytes map[string]uint64 `json:"received_bytes"`
 }
 
 func (t NetworkTarget) key() string {
@@ -222,8 +223,8 @@ func Network(endpoint, profilePath, observations string) error {
 	if err = profile.Validate(); err != nil {
 		return err
 	}
-	if !profile.HTTPProxyQualified || profile.MaxNetworkEgressBytes < 65536 || profile.MaxConcurrent < 2 || profile.Limits.WallMillis < 5000 {
-		return fmt.Errorf("qualified proxy, 64KiB egress and two slots required")
+	if !profile.HTTPProxyQualified || profile.MaxNetworkEgressBytes < 65536 || profile.MaxConcurrent < 2 || profile.Limits.WallMillis <= 3250+2*profile.Limits.CleanupMillis {
+		return fmt.Errorf("qualified proxy, 64KiB egress, two slots and wall limit later than expiry plus cleanup required")
 	}
 	raw, err = os.ReadFile(filepath.Join(filepath.Dir(profilePath), "network.json"))
 	if err != nil {
@@ -487,29 +488,69 @@ print('NONE_ATTEMPTED')`, string(targets))
 		return err
 	}
 	// Egress quota counts outbound request headers/body (not response bytes).
-	quota := scopeFor(primary)
-	quota.MaxEgressBytes = 128
-	result, err = run(prepare("quota", "import requests\ntry:\n requests.post("+strconv.Quote(primary.url("/ok"))+",data=b'x'*4096,timeout=3)\nexcept requests.exceptions.RequestException:pass\nprint('QUOTA_EXERCISED')", quota))
+	beforeQuota, err := collectNetwork(client, fixture)
 	if err != nil {
 		return err
 	}
-	if result.NetworkReceipt == nil || result.NetworkReceipt.EgressBytes > 128 || !result.NetworkReceipt.Revoked {
-		return fmt.Errorf("quota enforcement receipt missing")
+	quota := scopeFor(primary)
+	quota.MaxEgressBytes = 128
+	result, err = run(prepare("quota", "import requests\nprint('QUOTA_ATTEMPT_4096',flush=True)\ntry:\n requests.post("+strconv.Quote(primary.url("/ok"))+",data=b'x'*4096,timeout=3)\nexcept requests.exceptions.RequestException:pass\nprint('QUOTA_EXERCISED')", quota))
+	if err != nil {
+		return err
 	}
-	if _, err = settledNetwork(client, fixture, baseline); err != nil {
+	afterQuota, err := settledNetwork(client, fixture, baseline)
+	if err != nil {
+		return err
+	}
+	if err = quotaEvidence(result, beforeQuota, afterQuota, primary, 128); err != nil {
 		return err
 	}
 	hold := "import requests\nr=requests.get(" + strconv.Quote(primary.url("/hold")) + ",stream=True,timeout=10)\nassert r.status_code==200\nprint('CS1_READY',flush=True)\nfor chunk in r.iter_content(1):pass"
 	expire := scopeFor(primary)
 	expire.ExpiresAt = time.Now().Add(3 * time.Second).Unix()
-	result, err = run(prepare("expiry", hold, expire))
-	if err != nil {
-		return err
+	expiryRequest := prepare("expiry", hold, expire)
+	// Convert UTC scope expiry once; all subsequent elapsed bounds use the
+	// monotonic clock retained by started and time.Since(started).
+	started := time.Now()
+	expiresAfter := time.Unix(expire.ExpiresAt, 0).Sub(started)
+	allowance := 2*time.Duration(profile.Limits.CleanupMillis)*time.Millisecond + 250*time.Millisecond
+	wall := time.Duration(profile.Limits.WallMillis) * time.Millisecond
+	if expiresAfter <= 0 || wall <= expiresAfter+allowance {
+		return fmt.Errorf("ordinary wall deadline does not distinguish scope expiry")
 	}
-	if result.Status != "failed" || result.FailureReason != "deadline" {
-		return fmt.Errorf("scope expiry did not terminate: %+v", result)
+	expiryDone := make(chan execution, 1)
+	go func() { r, e := run(expiryRequest); expiryDone <- execution{request: expiryRequest, result: r, err: e} }()
+	liveContext, stopLive := context.WithDeadline(context.Background(), started.Add(expiresAfter))
+	readyErr := waitReady(liveContext, observations, expiryRequest.Options.ExecutionID)
+	live, liveAt := false, time.Duration(0)
+	if readyErr == nil {
+		for liveContext.Err() == nil {
+			snapshot, e := collectNetwork(client, fixture)
+			if e != nil {
+				readyErr = e
+				break
+			}
+			if snapshot.BootID != baseline.BootID {
+				readyErr = fmt.Errorf("collector restarted before live expiry proof")
+				break
+			}
+			if snapshot.Active[primary.key()] > baseline.Active[primary.key()] {
+				live = true
+				liveAt = time.Since(started)
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	stopLive()
+	expired := <-expiryDone
+	if expired.err != nil {
+		return expired.err
 	}
 	if _, err = settledNetwork(client, fixture, baseline); err != nil {
+		return err
+	}
+	if err = expiryEvidence(expired.result, readyErr == nil, live, liveAt, time.Since(started), expiresAfter, allowance, wall); err != nil {
 		return err
 	}
 	request := prepare("revoke", hold, scopeFor(primary))
@@ -582,4 +623,27 @@ func rebindControl(target NetworkTarget) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("missing control DNS address")
+}
+
+// These assertions are shared with adversarial evidence regressions.
+func quotaEvidence(result isolation.ExecutionResult, before, after NetworkCounters, target NetworkTarget, limit int64) error {
+	receipt := result.NetworkReceipt
+	if limit <= 0 || result.Status != "succeeded" || !strings.Contains(result.Stdout, "QUOTA_ATTEMPT_4096") || !strings.Contains(result.Stdout, "QUOTA_EXERCISED") || receipt == nil || !receipt.Revoked || receipt.RevocationReason != "egress_quota" || receipt.EgressBytes < 0 || receipt.EgressBytes > limit || receipt.DeniedEgressBytes <= limit-receipt.EgressBytes {
+		return fmt.Errorf("quota workload or nonroutine rejection evidence missing")
+	}
+	if err := compareNetwork(before, after, []NetworkTarget{target}, true); err != nil {
+		return err
+	}
+	a, okA := before.ReceivedBytes[target.key()]
+	b, okB := after.ReceivedBytes[target.key()]
+	if !okA || !okB || b < a || b-a > uint64(limit) || b-a > uint64(receipt.EgressBytes) {
+		return fmt.Errorf("independent quota byte ceiling missing or exceeded")
+	}
+	return nil
+}
+func expiryEvidence(result isolation.ExecutionResult, ready, live bool, liveAt, finished, expires, allowance, wall time.Duration) error {
+	if result.Status != "failed" || result.FailureReason != "deadline" || !ready || !live || liveAt <= 0 || liveAt >= expires || expires <= 0 || allowance < 0 || finished < expires || finished > expires+allowance || wall <= expires+allowance {
+		return fmt.Errorf("live scope expiry or bounded teardown not proved")
+	}
+	return nil
 }
