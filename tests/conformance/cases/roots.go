@@ -41,7 +41,10 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 		payload, _ := json.Marshal(isolation.Payload{Code: code, Preload: ""})
 		spec.InvocationDigest = isolation.InvocationDigest(spec, payload)
 		body, _ := json.Marshal(isolation.InvocationRequest{Options: spec, Language: language, Code: code})
-		resp, err := client.Post(endpoint+"/v1/sandbox/run", "application/json", bytes.NewReader(body))
+		req, _ := http.NewRequest("POST", endpoint+"/v1/sandbox/run", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Api-Key", os.Getenv("SANDBOX_API_KEY"))
+		resp, err := client.Do(req)
 		if err != nil {
 			return isolation.ExecutionResult{}, err
 		}

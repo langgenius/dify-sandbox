@@ -76,11 +76,16 @@ func (p *NodeJsRunner) Run(
 		if err != nil {
 			return err
 		}
-		output_handler.SetAfterExitHook(func() {
+		output_handler.SetCleanupHook(func() error {
 			codeReader.Close()
 			codeWriter.Close()
-			os.RemoveAll(root_path)
-			uidpool.ReleaseUID(uid)
+			if err := uidpool.VerifyUIDIdle(uid); err != nil {
+				return err
+			}
+			if err := os.RemoveAll(root_path); err != nil {
+				return err
+			}
+			return uidpool.ReleaseUIDChecked(uid)
 		})
 
 		// create a new process

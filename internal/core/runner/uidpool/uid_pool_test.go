@@ -2,6 +2,7 @@ package uidpool
 
 import (
 	"context"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -184,5 +185,10 @@ func TestReleaseRestoresCapacity(t *testing.T) {
 			t.Fatalf("duplicate uid %d", uid)
 		}
 		seen[uid] = true
+	}
+}
+func TestLiveUIDCannotBeReleased(t *testing.T) {
+	if err := VerifyUIDIdle(os.Getuid()); err == nil {
+		t.Fatal("live process UID was reusable")
 	}
 }

@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -82,4 +85,47 @@ func ReleaseUID(uid int) {
 		globalPool = NewUIDPool(10000, 11000)
 	})
 	globalPool.Release(uid)
+}
+
+// ReleaseUIDChecked refuses reuse unless Linux independently observes no task
+// with this execution UID. Failures quarantine the lease until service restart.
+func VerifyUIDIdle(uid int) error {
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if _, err := strconv.Atoi(entry.Name()); err != nil {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join("/proc", entry.Name(), "status"))
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.HasPrefix(line, "Uid:") {
+				for _, field := range strings.Fields(line)[1:] {
+					v, err := strconv.Atoi(field)
+					if err != nil {
+						return err
+					}
+					if v == uid {
+						return fmt.Errorf("UID %d still owns a process; quarantined", uid)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func ReleaseUIDChecked(uid int) error {
+	if err := VerifyUIDIdle(uid); err != nil {
+		return err
+	}
+	ReleaseUID(uid)
+	return nil
 }

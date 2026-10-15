@@ -17,7 +17,7 @@ import (
 )
 
 func setNamespaces(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{Cloneflags: syscall.CLONE_NEWNS | syscall.CLONE_NEWPID | syscall.CLONE_NEWIPC | syscall.CLONE_NEWUTS | syscall.CLONE_NEWNET, Pdeathsig: syscall.SIGKILL}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Cloneflags: syscall.CLONE_NEWNS | syscall.CLONE_NEWPID | syscall.CLONE_NEWIPC | syscall.CLONE_NEWUTS | syscall.CLONE_NEWNET, Pdeathsig: syscall.SIGKILL, Setpgid: true}
 }
 func (e *Execution) AttachCgroup(pid int) error {
 	// Only a pre-delegated subtree is accepted. No host hierarchy is discovered,
@@ -46,6 +46,24 @@ func (e *Execution) AttachCgroup(pid int) error {
 }
 func (e *Execution) cleanup() error {
 	if e.cgroup != "" {
+		if _, err := os.Lstat(e.cgroup); os.IsNotExist(err) {
+			if err := e.reapOwned(); err != nil {
+				return err
+			}
+			return removeOwnedRoot(e.WorkDir)
+		} else if err != nil {
+			return err
+		}
+		if err := privatePath(e.cgroup, true); err != nil {
+			return err
+		}
+		var fs unix.Statfs_t
+		if err := unix.Statfs(e.cgroup, &fs); err != nil {
+			return err
+		}
+		if fs.Type != unix.CGROUP2_SUPER_MAGIC {
+			return fmt.Errorf("cleanup requires actual cgroup v2")
+		}
 		if err := os.WriteFile(filepath.Join(e.cgroup, "cgroup.kill"), []byte("1"), 0600); err != nil {
 			return err
 		}
@@ -67,8 +85,11 @@ func (e *Execution) cleanup() error {
 			return err
 		}
 	}
+	if err := e.reapOwned(); err != nil {
+		return err
+	}
 	if e.WorkDir != "" {
-		return os.RemoveAll(e.WorkDir)
+		return removeOwnedRoot(e.WorkDir)
 	}
 	return nil
 }
@@ -255,5 +276,100 @@ func (e *Execution) observeEvents() {
 		if err == nil {
 			e.observation.Controls[name] = strings.TrimSpace(string(value))
 		}
+	}
+}
+
+// Child mount namespaces disappear when their cgroup is empty. Refuse deletion
+// if an unexpected supervisor-visible mount could make RemoveAll cross a mount.
+func removeOwnedRoot(root string) error {
+	if root == "" {
+		return nil
+	}
+	info, err := os.Lstat(root)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if stat, ok := info.Sys().(*syscall.Stat_t); !ok || stat.Uid != uint32(os.Geteuid()) {
+		return fmt.Errorf("execution root owner changed")
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("unsafe execution root")
+	}
+	data, err := os.ReadFile("/proc/self/mountinfo")
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) > 4 {
+			point := strings.NewReplacer(`\040`, " ", `\011`, "\t", `\012`, "\n", `\134`, `\`).Replace(fields[4])
+			if point == root || strings.HasPrefix(point, root+"/") {
+				return fmt.Errorf("execution root remains mounted")
+			}
+		}
+	}
+	return os.RemoveAll(root)
+}
+
+func waitUnreaped(pid int) error {
+	var info unix.Siginfo
+	for {
+		err := unix.Waitid(unix.P_PID, pid, &info, unix.WEXITED|unix.WNOWAIT, nil)
+		if err == unix.EINTR {
+			continue
+		}
+		return err
+	}
+}
+
+func processStartTime(pid int) (string, error) {
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	if err != nil {
+		return "", err
+	}
+	end := strings.LastIndex(string(data), ") ")
+	if end < 0 {
+		return "", fmt.Errorf("invalid process identity")
+	}
+	fields := strings.Fields(string(data)[end+2:])
+	if len(fields) < 20 {
+		return "", fmt.Errorf("short process identity")
+	}
+	return fields[19], nil
+}
+
+// Only reap a matching owned identity. Never signal a journal PID: a numeric PID
+// may have been reused. Non-child survivors stay quarantined until init reaps.
+func (e *Execution) reapOwned() error {
+	if e.ownedPID == 0 {
+		return nil
+	}
+	deadline := time.Now().Add(time.Duration(e.spec.Budget.CleanupMillis) * time.Millisecond)
+	for {
+		start, err := processStartTime(e.ownedPID)
+		if os.IsNotExist(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if start != e.ownedStart {
+			return nil
+		}
+		var status unix.WaitStatus
+		pid, err := unix.Wait4(e.ownedPID, &status, unix.WNOHANG, nil)
+		if err == nil && pid == e.ownedPID {
+			return nil
+		}
+		if err != nil && err != unix.ECHILD && err != unix.EINTR {
+			return err
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("owned process remains unreaped")
+		}
+		time.Sleep(time.Millisecond)
 	}
 }

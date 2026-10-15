@@ -58,6 +58,7 @@ type Profile struct {
 	EnvironmentRoot   string
 	WorkRoot          string
 	CgroupRoot        string
+	JournalRoot       string
 	WorkerPath        string
 	Languages         []string
 	Limits            Budget

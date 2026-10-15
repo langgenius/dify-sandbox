@@ -17,6 +17,7 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/uidpool"
 	"github.com/langgenius/dify-sandbox/internal/static"
 )
 
@@ -57,11 +58,16 @@ func (p *PythonRunner) Run(
 
 	outputHandler := runner.NewOutputCaptureRunner()
 	outputHandler.SetTimeout(timeout)
-	outputHandler.SetAfterExitHook(func() {
+	outputHandler.SetCleanupHook(func() error {
 		codeReader.Close()
 		codeWriter.Close()
-		os.Remove(bootstrapPath)
-		ReleaseUID(uid)
+		if err := uidpool.VerifyUIDIdle(uid); err != nil {
+			return err
+		}
+		if err := os.Remove(bootstrapPath); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		return uidpool.ReleaseUIDChecked(uid)
 	})
 
 	// create a new process

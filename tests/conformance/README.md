@@ -116,3 +116,48 @@ Configure the synthetic CPUTimeMillis low enough to exceed the total CPU budget
 within the offender's reduced wall deadline at the actual quota/period ratio.
 Actual kernel/image qualification remains pending CS3/CS5; unit fixtures exercise
 the evidence rejection/acceptance logic and do not substitute for it.
+
+## CS2 lifecycle qualification
+
+`--case lifecycle` requires the same qualified actual image/delegation as CS1.
+Start the candidate with `--lifecycle-reconcile` before invoking this case. The
+candidate privately starts a real native workload in a child supervisor, kills
+that supervisor, reconciles its durable journal, verifies the original process
+identities are absent, and verifies reuse of the native UID by a healthy peer.
+It also replaces an owned root with a symlink as a service-side cleanup fault,
+checks quarantine plus a successful peer, repairs the test fault, restarts, and
+checks reconciliation and parent FD counts. The proof is written only through
+the private observations volume; there is no public test-control endpoint.
+Use a fresh disposable qualification instance for this probe: fixed crash-probe
+IDs intentionally remain durable replay tombstones and cannot be rerun as code.
+The probe's journal and roots must persist across supervisor processes.
+
+The candidate now uses the ordinary server authentication middleware, configured
+by `/qualification/server.yaml` with a nonempty `app.key`. Supply the same secret
+as `SANDBOX_API_KEY` in the integration client; no key enters child execution.
+Production Builder composition refuses an empty server key. The ordinary
+endpoint's deployment/configuration is unchanged.
+
+The HTTP lifecycle case checks stdout/stderr flooding, UTF-8 byte boundaries,
+PID-namespace descendant pipe cleanup, TERM-ignoring cancellation, wrong digest,
+duplicate cancel, disconnect after native readiness, terminal same-ID retrieval,
+and successful subsequent execution. Missing native fork/signal support is a
+failed prerequisite, not a skip or a simulated pass. Unit tests separately cover
+pre-dispatch cancellation, queue races, untrusted journal paths, unavailable
+quarantined capacity, journal write failure, and fake-cgroup refusal.
+
+`GET /v1/sandbox/executions/:id` and `POST .../:id/cancel` require `X-Api-Key`
+and `X-Invocation-Digest`. GET returns output-free bounded status. Cancel requests
+termination idempotently and returns current status; poll GET for completion.
+A fully validated duplicate run retrieves a live owned terminal result. After
+restart, the nonsecret journal cannot restore result bytes: the terminal identity
+returns `unknown/result_unavailable`, never success or a second dispatch.
+
+`Profile.JournalRoot` is trusted constructor configuration only; if omitted it
+is `WorkRoot + ".journal"`. It must be outside all child environment/work/cgroup
+roots, service-owned, mode 0700, and nonsymlink. Records/lock are 0600, filenames
+hash execution IDs, and writes use file fsync + atomic rename + directory fsync.
+An exclusive lifetime lock prevents two supervisors from owning the same records.
+Startup reconciles before intake; unknown unjournaled roots fail startup. Failed
+cleanup retains its slot/root and never returns capacity until successful restart
+reconciliation. All-quarantined capacity returns explicit unavailable.

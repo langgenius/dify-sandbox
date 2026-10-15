@@ -82,9 +82,16 @@ func NewBuilderRunController(supervisor *isolation.Supervisor) gin.HandlerFunc {
 		if err != nil {
 			status := 400
 			reason := "input_limit"
+			if errors.Is(err, isolation.ErrInvocationConflict) {
+				status = 409
+				reason = "invocation_conflict"
+			}
 			var failure *isolation.Failure
 			if errors.As(err, &failure) {
 				reason = failure.Reason
+				if reason == "unavailable" {
+					status = 503
+				}
 				if reason == "queue_full" {
 					status = 429
 				}
@@ -97,5 +104,31 @@ func NewBuilderRunController(supervisor *isolation.Supervisor) gin.HandlerFunc {
 			return
 		}
 		c.JSON(200, result)
+	}
+}
+
+// Both lifecycle routes are installed under the server's existing Auth group.
+// The digest is an additional identity check, never an alternative credential.
+func NewExecutionController(supervisor *isolation.Supervisor, cancel bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if supervisor == nil {
+			c.JSON(503, gin.H{"status": "configuration_required"})
+			return
+		}
+		e, err := supervisor.Lookup(c.Param("id"), c.GetHeader("X-Invocation-Digest"))
+		if err != nil {
+			status := 404
+			if errors.Is(err, isolation.ErrInvocationConflict) {
+				status = 409
+			}
+			c.JSON(status, gin.H{"status": "unknown", "failure_reason": "result_unavailable"})
+			return
+		}
+		if cancel {
+			e.RequestTermination("cancelled")
+		}
+		// Status evidence remains bounded and carries no user output. Terminal result
+		// recovery uses the already-authorized, fully validated idempotent run route.
+		c.JSON(200, e.Snapshot())
 	}
 }

@@ -53,7 +53,14 @@ func InitRunRouter(Router *gin.RouterGroup) {
 // The owning HTTP server must configure ReadHeaderTimeout and ReadTimeout.
 func SetupBuilder(router *gin.Engine, supervisor *isolation.Supervisor) {
 	private := router.Group("/v1/sandbox/")
+	private.Use(func(c *gin.Context) {
+		if static.GetDifySandboxGlobalConfigurations().App.Key == "" {
+			c.AbortWithStatus(http.StatusServiceUnavailable)
+		}
+	})
 	private.Use(middleware.Auth())
 	private.POST("run", NewBuilderRunController(supervisor))
+	private.GET("executions/:id", NewExecutionController(supervisor, false))
+	private.POST("executions/:id/cancel", NewExecutionController(supervisor, true))
 	router.GET("/health", func(c *gin.Context) { c.JSON(http.StatusOK, "ok") })
 }

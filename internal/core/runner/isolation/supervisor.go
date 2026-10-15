@@ -3,6 +3,8 @@ package isolation
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +15,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 type ReservationResolver func(context.Context, InvocationSpec) (Budget, error)
@@ -26,6 +29,8 @@ type Supervisor struct {
 	intake    *admission
 	observer  Observer
 	origin    time.Time
+	journal   *journal
+	closed    bool
 }
 
 func NewSupervisor(p Profile, reserve ReservationResolver, launch LaunchFactory, observers ...Observer) (*Supervisor, error) {
@@ -64,20 +69,38 @@ func NewSupervisor(p Profile, reserve ReservationResolver, launch LaunchFactory,
 	if len(observers) == 1 {
 		observer = observers[0]
 	}
-	return &Supervisor{profile: p, reserve: reserve, launch: launch, admission: newAdmission(p.MaxConcurrent, p.MaxQueueDepth, p.MaxQueuedBytes), registry: newRegistry(p.MaxExecutions), intake: newAdmission(p.MaxConcurrent, p.MaxQueueDepth, p.MaxQueuedBytes), observer: observer, origin: time.Now()}, nil
+	s := &Supervisor{profile: p, reserve: reserve, launch: launch, admission: newAdmission(p.MaxConcurrent, p.MaxQueueDepth, p.MaxQueuedBytes), registry: newRegistry(p.MaxExecutions), intake: newAdmission(p.MaxConcurrent, p.MaxQueueDepth, p.MaxQueuedBytes), observer: observer, origin: time.Now()}
+	var err error
+	s.journal, err = openJournal(p)
+	if err != nil {
+		return nil, err
+	}
+	if err = s.reconcile(); err != nil {
+		s.journal.close()
+		return nil, err
+	}
+	return s, nil
 }
 func newRequestRoot(base string) (string, error) { return os.MkdirTemp(base, "request-") }
 
 type Execution struct {
+	mu          sync.Mutex
+	state       string
+	termination string
+	cancel      context.CancelFunc
+	journal     *journal
 	WorkDir     string
 	spec        InvocationSpec
 	profile     Profile
 	cmd         *exec.Cmd
 	gate        *os.File
 	cgroup      string
+	ownedPID    int
+	ownedStart  string
 	done        chan struct{}
 	result      ExecutionResult
 	release     func()
+	quarantine  func()
 	finishOnce  sync.Once
 	observer    Observer
 	observation Observation
@@ -120,21 +143,33 @@ func (s *Supervisor) startValidatedInput(ctx context.Context, spec InvocationSpe
 		return nil, err
 	}
 	var ticket *admissionTicket
+	var executionCtx context.Context
 	owned, created, err := s.registry.claim(spec.ExecutionID, spec.InvocationDigest, func() (*Execution, error) {
 		var err error
+		if s.closed {
+			return nil, fmt.Errorf("supervisor closed")
+		}
 		ticket, err = s.admission.reserve(spec.Budget.InputBytes)
 		if err != nil {
 			return nil, err
 		}
-		return &Execution{spec: spec, profile: s.profile, done: make(chan struct{}), observer: s.observer, origin: s.origin, result: ExecutionResult{ExecutionID: spec.ExecutionID, InvocationDigest: spec.InvocationDigest, ExitCode: -1, CleanupState: "clean"}}, nil
+		runCtx, cancel := context.WithCancel(ctx)
+		e := &Execution{state: "queued", cancel: cancel, journal: s.journal, spec: spec, profile: s.profile, done: make(chan struct{}), observer: s.observer, origin: s.origin, result: ExecutionResult{ExecutionID: spec.ExecutionID, InvocationDigest: spec.InvocationDigest, ExitCode: -1, CleanupState: "clean"}}
+		executionCtx = runCtx
+		if err = e.saveJournal("queued"); err != nil {
+			cancel()
+			ticket.release()
+			return nil, err
+		}
+		return e, nil
 	})
 	if err != nil || !created {
 		return owned, err
 	}
 	go func() {
-		release, err := ticket.wait(ctx, time.Duration(spec.Budget.QueueMillis)*time.Millisecond)
+		release, err := ticket.wait(executionCtx, time.Duration(spec.Budget.QueueMillis)*time.Millisecond)
 		if err != nil {
-			if ctx.Err() != nil {
+			if executionCtx.Err() != nil {
 				owned.complete("cancelled", "")
 			} else {
 				owned.complete("failed", "queue_full")
@@ -142,6 +177,7 @@ func (s *Supervisor) startValidatedInput(ctx context.Context, spec InvocationSpe
 			return
 		}
 		owned.release = release
+		owned.quarantine = ticket.quarantine
 		var parsed Payload
 		if err = decodeStrict(payload, &parsed); err != nil {
 			owned.complete("failed", "input_limit")
@@ -156,7 +192,7 @@ func (s *Supervisor) startValidatedInput(ctx context.Context, spec InvocationSpe
 			owned.complete("configuration_required", "environment_mismatch")
 			return
 		}
-		owned.run(ctx, launch, parsed)
+		owned.run(executionCtx, launch, parsed)
 	}()
 	return owned, nil
 }
@@ -176,9 +212,28 @@ func (e *Execution) complete(status, reason string) {
 	e.finishOnce.Do(func() {
 		e.result.Status = status
 		e.result.FailureReason = reason
+		e.mu.Lock()
+		if e.result.CleanupState == "quarantined" {
+			e.state = "quarantined"
+		} else {
+			e.state = "terminal"
+		}
+		if err := e.saveJournal(e.state); err != nil {
+			e.state = "quarantined"
+			e.result.Status = "unknown"
+			e.result.FailureReason = "cleanup_failed"
+			e.result.CleanupState = "quarantined"
+		}
+		e.mu.Unlock()
 		e.observeCompletion()
+		if e.result.CleanupState == "quarantined" && e.quarantine != nil {
+			e.quarantine()
+		}
 		if e.release != nil && e.result.CleanupState == "clean" {
 			e.release()
+		}
+		if e.cancel != nil {
+			e.cancel()
 		}
 		close(e.done)
 	})
@@ -189,13 +244,38 @@ func (e *Execution) FailBeforeStart(cause error) error {
 	}
 	if e.cmd != nil && e.cmd.Process != nil {
 		e.cmd.Process.Kill()
-		e.cmd.Wait()
+		waited := make(chan error, 1)
+		go func() { waited <- e.cmd.Wait() }()
+		select {
+		case <-waited:
+		case <-time.After(time.Duration(e.spec.Budget.CleanupMillis) * time.Millisecond):
+			e.result.CleanupState = "quarantined"
+			e.complete("unknown", "cleanup_failed")
+			return cause
+		}
 	}
 	if err := e.cleanup(); err != nil {
 		e.result.CleanupState = "quarantined"
 		e.complete("configuration_required", "cleanup_failed")
 	} else {
-		e.complete("configuration_required", "environment_mismatch")
+		e.mu.Lock()
+		reason := e.termination
+		e.mu.Unlock()
+		if reason == "" && errors.Is(cause, context.Canceled) {
+			reason = "cancelled"
+		}
+		if reason == "" && errors.Is(cause, context.DeadlineExceeded) {
+			reason = "deadline"
+		}
+		if reason != "" {
+			status := "failed"
+			if reason == "cancelled" {
+				status = "cancelled"
+			}
+			e.complete(status, reason)
+		} else {
+			e.complete("configuration_required", "environment_mismatch")
+		}
 	}
 	return cause
 }
@@ -210,7 +290,18 @@ func (e *Execution) ReleaseStartGate() error {
 func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 	start := time.Now()
 	var err error
-	e.WorkDir, err = newRequestRoot(e.profile.WorkRoot)
+	var random [16]byte
+	if _, err = rand.Read(random[:]); err != nil {
+		e.FailBeforeStart(err)
+		return
+	}
+	e.WorkDir = filepath.Join(e.profile.WorkRoot, "request-"+hex.EncodeToString(random[:]))
+	e.cgroup = filepath.Join(e.profile.CgroupRoot, filepath.Base(e.WorkDir))
+	if err = e.saveJournal("queued"); err != nil {
+		e.FailBeforeStart(err)
+		return
+	}
+	err = os.Mkdir(e.WorkDir, 0700)
 	if err != nil {
 		e.FailBeforeStart(err)
 		return
@@ -230,15 +321,15 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 	}
 	runCtx, cancel := context.WithTimeout(ctx, time.Duration(e.spec.Budget.WallMillis)*time.Millisecond)
 	defer cancel()
-	cmd := exec.CommandContext(runCtx, e.profile.WorkerPath)
+	cmd := exec.Command(e.profile.WorkerPath)
 	e.cmd = cmd
 	cmd.Dir = e.WorkDir
 	cmd.Env = e.ChildEnv()
 	cmd.ExtraFiles = []*os.File{gateRead}
 	cmd.Stdin = bytes.NewReader(encoded)
 	setNamespaces(cmd)
-	stdout := &limitedBuffer{limit: e.spec.Budget.StdoutBytes, observe: e.observeStdout}
-	stderr := &limitedBuffer{limit: e.spec.Budget.StderrBytes}
+	stdout := &limitedBuffer{limit: e.spec.Budget.StdoutBytes, observe: e.observeStdout, overflow: func() { e.RequestTermination("stdout_limit") }}
+	stderr := &limitedBuffer{limit: e.spec.Budget.StderrBytes, overflow: func() { e.RequestTermination("stderr_limit") }}
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	cmd.WaitDelay = time.Duration(e.spec.Budget.CleanupMillis) * time.Millisecond
@@ -247,6 +338,16 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 		return
 	}
 	gateRead.Close()
+	e.ownedPID = cmd.Process.Pid
+	e.ownedStart, err = processStartTime(e.ownedPID)
+	if err != nil {
+		e.FailBeforeStart(err)
+		return
+	}
+	if err = e.saveJournal("queued"); err != nil {
+		e.FailBeforeStart(err)
+		return
+	}
 	if err = e.AttachCgroup(cmd.Process.Pid); err != nil {
 		e.FailBeforeStart(err)
 		return
@@ -255,7 +356,7 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 		e.FailBeforeStart(err)
 		return
 	}
-	if err = e.ReleaseStartGate(); err != nil {
+	if err = e.openStartGate(runCtx); err != nil {
 		e.FailBeforeStart(err)
 		return
 	}
@@ -270,10 +371,37 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 	cpuExceeded := make(chan struct{}, 1)
 	monitorStopped := make(chan struct{})
 	go e.monitorCPU(monitorDone, monitorStopped, cpuExceeded)
-	err = cmd.Wait()
-	e.observation.ExitedNanos = e.elapsedNanos()
+	terminationStopped := make(chan struct{})
+	go e.terminationMonitor(runCtx, monitorDone, terminationStopped)
+	// Observe exit without reaping the group leader. Termination signals stop
+	// before Wait can release its PID for reuse.
+	exitReady := make(chan error, 1)
+	go func() { exitReady <- waitUnreaped(cmd.Process.Pid) }()
+	waitTimer := time.NewTimer(time.Duration(e.spec.Budget.WallMillis+2*e.spec.Budget.CleanupMillis) * time.Millisecond)
+	defer waitTimer.Stop()
+	var waitErr error
+	select {
+	case waitErr = <-exitReady:
+	case <-waitTimer.C:
+		e.killTree()
+		close(monitorDone)
+		<-monitorStopped
+		<-terminationStopped
+		// A stuck kernel task keeps its slot forever; a bounded late reaper
+		// prevents a zombie if the kernel eventually completes the kill.
+		go func() { <-exitReady; cmd.Wait() }()
+		e.result.CleanupState = "quarantined"
+		e.complete("unknown", "cleanup_failed")
+		return
+	}
 	close(monitorDone)
 	<-monitorStopped
+	<-terminationStopped
+	err = cmd.Wait()
+	if waitErr != nil && err == nil {
+		err = waitErr
+	}
+	e.observation.ExitedNanos = e.elapsedNanos()
 	e.result.ExitCode = cmd.ProcessState.ExitCode()
 	e.result.Stdout = stdout.String()
 	e.result.Stderr = stderr.String()
@@ -309,6 +437,24 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 		status = "failed"
 		reason = "stderr_limit"
 	}
+	e.mu.Lock()
+	termination := e.termination
+	e.mu.Unlock()
+	if termination != "" {
+		reason = termination
+		status = "failed"
+		if termination == "cancelled" {
+			status = "cancelled"
+		}
+	}
+	if errors.Is(err, exec.ErrWaitDelay) {
+		status = "failed"
+		reason = "output_read"
+	}
+	if (!utf8.ValidString(e.result.Stdout) || !utf8.ValidString(e.result.Stderr)) && status == "succeeded" {
+		status = "failed"
+		reason = "invalid_output"
+	}
 	if cleanupErr := e.cleanup(); cleanupErr != nil {
 		status = "unknown"
 		reason = "cleanup_failed"
@@ -317,19 +463,23 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 	e.complete(status, reason)
 }
 
-// Drain excess output without retaining it. CS2 adds prompt termination and
-// richer per-stream cancellation; excess can never become successful output.
+// Retain only the stream budget and request prompt termination on overflow.
+// Excess bytes are drained without retention and can never become success.
 type limitedBuffer struct {
 	data     bytes.Buffer
 	limit    int64
 	exceeded bool
 	observe  func([]byte)
+	overflow func()
 }
 
 func (b *limitedBuffer) Write(p []byte) (int, error) {
 	n := len(p)
 	remaining := b.limit - int64(b.data.Len())
 	if int64(n) > remaining {
+		if !b.exceeded && b.overflow != nil {
+			b.overflow()
+		}
 		b.exceeded = true
 		p = p[:remaining]
 	}
@@ -406,4 +556,23 @@ func (e *Execution) observeStdout(data []byte) {
 	if e.observer != nil {
 		e.observer(Observation{ExecutionID: e.spec.ExecutionID, Phase: "stdout", ObservedNanos: e.elapsedNanos(), StdoutChunk: string(data)})
 	}
+}
+
+func (e *Execution) openStartGate(ctx context.Context) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := e.saveJournal("running"); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := e.ReleaseStartGate(); err != nil {
+		return err
+	}
+	e.state = "running"
+	return nil
 }

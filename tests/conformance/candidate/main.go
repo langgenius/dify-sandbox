@@ -5,11 +5,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/langgenius/dify-sandbox/internal/controller"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
 	"github.com/langgenius/dify-sandbox/internal/service"
+	"github.com/langgenius/dify-sandbox/internal/static"
 	"github.com/langgenius/dify-sandbox/tests/conformance/cases"
 	"log"
 	"net/http"
@@ -19,6 +21,12 @@ import (
 )
 
 func main() {
+	probe := flag.Bool("lifecycle-reconcile", false, "run actual restart/quarantine probe before serving")
+	orphan := flag.Bool("lifecycle-orphan", false, "private restart child")
+	flag.Parse()
+	if err := static.InitConfig("/qualification/server.yaml"); err != nil {
+		log.Fatal("authenticated candidate config required: ", err)
+	}
 	raw, err := os.ReadFile("/qualification/profile.json")
 	if err != nil {
 		log.Fatal("qualified synthetic profile missing: ", err)
@@ -49,12 +57,23 @@ func main() {
 			return isolation.Launch{}, fmt.Errorf("unsupported language")
 		}
 	}
+	if *orphan {
+		if err := orphanProbe(p, resolver, factory); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	if *probe {
+		if err := reconcileProbe(p, resolver, factory); err != nil {
+			log.Fatal(err)
+		}
+	}
 	supervisor, err := isolation.NewSupervisor(p, resolver, factory, observer)
 	if err != nil {
 		log.Fatal(err)
 	}
 	router := gin.New()
-	router.POST("/v1/sandbox/run", controller.NewBuilderRunController(supervisor))
+	controller.SetupBuilder(router, supervisor)
 	server := &http.Server{Addr: ":8194", Handler: router, ReadHeaderTimeout: time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: time.Duration(p.Limits.WallMillis+p.Limits.QueueMillis+p.Limits.CleanupMillis+2000) * time.Millisecond}
 	log.Fatal(server.ListenAndServe())
 }

@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"strings"
+	capture_runner "github.com/langgenius/dify-sandbox/internal/core/runner"
 	"time"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
@@ -31,39 +31,7 @@ func RunNodeJsCode(ctx context.Context, code string, preload string, options *ru
 		return types.ErrorResponse(-500, err.Error())
 	}
 
-	var stdoutStr strings.Builder
-	var stderrStr strings.Builder
-
-	defer close(done)
-
-	for {
-		select {
-		case <-done:
-			// Drain any remaining buffered output to avoid races
-		drain:
-			for {
-				select {
-				case out := <-stdout:
-					stdoutStr.Write(out)
-				case err := <-stderr:
-					stderrStr.Write(err)
-				default:
-					break drain
-				}
-			}
-			// Close channels after draining all data
-			close(stdout)
-			close(stderr)
-			return types.SuccessResponse(&RunCodeResponse{
-				Stdout: stdoutStr.String(),
-				Stderr: stderrStr.String(),
-			})
-		case out := <-stdout:
-			stdoutStr.Write(out)
-		case err := <-stderr:
-			stderrStr.Write(err)
-		}
-	}
+	return collectOutput(stdout, stderr, done, capture_runner.LegacyOutputBytes)
 }
 
 func NodeIsolatedLaunch(executable string) isolation.Launch { return nodejs.IsolatedLaunch(executable) }

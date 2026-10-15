@@ -2,10 +2,25 @@ package isolation
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
 	"time"
 )
+
+var ErrInvocationConflict = errors.New("execution ID digest conflict")
+var ErrExecutionUnknown = errors.New("execution state unavailable")
+
+// Registry keeps bounded replay tombstones; it never evicts dispatch identity.
+type Registry = registry
+
+func (r *registry) Find(id string) (*Execution, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if e, ok := r.entries[id]; ok {
+		return e.execution, nil
+	}
+	return nil, ErrExecutionUnknown
+}
 
 type registryEntry struct {
 	digest    string
@@ -31,7 +46,7 @@ func (r *registry) claim(id, digest string, create func() (*Execution, error)) (
 	defer r.mu.Unlock()
 	if old, ok := r.entries[id]; ok {
 		if old.digest != digest {
-			return nil, false, fmt.Errorf("execution ID digest conflict")
+			return nil, false, ErrInvocationConflict
 		}
 		return old.execution, false, nil
 	}
@@ -51,6 +66,7 @@ func (r *registry) claim(id, digest string, create func() (*Execution, error)) (
 type admission struct {
 	mu                              sync.Mutex
 	running, queued, bytes          int64
+	quarantined                     int64
 	maxRunning, maxQueued, maxBytes int64
 	changed                         chan struct{}
 }
@@ -73,6 +89,9 @@ type admissionTicket struct {
 func (a *admission) reserve(bytes int64) (*admissionTicket, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.quarantined >= a.maxRunning {
+		return nil, failure("unavailable", "all execution slots quarantined")
+	}
 	if bytes <= 0 || bytes > a.maxBytes-a.bytes {
 		return nil, failure("queue_full", "service admission memory exhausted")
 	}
@@ -148,4 +167,22 @@ func (a *admission) acquire(ctx context.Context, bytes int64, wait time.Duration
 		return nil, err
 	}
 	return ticket.wait(ctx, wait)
+}
+
+// Quarantine frees retained payload accounting, but never returns the slot.
+func (t *admissionTicket) quarantine() {
+	a := t.owner
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if t.released {
+		return
+	}
+	t.released = true
+	if !t.running {
+		a.queued--
+		a.running++
+	}
+	a.quarantined++
+	a.bytes -= t.bytes
+	a.notify()
 }
