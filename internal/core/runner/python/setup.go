@@ -120,7 +120,7 @@ func InstallDependencies(requirements string) error {
 		pipMirrorURL := static.GetDifySandboxGlobalConfigurations().PythonPipMirrorURL
 
 		// Create the base command
-		args := []string{"install", "-r", "requirements.txt"}
+		args := []string{"install", "-r", path.Join(root_path, "requirements.txt")}
 		if pipMirrorURL != "" {
 			// If a mirror URL is provided, include it in the command arguments
 			args = append(args, "-i", pipMirrorURL)
@@ -128,6 +128,7 @@ func InstallDependencies(requirements string) error {
 			args = append(args, "--trusted-host", parsedUrl.Host)
 		}
 		cmd := exec.Command("pip3", args...)
+		cmd.Dir = root_path
 		reader, err := cmd.StdoutPipe()
 		if err != nil {
 			slog.Error("failed to get stdout pipe of pip3")

@@ -3,6 +3,8 @@
 package nodejs
 
 import (
+	"fmt"
+	sg "github.com/seccomp/libseccomp-golang"
 	"os"
 	"strconv"
 	"strings"
@@ -15,11 +17,23 @@ import (
 //var allow_syscalls = []int{}
 
 func InitSeccomp(uid int, gid int, enable_network bool) error {
-	err := syscall.Chroot(".")
+	return initSeccomp(uid, gid, enable_network, false)
+}
+
+// InitSeccompIsolated enters the already isolated environment and private cwd
+// before installing the same native filter. Network remains disabled.
+func InitSeccompIsolated(uid, gid int) error { return initSeccomp(uid, gid, false, true) }
+
+func initSeccomp(uid int, gid int, enable_network bool, isolated bool) error {
+	root, cwd := ".", "/"
+	if isolated {
+		root, cwd = "/", "/work"
+	}
+	err := syscall.Chroot(root)
 	if err != nil {
 		return err
 	}
-	err = syscall.Chdir("/")
+	err = syscall.Chdir(cwd)
 	if err != nil {
 		return err
 	}
@@ -49,6 +63,21 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 		}
 	}
 
+	if isolated {
+		extra, err := isolatedFilesystemSyscalls()
+		if err != nil {
+			return err
+		}
+		for _, number := range extra {
+			found := false
+			for _, existing := range allowed_syscalls {
+				found = found || existing == number
+			}
+			if !found {
+				allowed_syscalls = append(allowed_syscalls, number)
+			}
+		}
+	}
 	err = lib.Seccomp(allowed_syscalls, allowed_not_kill_syscalls)
 	if err != nil {
 		return err
@@ -72,4 +101,19 @@ func InitSeccomp(uid int, gid int, enable_network bool) error {
 	}
 
 	return nil
+}
+
+// These additions permit cwd/metadata inspection and module discovery inside
+// the read-only environment. They do not permit network, mount or cwd changes.
+// Names are resolved by libseccomp for the actual target architecture.
+func isolatedFilesystemSyscalls() ([]int, error) {
+	result := make([]int, 0, 8)
+	for _, name := range []string{"getcwd", "newfstatat", "readlinkat", "getdents64", "fstat", "lseek", "statfs", "fstatfs"} {
+		number, err := sg.GetSyscallFromName(name)
+		if err != nil || number < 0 {
+			return nil, fmt.Errorf("unsupported isolated filesystem syscall %s: %v", name, err)
+		}
+		result = append(result, int(number))
+	}
+	return result, nil
 }

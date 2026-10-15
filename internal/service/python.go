@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/python"
 	runner_types "github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
@@ -105,4 +106,9 @@ func UpdateDependencies() *types.DifySandboxResponse {
 	}
 
 	return types.SuccessResponse(&UpdateDependenciesResponse{})
+}
+
+// PythonIsolatedLaunch is constructed from server-owned environment metadata.
+func PythonIsolatedLaunch(executable string) isolation.Launch {
+	return python.IsolatedLaunch(executable)
 }

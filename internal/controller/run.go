@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
 	runner_types "github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/service"
 	"github.com/langgenius/dify-sandbox/internal/types"
@@ -66,4 +68,34 @@ func RefreshDependencies(c *gin.Context) {
 			c.JSON(400, types.ErrorResponse(-400, "unsupported language"))
 		}
 	})
+}
+
+// NewBuilderRunController is bound by server composition. It never falls back
+// to ordinary execution when options are absent or malformed.
+func NewBuilderRunController(supervisor *isolation.Supervisor) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if supervisor == nil {
+			c.JSON(503, isolation.ExecutionResult{Status: "configuration_required", FailureReason: "environment_mismatch", CleanupState: "clean", ExitCode: -1})
+			return
+		}
+		execution, err := supervisor.StartRequest(c.Request.Context(), c.Request.Body)
+		if err != nil {
+			status := 400
+			reason := "input_limit"
+			var failure *isolation.Failure
+			if errors.As(err, &failure) {
+				reason = failure.Reason
+				if reason == "queue_full" {
+					status = 429
+				}
+			}
+			c.JSON(status, isolation.ExecutionResult{Status: "failed", FailureReason: reason, CleanupState: "clean", ExitCode: -1})
+			return
+		}
+		result, err := execution.Wait(c.Request.Context())
+		if err != nil {
+			return
+		}
+		c.JSON(200, result)
+	}
 }

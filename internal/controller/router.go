@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
 	"github.com/langgenius/dify-sandbox/internal/middleware"
 	"github.com/langgenius/dify-sandbox/internal/static"
 )
@@ -45,4 +46,14 @@ func InitRunRouter(Router *gin.RouterGroup) {
 			RunSandboxController,
 		)
 	}
+}
+
+// SetupBuilder installs an explicitly separate deployment profile at the same
+// wire endpoint. Ordinary Setup and its dependency-refresh behavior are intact.
+// The owning HTTP server must configure ReadHeaderTimeout and ReadTimeout.
+func SetupBuilder(router *gin.Engine, supervisor *isolation.Supervisor) {
+	private := router.Group("/v1/sandbox/")
+	private.Use(middleware.Auth())
+	private.POST("run", NewBuilderRunController(supervisor))
+	router.GET("/health", func(c *gin.Context) { c.JSON(http.StatusOK, "ok") })
 }

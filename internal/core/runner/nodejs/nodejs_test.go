@@ -40,3 +40,16 @@ func TestBuildCommandArgsUsesProvidedUID(t *testing.T) {
 		t.Fatal("expected command args to avoid shared sandbox uid")
 	}
 }
+
+func TestIsolatedLaunchPreservesNativeSeccompAndPrivateCodePipe(t *testing.T) {
+	launch := IsolatedLaunch("/usr/bin/node")
+	if launch.Executable != "/usr/bin/node" || launch.BootstrapPath != "/work/bootstrap" {
+		t.Fatal("invalid native launch paths")
+	}
+	if !strings.Contains(launch.Bootstrap, "difySeccomp(uid, gid") || !strings.Contains(launch.Bootstrap, "readFileSync(3") {
+		t.Fatal("native bootstrap isolation removed")
+	}
+	if !strings.Contains(launch.Bootstrap, "DifySeccompIsolated") || strings.Contains(launch.Bootstrap, "process.chdir('/work')") {
+		t.Fatal("isolated native entry point must set cwd before seccomp")
+	}
+}

@@ -22,3 +22,16 @@ func TestBuildBootstrapInjectsPreloadButNotUserCode(t *testing.T) {
 		t.Fatal("bootstrap unexpectedly contains user code")
 	}
 }
+
+func TestIsolatedLaunchPreservesNativeSeccompAndPrivateCodePipe(t *testing.T) {
+	launch := IsolatedLaunch("/usr/local/bin/python3")
+	if launch.Executable != "/usr/local/bin/python3" || launch.BootstrapPath != "/work/bootstrap" {
+		t.Fatal("invalid native launch paths")
+	}
+	if !strings.Contains(launch.Bootstrap, "lib.DifySeccompIsolated(") || !strings.Contains(launch.Bootstrap, "os.fdopen(3") {
+		t.Fatal("native bootstrap isolation removed")
+	}
+	if strings.Contains(launch.Bootstrap, `os.chdir("/work")`) {
+		t.Fatal("cwd must be set before seccomp inside the native entry point")
+	}
+}

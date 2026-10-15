@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
 )
@@ -166,4 +167,13 @@ func (p *PythonRunner) InitializeEnvironment(preload string, options *types.Runn
 	}
 
 	return bootstrapPath, nil
+}
+
+// IsolatedLaunch reuses the native bootstrap and seccomp entry point. The worker
+// supplies a read-only environment root and code on descriptor 3.
+func IsolatedLaunch(executable string) isolation.Launch {
+	script := buildBootstrap("", &types.RunnerOptions{}, static.SANDBOX_USER_UID)
+	script = strings.Replace(script, `ctypes.CDLL("./python.so")`, `ctypes.CDLL("/var/sandbox/sandbox-python/python.so")`, 1)
+	script = strings.ReplaceAll(script, "DifySeccomp", "DifySeccompIsolated")
+	return isolation.Launch{Executable: executable, Args: []string{"/work/bootstrap", "/"}, BootstrapPath: "/work/bootstrap", Bootstrap: script}
 }

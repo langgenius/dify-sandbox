@@ -18,6 +18,11 @@ func (s *TempDirRunner) WithTempDir(basedir string, paths []string, closures fun
 
 	// create a tmp dir
 	tmpDir := path.Join(basedir, "tmp", "sandbox-"+uuid.String())
+	defer func() {
+		if err != nil {
+			_ = os.RemoveAll(tmpDir)
+		}
+	}()
 	err = os.Mkdir(tmpDir, 0755)
 	if err != nil {
 		return err
@@ -48,12 +53,6 @@ func (s *TempDirRunner) WithTempDir(basedir string, paths []string, closures fun
 		if err != nil {
 			return err
 		}
-	}
-
-	// chdir
-	err = os.Chdir(tmpDir)
-	if err != nil {
-		return err
 	}
 
 	err = closures(tmpDir)

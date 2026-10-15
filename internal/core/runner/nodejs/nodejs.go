@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/uidpool"
 	"github.com/langgenius/dify-sandbox/internal/static"
@@ -85,6 +86,7 @@ func (p *NodeJsRunner) Run(
 		// create a new process
 		cmd := exec.Command(configuration.NodejsPath, buildCommandArgs(script_path, uid, options)...)
 		cmd.Env = []string{}
+		cmd.Dir = root_path
 		cmd.ExtraFiles = []*os.File{codeReader}
 
 		if len(configuration.AllowedSyscalls) > 0 {
@@ -157,4 +159,12 @@ func (p *NodeJsRunner) InitializeEnvironment(preload string, root_path string) (
 	}
 
 	return script_path, nil
+}
+
+// IsolatedLaunch keeps the existing native Node bootstrap and seccomp library.
+func IsolatedLaunch(executable string) isolation.Launch {
+	script := buildBootstrap("")
+	script = strings.Replace(script, "require('koffi')", "require('/var/sandbox/sandbox-nodejs/nodejs-project/node_temp/node_modules/koffi')", 1)
+	script = strings.ReplaceAll(script, "DifySeccomp", "DifySeccompIsolated")
+	return isolation.Launch{Executable: executable, Args: buildCommandArgs("/work/bootstrap", static.SANDBOX_USER_UID, &types.RunnerOptions{}), BootstrapPath: "/work/bootstrap", Bootstrap: script}
 }

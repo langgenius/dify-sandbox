@@ -38,6 +38,7 @@ func PreparePythonDependenciesEnv() error {
 				lib_path,
 				LIB_PATH,
 			)
+			exec_cmd.Dir = root_path
 			exec_cmd.Stderr = os.Stderr
 
 			if err := exec_cmd.Run(); err != nil {

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/nodejs"
 	runner_types "github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/static"
@@ -64,3 +65,5 @@ func RunNodeJsCode(ctx context.Context, code string, preload string, options *ru
 		}
 	}
 }
+
+func NodeIsolatedLaunch(executable string) isolation.Launch { return nodejs.IsolatedLaunch(executable) }

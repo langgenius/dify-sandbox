@@ -10,4 +10,14 @@ func DifySeccomp(uid int, gid int, enable_network bool) {
 	}
 }
 
+//export DifySeccompIsolated
+func DifySeccompIsolated(uid int, gid int, enable_network bool) {
+	if enable_network {
+		panic("isolated network scope is not configured")
+	}
+	if err := nodejs.InitSeccompIsolated(uid, gid); err != nil {
+		panic(err)
+	}
+}
+
 func main() {}
