@@ -1,0 +1,12 @@
+const assert = require('assert');
+const fs = require('fs');
+const crypto = require('crypto');
+const koffi = require('koffi');
+assert.strictEqual(koffi.version, '2.10.1');
+assert.strictEqual(koffi.load('libc.so.6').func('int abs(int)')(-42), 42);
+koffi.load('/var/sandbox/sandbox-nodejs/nodejs.so');
+assert.strictEqual(crypto.createHash('sha256').update('你好').digest('hex'), '670d9743542cae3ea7ebe36af56bd53648b0a1126162e78d81a32934a711302e');
+assert.strictEqual(fs.existsSync('/conf'), false);
+assert.strictEqual(fs.existsSync('/qualification'), false);
+assert.throws(() => fs.appendFileSync('/opt/node/node_modules/koffi/index.js', ''), /EACCES|EROFS/);
+console.log(JSON.stringify({sum:[1,2,3].reduce((a,b)=>a+b),unicode:'你好',array:[1,true,null],object:{x:2}}));

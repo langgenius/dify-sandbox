@@ -23,7 +23,7 @@ func TestIsolatedFilesystemAdditionsDoNotGrantNetworkOrChdir(t *testing.T) {
 			}
 		}
 	}
-	for _, name := range []string{"getcwd", "newfstatat", "readlinkat", "getdents64"} {
+	for _, name := range []string{"getcwd", "newfstatat", "readlinkat", "getdents64", "statx", "faccessat", "faccessat2"} {
 		number, _ := sg.GetSyscallFromName(name)
 		found := false
 		for _, value := range allowed {

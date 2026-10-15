@@ -10,3 +10,8 @@ echo "Building main" &&
 GOOS=linux GOARCH=amd64 go build -o main -ldflags="-s -w" cmd/server/main.go
 echo "Building env"
 GOOS=linux GOARCH=amd64 go build -o env -ldflags="-s -w" cmd/dependencies/init.go
+# Explicit Builder build artifacts; ordinary builds retain their existing owner.
+if [ "${SANDBOX_PROFILE:-}" = builder ]; then
+  GOOS=linux GOARCH=amd64 go build -o request-worker ./cmd/request-worker || exit 1
+  GOOS=linux GOARCH=amd64 go build -o environment-manifest ./cmd/environment-manifest || exit 1
+fi

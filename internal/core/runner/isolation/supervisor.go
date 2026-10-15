@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/environment"
 	"io"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -50,15 +50,7 @@ func NewSupervisor(p Profile, reserve ReservationResolver, launch LaunchFactory,
 	if reserve == nil || launch == nil {
 		return nil, fmt.Errorf("trusted reservation resolver and native launch factory required")
 	}
-	if err := filepath.WalkDir(p.EnvironmentRoot, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.Type()&(os.ModeSocket|os.ModeNamedPipe|os.ModeDevice|os.ModeCharDevice) != 0 {
-			return fmt.Errorf("environment contains a service socket, pipe or device: %s", path)
-		}
-		return nil
-	}); err != nil {
+	if _, err := environment.LoadAndVerify(p.EnvironmentRoot, p.EnvironmentDigest); err != nil {
 		return nil, err
 	}
 	p.Languages = append([]string(nil), p.Languages...)
@@ -183,6 +175,10 @@ func (s *Supervisor) startValidatedInput(ctx context.Context, spec InvocationSpe
 			owned.complete("failed", "input_limit")
 			return
 		}
+		if _, err := environment.LoadAndVerify(s.profile.EnvironmentRoot, s.profile.EnvironmentDigest); err != nil {
+			owned.complete("configuration_required", "environment_mismatch")
+			return
+		}
 		launch, err := s.launch(spec, parsed)
 		if err != nil {
 			owned.complete("configuration_required", "environment_mismatch")
@@ -198,7 +194,7 @@ func (s *Supervisor) startValidatedInput(ctx context.Context, spec InvocationSpe
 }
 
 func (e *Execution) ChildEnv() []string {
-	return []string{"PATH=/usr/local/bin:/usr/bin:/bin", "HOME=/work", "TMPDIR=/work/tmp", "LANG=C.UTF-8", "PYTHONDONTWRITEBYTECODE=1"}
+	return []string{"PATH=/usr/local/bin:/usr/bin:/bin", "HOME=/work", "TMPDIR=/work/tmp", "LANG=C.UTF-8", "PYTHONDONTWRITEBYTECODE=1", "PYTHONHOME=/usr/local", "LD_LIBRARY_PATH=/usr/local/lib", "NODE_PATH=/opt/node/node_modules", "XDG_CACHE_HOME=/work/tmp"}
 }
 func (e *Execution) Wait(ctx context.Context) (ExecutionResult, error) {
 	select {

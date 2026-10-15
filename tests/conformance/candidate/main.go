@@ -29,11 +29,14 @@ func main() {
 	}
 	raw, err := os.ReadFile("/qualification/profile.json")
 	if err != nil {
-		log.Fatal("qualified synthetic profile missing: ", err)
+		log.Fatal("qualified candidate profile missing: ", err)
 	}
 	var p isolation.Profile
 	if err = json.Unmarshal(raw, &p); err != nil {
 		log.Fatal(err)
+	}
+	if p.EnvironmentRoot != "/environment-root" {
+		log.Fatal("candidate requires baked environment root")
 	}
 	recorder := cases.NewObservationRecorder("/observations", p.MaxExecutions)
 	observer := func(o isolation.Observation) {

@@ -4,6 +4,7 @@ package python
 
 import (
 	_ "embed"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/environment"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -17,6 +18,9 @@ import (
 var env_script string
 
 func PreparePythonDependenciesEnv() error {
+	if err := environment.RequireMutable(); err != nil {
+		return err
+	}
 	config := static.GetDifySandboxGlobalConfigurations()
 
 	runner := runner.TempDirRunner{}

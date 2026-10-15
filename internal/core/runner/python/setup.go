@@ -5,6 +5,7 @@ package python
 import (
 	_ "embed"
 	"fmt"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/environment"
 	"log/slog"
 	"net/url"
 	"os"
@@ -29,6 +30,9 @@ const (
 )
 
 func init() {
+	if environment.BuilderProfile() {
+		return
+	}
 	releaseLibBinary(true)
 }
 
@@ -102,6 +106,9 @@ func ExtractOnelineDepency(dependency string) (string, string) {
 }
 
 func InstallDependencies(requirements string) error {
+	if err := environment.RequireMutable(); err != nil {
+		return err
+	}
 	if requirements == "" {
 		return nil
 	}

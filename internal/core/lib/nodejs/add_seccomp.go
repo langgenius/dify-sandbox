@@ -78,7 +78,11 @@ func initSeccomp(uid int, gid int, enable_network bool, isolated bool) error {
 			}
 		}
 	}
-	err = lib.Seccomp(allowed_syscalls, allowed_not_kill_syscalls)
+	if isolated {
+		err = lib.SeccompIsolated(allowed_syscalls, allowed_not_kill_syscalls)
+	} else {
+		err = lib.Seccomp(allowed_syscalls, allowed_not_kill_syscalls)
+	}
 	if err != nil {
 		return err
 	}
@@ -108,7 +112,7 @@ func initSeccomp(uid int, gid int, enable_network bool, isolated bool) error {
 // Names are resolved by libseccomp for the actual target architecture.
 func isolatedFilesystemSyscalls() ([]int, error) {
 	result := make([]int, 0, 8)
-	for _, name := range []string{"getcwd", "newfstatat", "readlinkat", "getdents64", "fstat", "lseek", "statfs", "fstatfs"} {
+	for _, name := range []string{"getcwd", "newfstatat", "readlinkat", "getdents64", "fstat", "lseek", "statfs", "fstatfs", "statx", "faccessat", "faccessat2"} {
 		number, err := sg.GetSyscallFromName(name)
 		if err != nil || number < 0 {
 			return nil, fmt.Errorf("unsupported isolated filesystem syscall %s: %v", name, err)

@@ -5,6 +5,7 @@ package nodejs
 import (
 	"embed"
 	"fmt"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/environment"
 	"log/slog"
 	"os"
 	"path"
@@ -23,6 +24,9 @@ var nodejs_lib []byte
 var nodejs_dependens embed.FS // it's a directory
 
 func init() {
+	if environment.BuilderProfile() {
+		return
+	}
 	releaseLibBinary()
 }
 

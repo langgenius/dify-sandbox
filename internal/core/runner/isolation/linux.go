@@ -5,6 +5,7 @@ package isolation
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/environment"
 	"golang.org/x/sys/unix"
 	"io"
 	"os"
@@ -149,6 +150,9 @@ func WorkerMain() error {
 	}
 	// Recursive mount attributes avoid writable nested mounts in an environment.
 	if err = unix.MountSetattr(unix.AT_FDCWD, cfg.Root, unix.AT_RECURSIVE, &unix.MountAttr{Attr_set: unix.MOUNT_ATTR_RDONLY | unix.MOUNT_ATTR_NOSUID | unix.MOUNT_ATTR_NODEV}); err != nil {
+		return err
+	}
+	if _, err = environment.LoadAndVerify(cfg.Root, cfg.Spec.EnvironmentDigest); err != nil {
 		return err
 	}
 	work := filepath.Join(cfg.Root, "work")

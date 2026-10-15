@@ -2,6 +2,7 @@ package isolation
 
 import (
 	"bytes"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/environment"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/network"
 	"math"
 	"strings"
@@ -25,7 +26,15 @@ func TestRejectsInvalidBudget(t *testing.T) {
 }
 func testProfile(t *testing.T) Profile {
 	t.Helper()
-	return Profile{Digest: strings.Repeat("a", 64), EnvironmentDigest: strings.Repeat("b", 64), EnvironmentRoot: t.TempDir(), WorkRoot: t.TempDir(), CgroupRoot: t.TempDir(), WorkerPath: "/request-worker", Languages: []string{"python3", "nodejs"}, Limits: validTestBudget(), MaxConcurrent: 1, MaxQueueDepth: 2, MaxQueuedBytes: 32768, MaxExecutions: 20}
+	root := t.TempDir()
+	m, err := environment.BuildManifest(root, environment.EnvironmentManifest{PythonVersion: "fixture", NodeVersion: "fixture", JinjaVersion: "fixture", Architecture: "arm64"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = environment.WriteManifest(root, m); err != nil {
+		t.Fatal(err)
+	}
+	return Profile{Digest: strings.Repeat("a", 64), EnvironmentDigest: m.Digest, EnvironmentRoot: root, WorkRoot: t.TempDir(), CgroupRoot: t.TempDir(), WorkerPath: "/request-worker", Languages: []string{"python3", "nodejs"}, Limits: validTestBudget(), MaxConcurrent: 1, MaxQueueDepth: 2, MaxQueuedBytes: 32768, MaxExecutions: 20}
 }
 func testSpec(p Profile) InvocationSpec {
 	return InvocationSpec{Version: 1, ExecutionID: "request-1", Language: "python3", EnvironmentDigest: p.EnvironmentDigest, ProfileDigest: p.Digest, Budget: p.Limits, Network: network.NetworkScope{Mode: "none"}, BudgetReservationRef: "reservation-1"}

@@ -5,6 +5,7 @@ package lib
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"os"
 	"syscall"
 	"unsafe"
@@ -13,6 +14,23 @@ import (
 )
 
 func Seccomp(allowed_syscalls []int, allowed_not_kill_syscalls []int) error {
+	return seccomp(allowed_syscalls, allowed_not_kill_syscalls, false)
+}
+
+// SeccompIsolated lets optional dependency network probes observe a real denial.
+// It never permits socket creation; ordinary errno behavior stays unchanged.
+func SeccompIsolated(allowed, legacyErrno []int) error {
+	for _, list := range [][]int{allowed, legacyErrno} {
+		for _, number := range list {
+			if number == syscall.SYS_SOCKET {
+				return fmt.Errorf("isolated socket denial cannot be overridden")
+			}
+		}
+	}
+	return seccomp(allowed, legacyErrno, true)
+}
+
+func seccomp(allowed_syscalls []int, allowed_not_kill_syscalls []int, isolated bool) error {
 	ctx, err := sg.NewFilter(sg.ActKillProcess)
 	if err != nil {
 		return err
@@ -33,6 +51,11 @@ func Seccomp(allowed_syscalls []int, allowed_not_kill_syscalls []int) error {
 		ctx.AddRule(sg.ScmpSyscall(syscall), sg.ActErrno)
 	}
 
+	if isolated {
+		if err := ctx.AddRule(sg.ScmpSyscall(syscall.SYS_SOCKET), sg.ActErrno.SetReturnCode(int16(syscall.EPERM))); err != nil {
+			return err
+		}
+	}
 	file := os.NewFile(uintptr(writer.Fd()), "pipe")
 	ctx.ExportBPF(file)
 

@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/langgenius/dify-sandbox/internal/core/runner/environment"
 	"log/slog"
 	"time"
 
@@ -57,6 +58,9 @@ func initServer() {
 }
 
 func initDependencies() {
+	if environment.BuilderProfile() {
+		return
+	}
 	slog.Info("installing python dependencies")
 	dependencies := static.GetRunnerDependencies()
 	err := python.InstallDependencies(dependencies.PythonRequirements)
@@ -93,6 +97,9 @@ func initDependencies() {
 }
 
 func updatePythonDependencies(dependencies static.RunnerDependencies) error {
+	if err := environment.RequireMutable(); err != nil {
+		return err
+	}
 	slog.Info("Updating Python dependencies")
 	if err := python.InstallDependencies(dependencies.PythonRequirements); err != nil {
 		slog.Error("Failed to install Python dependencies", "err", err)
@@ -107,6 +114,9 @@ func updatePythonDependencies(dependencies static.RunnerDependencies) error {
 }
 
 func Run() {
+	if environment.BuilderProfile() {
+		panic("Builder requires a trusted profile, reservation resolver and SetupBuilder server; ordinary server entrypoint refused")
+	}
 	// init config
 	initConfig()
 	// init dependencies, it will cost some times
