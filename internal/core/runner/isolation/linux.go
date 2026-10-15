@@ -207,7 +207,7 @@ func applyRlimits(b Budget) error {
 }
 
 func (e *Execution) observeStart() error {
-	o := Observation{ExecutionID: e.spec.ExecutionID, Phase: "gated", Root: e.WorkDir, Cgroup: e.cgroup, Namespaces: map[string]string{}, Controls: map[string]string{}}
+	o := Observation{ExecutionID: e.spec.ExecutionID, ObservedNanos: e.elapsedNanos(), Phase: "gated", Root: e.WorkDir, Cgroup: e.cgroup, Namespaces: map[string]string{}, Controls: map[string]string{}}
 	for _, ns := range []string{"mnt", "pid", "ipc", "uts", "net"} {
 		id, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/%s", e.cmd.Process.Pid, ns))
 		if err != nil {

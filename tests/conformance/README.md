@@ -92,3 +92,27 @@ and `fstatfs`; their names resolve for the target architecture through libseccom
 No network syscalls are added and the isolated C ABI refuses a true network flag.
 Current native filter unit evidence is Linux arm64 only; amd64 and actual useful
 import workloads remain part of the CS3/CS5 image qualification.
+
+Review follow-up: every replay passes full bounded payload/profile/reservation
+validation before registry reuse. New identities atomically claim one pending
+owner and one finite admission ticket; duplicates do not reserve worker memory
+or queue slots again. Pending cancellation/deadline results retain their owner.
+
+Concurrent conformance now rejects MaxConcurrent/Concurrent below 2. Fixed
+workloads emit bounded READY/ALIVE markers; private observations record monotonic
+supervisor lifecycle intervals. READY/ALIVE markers are accepted only while
+their own cgroup is populated, so buffered output after exit cannot prove
+liveness. The synthetic recorder samples the already
+trusted delegated peer cgroup's `cgroup.events` for `populated 1`, without reading
+`/proc/<pid>/root`, adding capabilities, or exposing an observer route to code.
+Mixed-language cases require overlapping ready-to-exit intervals and a live-peer
+kernel sample during that overlap. For every stress case the harness waits for
+peer readiness before dispatching the offender. The peer has a finite keepalive
+of half the profile wall budget; the offender gets one quarter of that budget.
+The final evidence must show peer readiness before offender start, an independent
+populated-peer sample after offender exit, a later peer heartbeat, and clean peer
+success after that sample. A serialized or early-finished peer cannot qualify.
+Configure the synthetic CPUTimeMillis low enough to exceed the total CPU budget
+within the offender's reduced wall deadline at the actual quota/period ratio.
+Actual kernel/image qualification remains pending CS3/CS5; unit fixtures exercise
+the evidence rejection/acceptance logic and do not substitute for it.

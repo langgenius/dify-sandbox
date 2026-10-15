@@ -2,13 +2,13 @@ package cases
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/network"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,9 +29,15 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 	if err = p.Validate(); err != nil {
 		return err
 	}
+	if p.MaxConcurrent < 2 || p.Limits.Concurrent < 2 {
+		return fmt.Errorf("roots-and-budgets requires at least two concurrent execution slots")
+	}
+	if p.Limits.WallMillis < 4 {
+		return fmt.Errorf("wall budget too small for finite peer workload")
+	}
 	client := &http.Client{Timeout: time.Duration(p.Limits.WallMillis+p.Limits.QueueMillis+p.Limits.CleanupMillis+1000) * time.Millisecond}
-	run := func(id, language, code string) (isolation.ExecutionResult, error) {
-		spec := isolation.InvocationSpec{Version: 1, ExecutionID: id, Language: language, EnvironmentDigest: p.EnvironmentDigest, ProfileDigest: p.Digest, BudgetReservationRef: "cs1-synthetic", Budget: p.Limits, Network: network.NetworkScope{Mode: "none"}}
+	run := func(id, language, code string, budget isolation.Budget) (isolation.ExecutionResult, error) {
+		spec := isolation.InvocationSpec{Version: 1, ExecutionID: id, Language: language, EnvironmentDigest: p.EnvironmentDigest, ProfileDigest: p.Digest, BudgetReservationRef: "cs1-synthetic", Budget: budget, Network: network.NetworkScope{Mode: "none"}}
 		payload, _ := json.Marshal(isolation.Payload{Code: code, Preload: ""})
 		spec.InvocationDigest = isolation.InvocationDigest(spec, payload)
 		body, _ := json.Marshal(isolation.InvocationRequest{Options: spec, Language: language, Code: code})
@@ -49,15 +55,10 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 		}
 		return result, nil
 	}
-	readObservation := func(id string) (isolation.Observation, error) {
-		var o isolation.Observation
-		raw, err := os.ReadFile(filepath.Join(observations, id+".json"))
+	readObservation := func(id string) (Evidence, error) {
+		o, err := readEvidence(observations, id)
 		if err != nil {
 			return o, fmt.Errorf("missing independent observation for %s: %w", id, err)
-		}
-		err = json.Unmarshal(raw, &o)
-		if err != nil {
-			return o, err
 		}
 		if o.Phase != "completed" || o.ExecutionID != id || !o.RootRemoved || !o.CgroupRemoved || o.Result.CleanupState != "clean" {
 			return o, fmt.Errorf("unclean or incomplete observation for %s", id)
@@ -68,7 +69,7 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 		return o, nil
 	}
 	languages := []string{"python3", "nodejs"}
-	codes := []string{"import os,time\nopen('/work/private','w').write('python')\nprint(os.getcwd(),flush=True)\ntime.sleep(0.25)", "const fs=require('fs');fs.writeFileSync('/work/private','node');console.log(process.cwd());setTimeout(()=>{},250)"}
+	codes := []string{"import os,time\nopen('/work/private','w').write('python')\nprint('CS1_READY',flush=True)\nprint(os.getcwd(),flush=True)\ntime.sleep(0.25)", "const fs=require('fs');fs.writeFileSync('/work/private','node');console.log('CS1_READY');console.log(process.cwd());setTimeout(()=>{},250)"}
 	var wg sync.WaitGroup
 	results := make([]isolation.ExecutionResult, 2)
 	errs := make([]error, 2)
@@ -76,16 +77,16 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			results[i], errs[i] = run("cs1-roots-"+strconv.Itoa(i), languages[i], codes[i])
+			results[i], errs[i] = run("cs1-roots-"+strconv.Itoa(i), languages[i], codes[i], p.Limits)
 		}(i)
 	}
 	wg.Wait()
-	observationsSeen := make([]isolation.Observation, 2)
+	observationsSeen := make([]Evidence, 2)
 	for i := range results {
 		if errs[i] != nil {
 			return errs[i]
 		}
-		if results[i].Status != "succeeded" || strings.TrimSpace(results[i].Stdout) != "/work" {
+		if results[i].Status != "succeeded" || strings.TrimSpace(workloadOutput(results[i].Stdout)) != "/work" {
 			return fmt.Errorf("native %s cwd failed: %+v", languages[i], results[i])
 		}
 		o, err := readObservation(results[i].ExecutionID)
@@ -98,6 +99,9 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 				return fmt.Errorf("%s not enforced: %q", key, o.Controls[key])
 			}
 		}
+	}
+	if err := requireOverlap(observationsSeen[0], observationsSeen[1]); err != nil {
+		return err
 	}
 	if observationsSeen[0].Root == observationsSeen[1].Root || observationsSeen[0].Cgroup == observationsSeen[1].Cgroup {
 		return fmt.Errorf("requests share writable root or cgroup")
@@ -118,15 +122,26 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 		{"disk", "import sys\ntry:\n with open('/work/full','wb') as f:\n  for i in range(" + strconv.FormatInt(p.Limits.DiskBytes/4096+2, 10) + "): f.write(b'x'*4096)\nexcept OSError as e:\n print('DISK_LIMIT:'+str(e.errno),file=sys.stderr);sys.exit(1)"},
 	}
 	for _, stress := range stresses {
-		var bad, peer isolation.ExecutionResult
-		var badErr, peerErr error
-		wg.Add(2)
-		go func() { defer wg.Done(); bad, badErr = run("cs1-limit-"+stress.name, "python3", stress.code) }()
-		go func() {
-			defer wg.Done()
-			peer, peerErr = run("cs1-peer-"+stress.name, "nodejs", "console.log('peer-alive')")
-		}()
-		wg.Wait()
+		peerID := "cs1-peer-" + stress.name
+		type response struct {
+			result isolation.ExecutionResult
+			err    error
+		}
+		peerDone := make(chan response, 1)
+		peerCode := fmt.Sprintf("console.log('CS1_READY');const h=setInterval(()=>console.log('CS1_ALIVE'),25);setTimeout(()=>{clearInterval(h);console.log('peer-alive')},%d)", p.Limits.WallMillis/2)
+		go func() { result, err := run(peerID, "nodejs", peerCode, p.Limits); peerDone <- response{result, err} }()
+		readyCtx, stop := context.WithTimeout(context.Background(), time.Duration(p.Limits.WallMillis)*time.Millisecond)
+		readyErr := waitReady(readyCtx, observations, peerID)
+		stop()
+		if readyErr != nil {
+			<-peerDone
+			return readyErr
+		}
+		offenderBudget := p.Limits
+		offenderBudget.WallMillis = p.Limits.WallMillis / 4
+		bad, badErr := run("cs1-limit-"+stress.name, "python3", "print('CS1_READY',flush=True)\n"+stress.code, offenderBudget)
+		peerResponse := <-peerDone
+		peer, peerErr := peerResponse.result, peerResponse.err
 		if badErr != nil {
 			return badErr
 		}
@@ -136,7 +151,7 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 		if bad.Status != "failed" || bad.CleanupState != "clean" {
 			return fmt.Errorf("%s limit did not fail cleanly: %+v", stress.name, bad)
 		}
-		if peer.Status != "succeeded" || strings.TrimSpace(peer.Stdout) != "peer-alive" {
+		if peer.Status != "succeeded" || strings.TrimSpace(workloadOutput(peer.Stdout)) != "peer-alive" {
 			return fmt.Errorf("peer died after %s exhaustion: %+v", stress.name, peer)
 		}
 		o, err := readObservation(bad.ExecutionID)
@@ -165,12 +180,16 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 				return fmt.Errorf("private filesystem exhaustion not observed")
 			}
 		}
-		if _, err := readObservation(peer.ExecutionID); err != nil {
+		peerEvidence, err := readObservation(peer.ExecutionID)
+		if err != nil {
+			return err
+		}
+		if err = requirePeerSpan(o, peerEvidence); err != nil {
 			return err
 		}
 	}
 	// Serial reuse must not observe the prior request's file.
-	serial, err := run("cs1-serial", "python3", "import os\nassert not os.path.exists('/work/private')\nprint('isolated')")
+	serial, err := run("cs1-serial", "python3", "import os\nassert not os.path.exists('/work/private')\nprint('isolated')", p.Limits)
 	if err != nil {
 		return err
 	}
@@ -190,4 +209,27 @@ func positiveEvent(data, name string) bool {
 		}
 	}
 	return false
+}
+
+func waitReady(ctx context.Context, directory, id string) error {
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		e, err := readEvidence(directory, id)
+		if err == nil {
+			if e.Phase == "completed" {
+				return fmt.Errorf("peer finished before offender admission: %s", id)
+			}
+			if e.ReadyNanos > 0 {
+				return nil
+			}
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("peer readiness not observed: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }

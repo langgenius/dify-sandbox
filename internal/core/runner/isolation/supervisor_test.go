@@ -231,3 +231,236 @@ func TestEnvironmentRefusesServiceSockets(t *testing.T) {
 		t.Fatal("service socket exposed to user execution")
 	}
 }
+
+func TestReplayRequiresFullImmutableInvocationValidation(t *testing.T) {
+	p := testProfile(t)
+	payload := []byte(`{"code":"print(1)","preload":""}`)
+	spec := testSpec(p)
+	spec.InvocationDigest = InvocationDigest(spec, payload)
+	reservation := p.Limits
+	launches := 0
+	sup, err := NewSupervisor(p, func(context.Context, InvocationSpec) (Budget, error) { return reservation, nil }, func(InvocationSpec, Payload) (Launch, error) {
+		launches++
+		return Launch{Executable: "/bin/false", BootstrapPath: "/work/bootstrap"}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	owned, err := sup.Start(context.Background(), spec, strings.NewReader(string(payload)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = owned.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name    string
+		change  func(*InvocationSpec)
+		payload string
+	}{
+		{"code", nil, `{"code":"print(2)","preload":""}`},
+		{"preload", nil, `{"code":"print(1)","preload":"print('other')"}`},
+		{"schema", func(s *InvocationSpec) { s.Version = 2 }, string(payload)},
+		{"language", func(s *InvocationSpec) { s.Language = "nodejs" }, string(payload)},
+		{"profile", func(s *InvocationSpec) { s.ProfileDigest = strings.Repeat("c", 64) }, string(payload)},
+		{"environment", func(s *InvocationSpec) { s.EnvironmentDigest = strings.Repeat("c", 64) }, string(payload)},
+		{"network", func(s *InvocationSpec) { s.Network.Mode = "scoped" }, string(payload)},
+		{"reservation identity", func(s *InvocationSpec) { s.BudgetReservationRef = "another-reservation" }, string(payload)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			changed := spec
+			if tc.change != nil {
+				tc.change(&changed)
+			}
+			if _, err := sup.Start(context.Background(), changed, strings.NewReader(tc.payload)); err == nil {
+				t.Fatal("invalid replay accepted")
+			}
+		})
+	}
+	reservation.MemoryBytes--
+	if _, err = sup.Start(context.Background(), spec, strings.NewReader(string(payload))); err == nil {
+		t.Fatal("replay exceeds current trusted reservation")
+	}
+	if launches != 1 {
+		t.Fatalf("replay allocated another native launch: %d", launches)
+	}
+}
+
+func TestQueuedDuplicatesSharePendingOwnerAndOneReservation(t *testing.T) {
+	p := testProfile(t)
+	p.MaxQueueDepth = 1
+	p.Limits.QueueMillis = 2000
+	payload := []byte(`{"code":"print(1)","preload":""}`)
+	spec := testSpec(p)
+	spec.InvocationDigest = InvocationDigest(spec, payload)
+	sup, err := NewSupervisor(p, func(context.Context, InvocationSpec) (Budget, error) { return p.Limits, nil }, func(InvocationSpec, Payload) (Launch, error) {
+		t.Error("cancelled queued execution launched")
+		return Launch{}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := sup.admission.acquire(context.Background(), p.Limits.InputBytes, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	type started struct {
+		e   *Execution
+		err error
+	}
+	first := make(chan started, 1)
+	go func() { e, err := sup.Start(ctx, spec, strings.NewReader(string(payload))); first <- started{e, err} }()
+	var owner *Execution
+	select {
+	case got := <-first:
+		if got.err != nil {
+			t.Fatal(got.err)
+		}
+		owner = got.e
+	case <-time.After(time.Second):
+		t.Fatal("first submission did not return its pending owner")
+	}
+	duplicate, err := sup.Start(context.Background(), spec, strings.NewReader(string(payload)))
+	if err != nil || duplicate != owner {
+		t.Fatalf("queued duplicate did not share owner: %v", err)
+	}
+	sup.admission.mu.Lock()
+	queued, reserved := sup.admission.queued, sup.admission.bytes
+	sup.admission.mu.Unlock()
+	if queued != 1 || reserved != 2*p.Limits.InputBytes {
+		t.Fatalf("duplicate reserved additional capacity: queued=%d bytes=%d", queued, reserved)
+	}
+	other := spec
+	other.ExecutionID = "other"
+	other.InvocationDigest = InvocationDigest(other, payload)
+	if _, err = sup.Start(context.Background(), other, strings.NewReader(string(payload))); err == nil {
+		t.Fatal("unrelated request exceeded queue bound")
+	}
+	cancel()
+	waitCtx, stop := context.WithTimeout(context.Background(), time.Second)
+	defer stop()
+	result, err := owner.Wait(waitCtx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != "cancelled" || result.CleanupState != "clean" {
+		t.Fatalf("queued cancellation not finalized: %+v", result)
+	}
+	again, err := sup.Start(context.Background(), spec, strings.NewReader(string(payload)))
+	if err != nil || again != owner {
+		t.Fatal("cancelled owner was reallocated")
+	}
+	sup.admission.mu.Lock()
+	queued, reserved = sup.admission.queued, sup.admission.bytes
+	sup.admission.mu.Unlock()
+	if queued != 0 || reserved != p.Limits.InputBytes {
+		t.Fatalf("queue reservation not released exactly once: %d %d", queued, reserved)
+	}
+}
+func TestQueuedDeadlineFinalizesReplayableOwner(t *testing.T) {
+	p := testProfile(t)
+	p.Limits.QueueMillis = 25
+	payload := []byte(`{"code":"print(1)","preload":""}`)
+	spec := testSpec(p)
+	spec.InvocationDigest = InvocationDigest(spec, payload)
+	sup, err := NewSupervisor(p, func(context.Context, InvocationSpec) (Budget, error) { return p.Limits, nil }, func(InvocationSpec, Payload) (Launch, error) { t.Error("expired queue launched"); return Launch{}, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := sup.admission.acquire(context.Background(), p.Limits.InputBytes, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held()
+	owner, err := sup.Start(context.Background(), spec, strings.NewReader(string(payload)))
+	if err != nil {
+		t.Fatalf("no pending owner: %v", err)
+	}
+	result, err := owner.Wait(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != "failed" || result.FailureReason != "queue_full" {
+		t.Fatalf("wrong terminal queue outcome: %+v", result)
+	}
+	again, err := sup.Start(context.Background(), spec, strings.NewReader(string(payload)))
+	if err != nil || again != owner {
+		t.Fatal("queue timeout lost identity")
+	}
+}
+
+func TestConcurrentFirstSubmissionsClaimOnePendingMemoryReservation(t *testing.T) {
+	p := testProfile(t)
+	p.MaxConcurrent = 2
+	p.MaxQueueDepth = 1
+	p.MaxQueuedBytes = 3 * p.Limits.InputBytes
+	p.Limits.QueueMillis = 2000
+	payload := []byte(`{"code":"print(1)","preload":""}`)
+	spec := testSpec(p)
+	spec.InvocationDigest = InvocationDigest(spec, payload)
+	sup, err := NewSupervisor(p, func(context.Context, InvocationSpec) (Budget, error) { return p.Limits, nil }, func(InvocationSpec, Payload) (Launch, error) {
+		t.Error("cancelled queued execution launched")
+		return Launch{}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		held, err := sup.admission.acquire(context.Background(), p.Limits.InputBytes, time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer held()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	gate := make(chan struct{})
+	owners := make(chan *Execution, 2)
+	errors := make(chan error, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			<-gate
+			e, err := sup.Start(ctx, spec, strings.NewReader(string(payload)))
+			owners <- e
+			errors <- err
+		}()
+	}
+	close(gate)
+	first, second := <-owners, <-owners
+	if err := <-errors; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-errors; err != nil {
+		t.Fatal(err)
+	}
+	if first == nil || first != second {
+		t.Fatal("simultaneous first requests received different owners")
+	}
+	sup.admission.mu.Lock()
+	queued, reserved := sup.admission.queued, sup.admission.bytes
+	sup.admission.mu.Unlock()
+	if queued != 1 || reserved != p.MaxQueuedBytes {
+		t.Fatalf("wrong pending reservation: %d %d", queued, reserved)
+	}
+	duplicate, err := sup.Start(context.Background(), spec, strings.NewReader(string(payload)))
+	if err != nil || duplicate != first {
+		t.Fatal("valid replay rejected when worker memory fully reserved")
+	}
+	cancel()
+	if _, err = first.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+func TestObservationReceivesOnlyRetainedStdout(t *testing.T) {
+	var observed strings.Builder
+	b := &limitedBuffer{limit: 4, observe: func(p []byte) { observed.Write(p) }}
+	b.Write([]byte("abcdef"))
+	b.Write([]byte("more"))
+	if observed.String() != "abcd" || !b.exceeded {
+		t.Fatal("diagnostic sink received output beyond budget")
+	}
+}

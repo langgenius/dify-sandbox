@@ -21,6 +21,12 @@ func newRegistry(limit int64) *registry {
 	return &registry{limit: limit, entries: map[string]registryEntry{}}
 }
 func (r *registry) register(id, digest string, e *Execution) (*Execution, bool, error) {
+	return r.claim(id, digest, func() (*Execution, error) { return e, nil })
+}
+
+// claim makes the first pending owner and its finite admission reservation one
+// atomic operation. The callback is never invoked for a duplicate identity.
+func (r *registry) claim(id, digest string, create func() (*Execution, error)) (*Execution, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if old, ok := r.entries[id]; ok {
@@ -31,6 +37,10 @@ func (r *registry) register(id, digest string, e *Execution) (*Execution, bool, 
 	}
 	if int64(len(r.entries)) >= r.limit {
 		return nil, false, failure("queue_full", "execution registry at capacity")
+	}
+	e, err := create()
+	if err != nil {
+		return nil, false, err
 	}
 	r.entries[id] = registryEntry{digest, e}
 	return e, true, nil
@@ -50,36 +60,76 @@ func newAdmission(r, q, b int64) *admission {
 }
 func (a *admission) notify()            { close(a.changed); a.changed = make(chan struct{}) }
 func (a *admission) queuedCount() int64 { a.mu.Lock(); defer a.mu.Unlock(); return a.queued }
-func (a *admission) acquire(ctx context.Context, bytes int64, wait time.Duration) (func(), error) {
+
+type admissionTicket struct {
+	owner    *admission
+	bytes    int64
+	running  bool
+	released bool
+}
+
+// reserve accounts for the queued payload synchronously, before the caller
+// releases intake memory or starts any goroutine that retains that payload.
+func (a *admission) reserve(bytes int64) (*admissionTicket, error) {
 	a.mu.Lock()
-	if bytes <= 0 || bytes > a.maxBytes-a.bytes || a.queued >= a.maxQueued {
-		a.mu.Unlock()
-		return nil, failure("queue_full", "service admission capacity exhausted")
+	defer a.mu.Unlock()
+	if bytes <= 0 || bytes > a.maxBytes-a.bytes {
+		return nil, failure("queue_full", "service admission memory exhausted")
+	}
+	ticket := &admissionTicket{owner: a, bytes: bytes}
+	if a.running < a.maxRunning && a.queued == 0 {
+		ticket.running = true
+		a.running++
+	} else {
+		if a.queued >= a.maxQueued {
+			return nil, failure("queue_full", "service queue exhausted")
+		}
+		a.queued++
 	}
 	a.bytes += bytes
-	a.queued++
 	a.notify()
-	a.mu.Unlock()
+	return ticket, nil
+}
+func (t *admissionTicket) release() {
+	a := t.owner
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	t.releaseLocked()
+}
+func (t *admissionTicket) releaseLocked() {
+	if t.released {
+		return
+	}
+	t.released = true
+	a := t.owner
+	if t.running {
+		a.running--
+	} else {
+		a.queued--
+	}
+	a.bytes -= t.bytes
+	a.notify()
+}
+func (t *admissionTicket) wait(ctx context.Context, wait time.Duration) (func(), error) {
 	timer := time.NewTimer(wait)
 	defer timer.Stop()
+	a := t.owner
 	for {
 		a.mu.Lock()
 		if ctx.Err() != nil {
-			a.queued--
-			a.bytes -= bytes
-			a.notify()
+			t.releaseLocked()
 			a.mu.Unlock()
 			return nil, ctx.Err()
 		}
-		if a.running < a.maxRunning {
+		if !t.running && a.running < a.maxRunning {
 			a.queued--
 			a.running++
+			t.running = true
 			a.notify()
+		}
+		if t.running {
 			a.mu.Unlock()
-			var once sync.Once
-			return func() {
-				once.Do(func() { a.mu.Lock(); defer a.mu.Unlock(); a.running--; a.bytes -= bytes; a.notify() })
-			}, nil
+			return t.release, nil
 		}
 		changed := a.changed
 		a.mu.Unlock()
@@ -87,23 +137,15 @@ func (a *admission) acquire(ctx context.Context, bytes int64, wait time.Duration
 		case <-changed:
 		case <-ctx.Done():
 		case <-timer.C:
-			a.mu.Lock()
-			a.queued--
-			a.bytes -= bytes
-			a.notify()
-			a.mu.Unlock()
+			t.release()
 			return nil, failure("queue_full", "queue deadline exceeded")
 		}
 	}
 }
-func (r *registry) lookup(id, digest string) (*Execution, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if old, ok := r.entries[id]; ok {
-		if old.digest != digest {
-			return nil, fmt.Errorf("execution ID digest conflict")
-		}
-		return old.execution, nil
+func (a *admission) acquire(ctx context.Context, bytes int64, wait time.Duration) (func(), error) {
+	ticket, err := a.reserve(bytes)
+	if err != nil {
+		return nil, err
 	}
-	return nil, nil
+	return ticket.wait(ctx, wait)
 }

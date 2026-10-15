@@ -10,10 +10,10 @@ import (
 	"github.com/langgenius/dify-sandbox/internal/controller"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
 	"github.com/langgenius/dify-sandbox/internal/service"
+	"github.com/langgenius/dify-sandbox/tests/conformance/cases"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -27,17 +27,10 @@ func main() {
 	if err = json.Unmarshal(raw, &p); err != nil {
 		log.Fatal(err)
 	}
+	recorder := cases.NewObservationRecorder("/observations", p.MaxExecutions)
 	observer := func(o isolation.Observation) {
-		b, err := json.Marshal(o)
-		if err != nil {
-			log.Fatal(err)
-		}
-		target := filepath.Join("/observations", o.ExecutionID+".json")
-		if err = os.WriteFile(target+".tmp", b, 0444); err != nil {
-			log.Fatal(err)
-		}
-		if err = os.Rename(target+".tmp", target); err != nil {
-			log.Fatal(err)
+		if err := recorder.Observe(o); err != nil {
+			log.Fatal("conformance observation failed: ", err)
 		}
 	}
 	resolver := func(_ context.Context, s isolation.InvocationSpec) (isolation.Budget, error) {
