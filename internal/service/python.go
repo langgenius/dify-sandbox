@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	capture_runner "github.com/langgenius/dify-sandbox/internal/core/runner"
 	"time"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
@@ -42,7 +41,7 @@ func RunPython3Code(ctx context.Context, code string, preload string, options *r
 		return types.ErrorResponse(-500, err.Error())
 	}
 
-	return collectOutput(stdout, stderr, done, capture_runner.LegacyOutputBytes)
+	return collectOutput(stdout, stderr, done)
 }
 
 type ListDependenciesResponse struct {

@@ -15,9 +15,10 @@ import (
 var ErrUIDPoolExhausted = errors.New("sandbox UID pool exhausted")
 
 type UIDPool struct {
-	pool chan int
-	min  int
-	max  int
+	pool       chan int
+	min        int
+	max        int
+	persistent *persistentPool
 }
 
 func NewUIDPool(min, max int) *UIDPool {
@@ -34,16 +35,30 @@ func NewUIDPool(min, max int) *UIDPool {
 
 // Acquire waits for an available UID until ctx is cancelled.
 func (p *UIDPool) Acquire(ctx context.Context) (int, error) {
-	select {
-	case uid := <-p.pool:
-		return uid, nil
-	case <-ctx.Done():
-		return 0, ErrUIDPoolExhausted
+	for {
+		select {
+		case uid := <-p.pool:
+			if p.persistent != nil {
+				if err := p.persistent.acquire(uid); err != nil {
+					slog.Warn("ordinary UID quarantined", "uid", uid, "err", err)
+					continue
+				}
+			}
+			return uid, nil
+		case <-ctx.Done():
+			return 0, ErrUIDPoolExhausted
+		}
 	}
 }
 
 func (p *UIDPool) Release(uid int) {
 	if uid >= p.min && uid < p.max {
+		if p.persistent != nil {
+			if err := p.persistent.release(uid); err != nil {
+				slog.Warn("ordinary UID remains quarantined", "uid", uid, "err", err)
+				return
+			}
+		}
 		p.pool <- uid
 	}
 }
@@ -55,13 +70,23 @@ func (p *UIDPool) Len() int {
 var (
 	globalPool     *UIDPool
 	globalPoolOnce sync.Once
+	globalPoolErr  error
 )
 
 func AcquireUID(ctx context.Context) (int, error) {
 	globalPoolOnce.Do(func() {
-		globalPool = NewUIDPool(10000, 11000)
-		ensurePasswdEntries(10000, 11000)
+		if err := os.MkdirAll(filepath.Dir(ordinaryLeaseRoot), 0755); err != nil {
+			globalPoolErr = err
+			return
+		}
+		globalPool, globalPoolErr = NewPersistentUIDPool(10000, 11000, ordinaryLeaseRoot)
+		if globalPoolErr == nil {
+			ensurePasswdEntries(10000, 11000)
+		}
 	})
+	if globalPoolErr != nil {
+		return 0, globalPoolErr
+	}
 	return globalPool.Acquire(ctx)
 }
 
@@ -81,14 +106,13 @@ func ensurePasswdEntries(min, max int) {
 }
 
 func ReleaseUID(uid int) {
-	globalPoolOnce.Do(func() {
-		globalPool = NewUIDPool(10000, 11000)
-	})
-	globalPool.Release(uid)
+	if globalPool != nil {
+		globalPool.Release(uid)
+	}
 }
 
-// ReleaseUIDChecked refuses reuse unless Linux independently observes no task
-// with this execution UID. Failures quarantine the lease until service restart.
+// VerifyUIDIdle independently observes Linux process UIDs before reuse.
+// Durable ordinary leases retain resources and ownership across server restart.
 func VerifyUIDIdle(uid int) error {
 	entries, err := os.ReadDir("/proc")
 	if err != nil {
@@ -125,6 +149,16 @@ func VerifyUIDIdle(uid int) error {
 func ReleaseUIDChecked(uid int) error {
 	if err := VerifyUIDIdle(uid); err != nil {
 		return err
+	}
+	if globalPool == nil {
+		return fmt.Errorf("UID pool is not initialized")
+	}
+	if globalPool.persistent != nil {
+		if err := globalPool.persistent.release(uid); err != nil {
+			return err
+		}
+		globalPool.pool <- uid
+		return nil
 	}
 	ReleaseUID(uid)
 	return nil

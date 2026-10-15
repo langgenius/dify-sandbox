@@ -32,3 +32,26 @@ func TestTempDirDoesNotMutateProcessWorkingDirectory(t *testing.T) {
 		t.Fatal("process cwd changed after request")
 	}
 }
+
+func TestTempDirRecordsOwnershipBeforeCreation(t *testing.T) {
+	base := t.TempDir()
+	if err := os.Mkdir(filepath.Join(base, "tmp"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	r := TempDirRunner{}
+	called := false
+	err := r.WithTempDirTracked(base, nil, func(root string) error {
+		called = true
+		if _, err := os.Lstat(root); !os.IsNotExist(err) {
+			t.Fatal("resource created before ownership was recorded")
+		}
+		return os.ErrPermission
+	}, func(string) error { t.Fatal("dispatch followed journal failure"); return nil })
+	if !called || err != os.ErrPermission {
+		t.Fatalf("ownership failure ignored: %v", err)
+	}
+	entries, err := os.ReadDir(filepath.Join(base, "tmp"))
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("untracked resources leaked: %v %v", entries, err)
+	}
+}

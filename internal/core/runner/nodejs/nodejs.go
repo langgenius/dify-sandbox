@@ -58,7 +58,7 @@ func (p *NodeJsRunner) Run(
 	output_handler := runner.NewOutputCaptureRunner()
 	output_handler.SetTimeout(timeout)
 
-	err = p.WithTempDir("/", REQUIRED_FS, func(root_path string) error {
+	err = p.WithTempDirTracked("/", REQUIRED_FS, func(root string) error { return uidpool.TrackResource(uid, root) }, func(root_path string) error {
 		cleanupRootPath := true
 		defer func() {
 			if cleanupRootPath {

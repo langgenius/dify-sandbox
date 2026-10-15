@@ -8,12 +8,12 @@ import (
 	"time"
 )
 
-func TestCollectorOverflowFailureAndBlockedConsumer(t *testing.T) {
+func TestCollectorDeadlineAndBlockedConsumer(t *testing.T) {
 	r := NewOutputCaptureRunner()
-	r.SetTimeout(time.Second)
+	r.SetTimeout(100 * time.Millisecond)
 	exited := make(chan struct{})
 	r.SetAfterExitHook(func() { close(exited) })
-	if err := r.CaptureOutput(context.Background(), exec.Command("/bin/sh", "-c", "yes x")); err != nil {
+	if err := r.CaptureOutput(context.Background(), exec.Command("/bin/sh", "-c", "printf output; sleep 30")); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -24,7 +24,7 @@ func TestCollectorOverflowFailureAndBlockedConsumer(t *testing.T) {
 	select {
 	case success := <-r.GetDone():
 		if success {
-			t.Fatal("overflow reported success")
+			t.Fatal("deadline reported success")
 		}
 	case <-time.After(time.Second):
 		t.Fatal("no failure result")

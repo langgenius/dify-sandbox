@@ -11,6 +11,11 @@ import (
 type TempDirRunner struct{}
 
 func (s *TempDirRunner) WithTempDir(basedir string, paths []string, closures func(path string) error) error {
+	return s.WithTempDirTracked(basedir, paths, nil, closures)
+}
+
+// WithTempDirTracked persists resource ownership before creating the root.
+func (s *TempDirRunner) WithTempDirTracked(basedir string, paths []string, beforeCreate func(string) error, closures func(string) error) error {
 	uuid, err := uuid.NewRandom()
 	if err != nil {
 		return err
@@ -18,6 +23,11 @@ func (s *TempDirRunner) WithTempDir(basedir string, paths []string, closures fun
 
 	// create a tmp dir
 	tmpDir := path.Join(basedir, "tmp", "sandbox-"+uuid.String())
+	if beforeCreate != nil {
+		if err := beforeCreate(tmpDir); err != nil {
+			return err
+		}
+	}
 	defer func() {
 		if err != nil {
 			_ = os.RemoveAll(tmpDir)

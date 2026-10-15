@@ -159,6 +159,9 @@ func (p *PythonRunner) InitializeEnvironment(preload string, options *types.Runn
 	script := buildBootstrap(preload, options, uid)
 
 	bootstrapPath := fmt.Sprintf("%s/tmp/%s.py", LIB_PATH, tempCodeName)
+	if err := uidpool.TrackResource(uid, bootstrapPath); err != nil {
+		return "", err
+	}
 	err := os.MkdirAll(path.Dir(bootstrapPath), 0755)
 	if err != nil {
 		return "", err

@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	capture_runner "github.com/langgenius/dify-sandbox/internal/core/runner"
 	"time"
 
 	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
@@ -31,7 +30,7 @@ func RunNodeJsCode(ctx context.Context, code string, preload string, options *ru
 		return types.ErrorResponse(-500, err.Error())
 	}
 
-	return collectOutput(stdout, stderr, done, capture_runner.LegacyOutputBytes)
+	return collectOutput(stdout, stderr, done)
 }
 
 func NodeIsolatedLaunch(executable string) isolation.Launch { return nodejs.IsolatedLaunch(executable) }

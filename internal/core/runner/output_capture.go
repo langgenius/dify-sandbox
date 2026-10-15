@@ -3,17 +3,14 @@ package runner
 import (
 	"context"
 	"fmt"
-	"github.com/langgenius/dify-sandbox/internal/core/runner/isolation"
 	"golang.org/x/sys/unix"
+	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 )
-
-// LegacyOutputBytes is a finite ordinary-endpoint transport ceiling, not a
-// Builder qualification budget. Builder streams use their immutable budgets.
-const LegacyOutputBytes = 1 << 20
 
 type OutputCaptureRunner struct {
 	stdout, stderr  chan []byte
@@ -91,12 +88,12 @@ func (s *OutputCaptureRunner) CaptureOutput(ctx context.Context, cmd *exec.Cmd) 
 				return
 			}
 		}()
-		captureDone := make(chan isolation.CaptureResult, 1)
+		captureDone := make(chan ordinaryCaptureResult, 1)
 		go func() {
-			captureDone <- isolation.Capture(runCtx, stdout, stderr, isolation.Budget{StdoutBytes: LegacyOutputBytes, StderrBytes: LegacyOutputBytes})
+			captureDone <- captureOrdinary(runCtx, stdout, stderr)
 		}()
 		leaderExited := false
-		var result isolation.CaptureResult
+		var result ordinaryCaptureResult
 		select {
 		case result = <-captureDone:
 		case <-exited:
@@ -137,13 +134,18 @@ func (s *OutputCaptureRunner) CaptureOutput(ctx context.Context, cmd *exec.Cmd) 
 		waitErr := cmd.Wait()
 		success := result.Failure == ""
 		if result.Failure != "" {
-			result.Stderr = []byte("error: " + result.Failure + "\n")
-		} else if waitErr != nil {
-			result.Stderr = append(result.Stderr, []byte(fmt.Sprintf("error: %v\n", waitErr))...)
-			if len(result.Stderr) > LegacyOutputBytes {
-				result.Stderr = []byte("error: stderr_limit\n")
-				success = false
+			reason := result.Failure
+			if reason == "deadline" {
+				reason = "timeout"
 			}
+			result.Stderr = append(result.Stderr, []byte("error: "+reason+"\n")...)
+		}
+		if waitErr != nil {
+			message := fmt.Sprintf("error: %v\n", waitErr)
+			if strings.Contains(waitErr.Error(), "bad system call") {
+				message = "error: operation not permitted\n"
+			}
+			result.Stderr = append(result.Stderr, []byte(message)...)
 		}
 		if s.cleanupHook != nil {
 			if err := s.cleanupHook(); err != nil {
@@ -163,3 +165,50 @@ func (s *OutputCaptureRunner) CaptureOutput(ctx context.Context, cmd *exec.Cmd) 
 func (s *OutputCaptureRunner) GetStdout() chan []byte { return s.stdout }
 func (s *OutputCaptureRunner) GetStderr() chan []byte { return s.stderr }
 func (s *OutputCaptureRunner) GetDone() chan bool     { return s.done }
+
+// Ordinary endpoints historically accept arbitrary output bytes without a byte
+// budget. Builder's bounded, UTF-8-validating capture is intentionally separate.
+type ordinaryCaptureResult struct {
+	Stdout, Stderr []byte
+	Failure        string
+}
+
+func captureOrdinary(ctx context.Context, stdout, stderr *os.File) ordinaryCaptureResult {
+	type stream struct {
+		data []byte
+		err  error
+	}
+	out, errout := make(chan stream, 1), make(chan stream, 1)
+	read := func(f *os.File, done chan<- stream) { defer f.Close(); b, err := io.ReadAll(f); done <- stream{b, err} }
+	go read(stdout, out)
+	go read(stderr, errout)
+	var a, b stream
+	var failure string
+	for out != nil || errout != nil {
+		select {
+		case a = <-out:
+			out = nil
+		case b = <-errout:
+			errout = nil
+		case <-ctx.Done():
+			stdout.Close()
+			stderr.Close()
+			if out != nil {
+				a = <-out
+				out = nil
+			}
+			if errout != nil {
+				b = <-errout
+				errout = nil
+			}
+			failure = "cancelled"
+			if ctx.Err() == context.DeadlineExceeded {
+				failure = "deadline"
+			}
+		}
+	}
+	if failure == "" && (a.err != nil || b.err != nil) {
+		failure = "output_read"
+	}
+	return ordinaryCaptureResult{Stdout: a.data, Stderr: b.data, Failure: failure}
+}
