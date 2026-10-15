@@ -9,6 +9,7 @@ RUN go mod download
 COPY . .
 RUN go build -buildmode=c-shared -o internal/core/runner/python/python.so ./cmd/lib/python && go build -buildmode=c-shared -o internal/core/runner/nodejs/nodejs.so ./cmd/lib/nodejs
 RUN go build -o /out/request-worker ./cmd/request-worker && go build -o /out/environment-manifest ./cmd/environment-manifest && go build -o /out/conformance-candidate ./tests/conformance/candidate && go build -o /out/main ./cmd/server && go build -o /out/dependency-launch ./tests/conformance/dependency-launch
+RUN CGO_ENABLED=0 go build -o /out/network-gateway ./cmd/network-gateway
 
 FROM node:20.11.1-bookworm-slim@sha256:357deca6eb61149534d32faaf5e4b2e4fa3549c2be610ee1019bf340ea8c51ec AS node
 WORKDIR /build/node
@@ -31,6 +32,7 @@ COPY --from=build /src/internal/core/runner/nodejs/nodejs.so /build/nodejs.so
 COPY --from=build /out/ /
 COPY scripts/assemble-builder-environment.py /build/assemble.py
 RUN python3 /build/assemble.py
+RUN mkdir -p /environment-root/usr/local/libexec && cp /network-gateway /environment-root/usr/local/libexec/network-gateway && chmod 0555 /environment-root/usr/local/libexec/network-gateway
 # Confirm dependency usability in the final chroot, with the sandbox UID.
 COPY tests/conformance/dependencies/python.py tests/conformance/dependencies/node.js /environment-root/work/
 RUN PYTHONHOME=/usr/local LD_LIBRARY_PATH=/usr/local/lib NODE_PATH=/opt/node/node_modules chroot --userspec=65537:65537 /environment-root /usr/bin/python3 /work/python.py && PYTHONHOME=/usr/local LD_LIBRARY_PATH=/usr/local/lib NODE_PATH=/opt/node/node_modules chroot --userspec=65537:65537 /environment-root /usr/bin/node /work/node.js

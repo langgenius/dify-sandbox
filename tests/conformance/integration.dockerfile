@@ -6,6 +6,7 @@ RUN go mod download
 COPY internal/core/runner/isolation ./internal/core/runner/isolation
 COPY internal/core/runner/environment ./internal/core/runner/environment
 COPY internal/core/runner/network ./internal/core/runner/network
+COPY internal/core/runner/uidpool ./internal/core/runner/uidpool
 COPY tests/conformance ./tests/conformance
 RUN go build -o /conformance ./tests/conformance
 FROM scratch
