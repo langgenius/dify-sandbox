@@ -76,7 +76,7 @@ func NetworkNode(endpoint, profilePath, observations string) error {
 async function probe(t){return new Promise(resolve=>{let s;const done=()=>{if(s){try{s.close?s.close():s.destroy()}catch{}}resolve()};
  try{if(t.Protocol==='udp'||t.Protocol==='dns'){s=dgram.createSocket(t.Address.includes(':')?'udp6':'udp4');s.on('error',done);s.send(Buffer.from('NODE_NONE'),t.Port,t.Address,done);}else{s=net.connect({host:t.Address,port:t.Port});s.on('error',done);s.on('connect',()=>{s.write('NODE_NONE');done()});s.setTimeout(200,done);}}catch{done()}
 });}
-(async()=>{for(const t of targets)await probe(t);console.log('NONE_ATTEMPTED')})().catch(e=>{console.error(e);process.exitCode=1});`, targets)
+(async()=>{for(const t of targets)await probe(t);console.log('CS1_READY');await new Promise(r=>setTimeout(r,100));console.log('NONE_ATTEMPTED')})().catch(e=>{console.error(e);process.exitCode=1});`, targets)
 	result, err := c.run(c.prepare("node-network-none", "nodejs", none, network.NetworkScope{Mode: "none"}))
 	if err != nil {
 		return err
@@ -95,7 +95,7 @@ async function probe(t){return new Promise(resolve=>{let s;const done=()=>{if(s)
 		return network.NetworkScope{Mode: "scoped", Destinations: []network.Destination{{Protocol: t.Protocol, Host: t.Host, Port: t.Port, Addresses: []string{t.Address}}}, MaxEgressBytes: 65536, ExpiresAt: time.Now().Add(time.Duration(c.profile.Limits.WallMillis+5000) * time.Millisecond).Unix()}
 	}
 	code := func(body string) string {
-		return nodeProxyClient + "\n(async()=>{" + body + "})().catch(e=>{console.error(e);process.exitCode=1});"
+		return nodeProxyClient + "\n(async()=>{" + body + ";console.log('CS1_READY');await new Promise(r=>setTimeout(r,100));})().catch(e=>{console.error(e);process.exitCode=1});"
 	}
 	primary := NetworkTarget{}
 	for i, t := range fixture.Targets {

@@ -29,7 +29,8 @@ func TestMeasuredProfileNeedsEveryLanguageAndConcurrencyCohort(t *testing.T) {
 }
 
 func TestResourceEvidenceRejectsSetupOnlyAndPayloadCapabilities(t *testing.T) {
-	sample := ResourceSample{Samples: 10, PIDs: 2, FDs: 8, DiskBytes: 4096, IntervalMicros: 2000}
+	sample := nativeSample()
+	sample.NativeSamples = 0
 	if RequireNativeResourceSample(sample) == nil {
 		t.Fatal("setup-only samples qualified native execution")
 	}

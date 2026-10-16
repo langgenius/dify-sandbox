@@ -61,10 +61,7 @@ func Lifecycle(endpoint, profilePath, observations string) error {
 		if err != nil {
 			return err
 		}
-		if o.Phase != "completed" || len(o.Namespaces) != 5 || !o.RootRemoved || !o.CgroupRemoved || o.Result.CleanupState != "clean" {
-			return fmt.Errorf("actual cleanup evidence absent for %s", id)
-		}
-		return nil
+		return requireLifecycleCompletion(o)
 	}
 	workloads := []struct{ name, lang, code, reason string }{
 		{"stderr", "python3", "import sys\nwhile True: sys.stderr.write('x'*4096);sys.stderr.flush()", "stderr_limit"},
@@ -279,6 +276,13 @@ func Lifecycle(endpoint, profilePath, observations string) error {
 		return fmt.Errorf("incomplete lifecycle reconciliation proof: %+v", proof)
 	}
 	return nil
+}
+
+func requireLifecycleCompletion(o Evidence) error {
+	if o.Phase != "completed" || !o.RootRemoved || !o.CgroupRemoved || o.Result.CleanupState != "clean" {
+		return fmt.Errorf("actual cleanup evidence absent for %s", o.ExecutionID)
+	}
+	return requireGatedCustody(o.Observation)
 }
 
 type LifecycleReconcileEvidence struct {

@@ -55,6 +55,9 @@ func main() {
 		return p.Limits, nil
 	}
 	factory := func(s isolation.InvocationSpec, _ isolation.Payload) (isolation.Launch, error) {
+		if err := resources.Expect(s); err != nil {
+			return isolation.Launch{}, err
+		}
 		switch s.Language {
 		case "python3":
 			return service.PythonIsolatedLaunch("/usr/bin/python3"), nil

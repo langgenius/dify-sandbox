@@ -20,6 +20,11 @@ func main() {
 	junit := flag.String("junit", "", "JUnit report path")
 	measure := flag.Bool("measure", false, "measure actual serial/four-way native workloads")
 	flag.Parse()
+	if *output != "" {
+		if err := os.Setenv("CS5_ARTIFACTS", filepath.Dir(*output)); err != nil {
+			fatal(err)
+		}
+	}
 	if *measure {
 		if *output == "" {
 			fatal(fmt.Errorf("measurement output required"))

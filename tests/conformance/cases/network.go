@@ -302,6 +302,7 @@ func Network(endpoint, profilePath, observations string) error {
 		err     error
 	}
 	prepare := func(id, code string, scope network.NetworkScope) isolation.InvocationRequest {
+		code += "\nimport time\nprint('CS1_READY',flush=True)\ntime.sleep(.1)\n"
 		payload, _ := json.Marshal(isolation.Payload{Code: code, Preload: ""})
 		if scope.Mode == "scoped" {
 			digest := sha256.Sum256(payload)
@@ -335,6 +336,9 @@ func Network(endpoint, profilePath, observations string) error {
 		}
 		if evidence.Phase != "completed" || !evidence.RootRemoved || !evidence.CgroupRemoved || result.CleanupState != "clean" || evidence.Namespaces["net"] == "" {
 			return result, fmt.Errorf("network execution lacks real namespace/cleanup evidence")
+		}
+		if _, err := readNativeResource(observations, request.Options.ExecutionID, "python3", request.Options.Network.Mode); err != nil {
+			return result, err
 		}
 		if request.Options.Network.Mode == "scoped" {
 			if evidence.Namespaces["user"] == "" || evidence.HostUID < profile.HostUIDMin || evidence.HostUID >= profile.HostUIDMax {

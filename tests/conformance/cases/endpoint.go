@@ -77,6 +77,9 @@ func (c *endpointClient) run(request isolation.InvocationRequest) (isolation.Exe
 	if evidence.Phase != "completed" || !evidence.RootRemoved || !evidence.CgroupRemoved || result.CleanupState != "clean" {
 		return result, fmt.Errorf("missing independent clean completion: %s", request.Options.ExecutionID)
 	}
+	if _, err := readNativeResource(c.observations, request.Options.ExecutionID, request.Language, request.Options.Network.Mode); err != nil {
+		return result, err
+	}
 	return result, nil
 }
 func (c *endpointClient) cancel(request isolation.InvocationRequest) error {

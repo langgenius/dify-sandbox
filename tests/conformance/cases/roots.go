@@ -67,8 +67,8 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 		if o.Phase != "completed" || o.ExecutionID != id || !o.RootRemoved || !o.CgroupRemoved || o.Result.CleanupState != "clean" {
 			return o, fmt.Errorf("unclean or incomplete observation for %s", id)
 		}
-		if len(o.Namespaces) < 5 || len(o.Controls) < 5 {
-			return o, fmt.Errorf("namespace/cgroup setup did not complete for %s: %s", id, o.Result.FailureReason)
+		if err := requireGatedCustody(o.Observation); err != nil {
+			return o, err
 		}
 		return o, nil
 	}
@@ -109,6 +109,9 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 		if err = RequireNativeResourceSample(sample); err != nil {
 			return err
 		}
+		if sample.Custody.Language != languages[i] || sample.Custody.Mode != "none" {
+			return fmt.Errorf("roots live custody language/scope mismatch")
+		}
 		for key, want := range map[string]string{"memory.max": strconv.FormatInt(p.Limits.MemoryBytes, 10), "memory.swap.max": "0", "memory.oom.group": "1", "pids.max": strconv.FormatInt(p.Limits.PIDs, 10), "cpu.max": fmt.Sprintf("%d %d", p.Limits.CPUQuotaMicros, p.Limits.CPUPeriodMicros)} {
 			if o.Controls[key] != want {
 				return fmt.Errorf("%s not enforced: %q", key, o.Controls[key])
@@ -128,6 +131,9 @@ func RootsAndBudgets(endpoint, profilePath, observations string) error {
 		if observationsSeen[0].Namespaces[ns] == observationsSeen[1].Namespaces[ns] {
 			return fmt.Errorf("requests share %s namespace", ns)
 		}
+	}
+	if err := IsolationControls(endpoint, profilePath, observations); err != nil {
+		return err
 	}
 	// Every stress request runs alongside an ordinary peer. Natural kernel limit
 	// failure or explicit supervisor failure is required; successful truncation is
