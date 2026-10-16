@@ -96,7 +96,12 @@ func (s *Supervisor) Close() error {
 		return nil
 	}
 	s.closed = true
-	return s.journal.close()
+	poolErr := s.uidPool.Close()
+	journalErr := s.journal.close()
+	if poolErr != nil {
+		return poolErr
+	}
+	return journalErr
 }
 func (e *Execution) terminateTree() error {
 	// Called only after Start; the wait goroutine cannot reap/reuse this PID until

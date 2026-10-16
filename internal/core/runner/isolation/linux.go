@@ -251,11 +251,8 @@ func applyRlimits(b Budget) error {
 
 func (e *Execution) observeStart() error {
 	o := Observation{ExecutionID: e.spec.ExecutionID, ObservedNanos: e.elapsedNanos(), Phase: "gated", Root: e.WorkDir, Cgroup: e.cgroup, Namespaces: map[string]string{}, Controls: map[string]string{}}
-	namespaces := []string{"mnt", "pid", "ipc", "uts", "net"}
-	if e.gateway != nil {
-		namespaces = append(namespaces, "user")
-		o.HostUID = e.hostUID
-	}
+	namespaces := []string{"mnt", "pid", "ipc", "uts", "net", "user"}
+	o.HostUID = e.hostUID
 	for _, ns := range namespaces {
 		id, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/%s", e.cmd.Process.Pid, ns))
 		if err != nil {
@@ -270,14 +267,12 @@ func (e *Execution) observeStart() error {
 		}
 		o.Controls[control] = strings.TrimSpace(string(value))
 	}
-	if e.gateway != nil {
-		for _, name := range []string{"uid_map", "gid_map"} {
-			data, err := os.ReadFile(fmt.Sprintf("/proc/%d/%s", e.cmd.Process.Pid, name))
-			if err != nil {
-				return err
-			}
-			o.Controls[name] = strings.TrimSpace(string(data))
+	for _, name := range []string{"uid_map", "gid_map"} {
+		data, err := os.ReadFile(fmt.Sprintf("/proc/%d/%s", e.cmd.Process.Pid, name))
+		if err != nil {
+			return err
 		}
+		o.Controls[name] = strings.TrimSpace(string(data))
 	}
 	e.observation = o
 	if e.observer != nil {
@@ -412,7 +407,7 @@ func (e *Execution) reapOwned() error {
 
 // UID 0 is trusted setup only. The payload's fixed namespace UID maps to the
 // persistent per-execution host lease, never another concurrent payload UID.
-func setScopedNamespaces(cmd *exec.Cmd, hostUID int) {
+func setNativeNamespaces(cmd *exec.Cmd, hostUID int) {
 	setNamespaces(cmd)
 	cmd.SysProcAttr.Cloneflags |= syscall.CLONE_NEWUSER
 	cmd.SysProcAttr.UidMappings = []syscall.SysProcIDMap{{ContainerID: 0, HostID: os.Geteuid(), Size: 1}, {ContainerID: 65537, HostID: hostUID, Size: 1}}

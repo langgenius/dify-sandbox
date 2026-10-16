@@ -34,7 +34,7 @@ func testProfile(t *testing.T) Profile {
 	if err = environment.WriteManifest(root, m); err != nil {
 		t.Fatal(err)
 	}
-	return Profile{Digest: strings.Repeat("a", 64), EnvironmentDigest: m.Digest, EnvironmentRoot: root, WorkRoot: t.TempDir(), CgroupRoot: t.TempDir(), WorkerPath: "/request-worker", Languages: []string{"python3", "nodejs"}, Limits: validTestBudget(), MaxConcurrent: 1, MaxQueueDepth: 2, MaxQueuedBytes: 32768, MaxExecutions: 20}
+	return Profile{Digest: strings.Repeat("a", 64), EnvironmentDigest: m.Digest, EnvironmentRoot: root, WorkRoot: t.TempDir(), CgroupRoot: t.TempDir(), WorkerPath: "/request-worker", Languages: []string{"python3", "nodejs"}, Limits: validTestBudget(), MaxConcurrent: 1, MaxQueueDepth: 2, MaxQueuedBytes: 32768, MaxExecutions: 20, HostUIDMin: 21000, HostUIDMax: 21016}
 }
 func testSpec(p Profile) InvocationSpec {
 	return InvocationSpec{Version: 1, ExecutionID: "request-1", Language: "python3", EnvironmentDigest: p.EnvironmentDigest, ProfileDigest: p.Digest, Budget: p.Limits, Network: network.NetworkScope{Mode: "none"}, BudgetReservationRef: "reservation-1"}

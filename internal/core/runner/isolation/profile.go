@@ -76,9 +76,12 @@ var digestPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 var idPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$`)
 
 func (p Profile) Validate() error {
+	if p.HostUIDMin < 11000 || p.HostUIDMax <= p.HostUIDMin || p.HostUIDMax > 1<<30 || p.HostUIDMax-p.HostUIDMin > 4096 || (p.HostUIDMin <= 65537 && p.HostUIDMax > 65537) {
+		return fmt.Errorf("finite distinct native UID range required")
+	}
 	if p.HTTPProxyQualified {
-		if p.HostUIDMin < 11000 || p.HostUIDMax <= p.HostUIDMin || p.HostUIDMax > 1<<30 || p.HostUIDMax-p.HostUIDMin > 4096 || (p.HostUIDMin <= 65537 && p.HostUIDMax > 65537) || p.MaxNetworkEgressBytes <= 0 || p.MaxNetworkEgressBytes > 1<<40 {
-			return fmt.Errorf("finite distinct scoped UID range and network budget required")
+		if p.MaxNetworkEgressBytes <= 0 || p.MaxNetworkEgressBytes > 1<<40 {
+			return fmt.Errorf("finite scoped network budget required")
 		}
 	}
 	if err := p.Limits.Validate(); err != nil {

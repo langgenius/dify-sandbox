@@ -122,7 +122,15 @@ func TestUIDLeaseRetainedWhenFinalReleaseCannotProveAbsence(t *testing.T) {
 	}
 	defer func() { os.Remove(resource); pool.ReleaseChecked(uid) }()
 	released, quarantined := false, false
-	e := &Execution{done: make(chan struct{}), hostUID: uid, uidPool: pool, result: ExecutionResult{CleanupState: "clean"}, release: func() { released = true }, quarantine: func() { quarantined = true }}
+	p := testProfile(t)
+	p.HostUIDMin, p.HostUIDMax = 20000, 20001
+	j, err := openJournal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer j.close()
+	e := &Execution{spec: testSpec(p), journal: j, done: make(chan struct{}), hostUID: uid, uidPool: pool, result: ExecutionResult{CleanupState: "clean"}, release: func() { released = true }, quarantine: func() { quarantined = true }}
+	e.spec.InvocationDigest = strings.Repeat("a", 64)
 	e.complete("succeeded", "")
 	if e.result.Status != "unknown" || e.result.CleanupState != "quarantined" || released || !quarantined || pool.Len() != 0 {
 		t.Fatalf("uncertain UID was recycled: %+v", e.result)

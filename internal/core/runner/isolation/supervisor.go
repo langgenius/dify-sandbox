@@ -81,13 +81,14 @@ func NewSupervisor(p Profile, reserve ReservationResolver, launch LaunchFactory,
 			s.journal.close()
 			return nil, fmt.Errorf("measured gateway executable required")
 		}
-		s.uidPool, err = uidpool.NewPersistentUIDPool(p.HostUIDMin, p.HostUIDMax, s.journal.root+".uids")
-		if err != nil {
-			s.journal.close()
-			return nil, err
-		}
+	}
+	s.uidPool, err = uidpool.NewPersistentUIDPool(p.HostUIDMin, p.HostUIDMax, s.journal.root+".uids")
+	if err != nil {
+		s.journal.close()
+		return nil, err
 	}
 	if err = s.reconcile(); err != nil {
+		s.uidPool.Close()
 		s.journal.close()
 		return nil, err
 	}
@@ -96,34 +97,36 @@ func NewSupervisor(p Profile, reserve ReservationResolver, launch LaunchFactory,
 func newRequestRoot(base string) (string, error) { return os.MkdirTemp(base, "request-") }
 
 type Execution struct {
-	mu               sync.Mutex
-	state            string
-	termination      string
-	cancel           context.CancelFunc
-	journal          *journal
-	WorkDir          string
-	spec             InvocationSpec
-	profile          Profile
-	cmd              *exec.Cmd
-	gate             *os.File
-	cgroup           string
-	ownedPID         int
-	ownedStart       string
-	done             chan struct{}
-	result           ExecutionResult
-	release          func()
-	quarantine       func()
-	finishOnce       sync.Once
-	observer         Observer
-	observation      Observation
-	origin           time.Time
-	admittedAt       time.Time
-	verificationDone <-chan struct{}
-	uidPool          *uidpool.UIDPool
-	hostUID          int
-	gateway          *network.Gateway
-	networkNS        *os.File
-	NetworkReceipt   network.NetworkReceipt
+	mu                sync.Mutex
+	state             string
+	termination       string
+	cancel            context.CancelFunc
+	journal           *journal
+	WorkDir           string
+	spec              InvocationSpec
+	profile           Profile
+	cmd               *exec.Cmd
+	gate              *os.File
+	cgroup            string
+	ownedPID          int
+	ownedStart        string
+	done              chan struct{}
+	result            ExecutionResult
+	release           func()
+	quarantine        func()
+	finishOnce        sync.Once
+	observer          Observer
+	observation       Observation
+	origin            time.Time
+	admittedAt        time.Time
+	verificationDone  <-chan struct{}
+	uidPool           *uidpool.UIDPool
+	hostUID           int
+	custodyRecorded   bool
+	uidReleasePending bool
+	gateway           *network.Gateway
+	networkNS         *os.File
+	NetworkReceipt    network.NetworkReceipt
 }
 
 func (s *Supervisor) Start(ctx context.Context, spec InvocationSpec, input io.Reader) (*Execution, error) {
@@ -293,7 +296,8 @@ func (e *Execution) complete(status, reason string) {
 			e.networkNS.Close()
 		}
 		if e.result.CleanupState == "clean" && e.hostUID != 0 && e.uidPool != nil {
-			if err := e.uidPool.ReleaseChecked(e.hostUID); err != nil {
+			err := e.releaseUIDCustody()
+			if err != nil {
 				e.mu.Lock()
 				e.state = "quarantined"
 				e.result.Status = "unknown"
@@ -378,16 +382,16 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 		return
 	}
 	var err error
+	if e.uidPool == nil {
+		e.complete("configuration_required", "environment_mismatch")
+		return
+	}
+	e.hostUID, err = e.uidPool.Acquire(ctx)
+	if err != nil {
+		e.FailBeforeStart(err)
+		return
+	}
 	if e.spec.Network.Mode == "scoped" {
-		if e.uidPool == nil {
-			e.complete("configuration_required", "network_capability")
-			return
-		}
-		e.hostUID, err = e.uidPool.Acquire(ctx)
-		if err != nil {
-			e.FailBeforeStart(err)
-			return
-		}
 		e.gateway, err = network.NewGateway(ctx, e.spec.ExecutionID, e.spec.Network)
 		if err != nil {
 			e.FailBeforeStart(err)
@@ -440,11 +444,10 @@ func (e *Execution) run(ctx context.Context, launch Launch, payload Payload) {
 	cmd.Env = e.ChildEnv()
 	cmd.ExtraFiles = []*os.File{gateRead}
 	cmd.Stdin = bytes.NewReader(encoded)
-	setNamespaces(cmd)
+	setNativeNamespaces(cmd, e.hostUID)
 	var networkReady chan error
 	var frontend *os.File
 	if e.gateway != nil {
-		setScopedNamespaces(cmd, e.hostUID)
 		parent, child, err := network.NewChannel()
 		if err != nil {
 			e.FailBeforeStart(err)
