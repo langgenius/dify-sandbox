@@ -45,5 +45,5 @@ result=dict(schema_version=1,profile_version='builder-native-test-v1',
       network=digest(json.loads((root/'qualification/network.json').read_text())),resources=digest(profile['Limits'])),
     budget=measured['budget'],measurements=measured['measurements'],
     required_case_ids=report['case_ids'],case_results=report['case_results'],skipped=0,failed=0,xfailed=0,
-    ci=dict(run_id=identity['ci_run'],test_revision=identity['source_revision']))
+    ci=dict(run_id=identity['ci_run'],test_revision=identity['harness_revision']))
 print(canonical(result).decode(),end='')

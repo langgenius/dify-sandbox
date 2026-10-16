@@ -5,7 +5,7 @@ import pathlib
 import sys
 
 root=pathlib.Path('/var/lib/dify-builder-ci')
-image,arch,revision,run_id,runtime,config_id=sys.argv[1:]
+image,arch,revision,run_id,runtime,config_id,harness_revision=sys.argv[1:]
 index_digest=image.rsplit('@',1)[1]
 def load_bound(path,digest):
     raw=path.read_bytes()
@@ -19,6 +19,6 @@ assert len(platforms)==1,'exact native manifest required'
 platform_digest=platforms[0]['digest']
 manifest=load_bound(root/'platform.json',platform_digest)
 assert manifest['config']['digest']==config_id,'executed config mismatch'
-identity=dict(architecture=arch,source_revision=revision,ci_run=run_id,runtime=runtime,
+identity=dict(architecture=arch,source_revision=revision,harness_revision=harness_revision,ci_run=run_id,runtime=runtime,
               image=dict(index_digest=index_digest,platform_digest=platform_digest,config_digest=config_id))
 (root/'identity.json').write_text(json.dumps(identity,sort_keys=True))

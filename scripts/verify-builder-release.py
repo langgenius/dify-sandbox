@@ -128,9 +128,12 @@ def _verify(d, trust, expected):
                 and m['fds'] > 0 and m['wall_millis'] > 0, 'empty resource measurement')
     require(keys == {(l, m) for l in ('python3', 'nodejs', 'jinja2') for m in ('serial', 'four-way')},
             'missing serial/four-way language measurement')
+    harness_revision = expected.get('harness_revision')
+    require(isinstance(harness_revision, str) and REVISION.fullmatch(harness_revision) is not None,
+            'protected harness revision required')
     require(REVISION.fullmatch(d['ci']['test_revision']) is not None
-            and d['ci']['test_revision'] == d['source_revision'] and bool(d['ci']['run_id']),
-            'CI test revision/run mismatch')
+            and d['ci']['test_revision'] == harness_revision and bool(d['ci']['run_id']),
+            'CI harness revision/run mismatch')
     provenance = trust.build_provenance()
     require(provenance['source_revision'] == d['source_revision']
             and provenance['image'] == d['image'] and provenance['ci'] == d['ci'],

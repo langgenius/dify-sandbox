@@ -1,0 +1,159 @@
+name: Builder isolated native candidate build
+on:
+  workflow_dispatch:
+# Manual reviewed lane only. No push/main/release/latest production linkage.
+permissions:
+  contents: read
+concurrency:
+  group: builder-candidate-build-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      BUILDER_APPROVED_SOURCE_REVISION: ${{ vars.BUILDER_APPROVED_SOURCE_REVISION }}
+    steps:
+      - name: Gate source, trusted workflow and harness before checkout
+        env:
+          TRUSTED_BUILD: ${{ vars.BUILDER_TRUSTED_BUILD_REVISION }}
+          ACTUAL_WORKFLOW: ${{ github.workflow_sha }}
+          TRUSTED_WORKFLOW: ${{ vars.BUILDER_TRUSTED_BUILD_WORKFLOW }}
+          TRUSTED_HARNESS: ${{ vars.BUILDER_TRUSTED_HARNESS_REVISION }}
+        run: |
+          python3 - <<'PY'
+          import os,re
+          e=os.environ
+          for name in ('TRUSTED_BUILD','TRUSTED_HARNESS','BUILDER_APPROVED_SOURCE_REVISION'):
+              if not re.fullmatch('[0-9a-f]{40}',e[name]): raise ValueError('protected reviewed SHA required: '+name)
+          if e['GITHUB_SHA'] != e['BUILDER_APPROVED_SOURCE_REVISION']: raise ValueError('unapproved source')
+          if e['ACTUAL_WORKFLOW'] != e['TRUSTED_BUILD']: raise ValueError('unapproved build entrypoint')
+          if e['TRUSTED_WORKFLOW'] != e['GITHUB_REPOSITORY']+'/.github/workflows/builder-candidate-build.yml': raise ValueError('unapproved signer workflow')
+          PY
+      - name: Checkout independently pinned harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ vars.BUILDER_TRUSTED_HARNESS_REVISION }}
+          path: harness
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Checkout approved exact build source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: source
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Build useful Builder recipe on native host without publish credentials
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: bash harness/scripts/build-builder-candidate.sh "$GITHUB_WORKSPACE/source" "$ARCHITECTURE" "$GITHUB_WORKSPACE/native"
+      - name: Transfer exact native archive and retain raw build evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: builder-native-${{ matrix.architecture }}
+          path: native/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Retain failed build log
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: builder-build-failure-${{ matrix.architecture }}
+          path: native/*.log
+          if-no-files-found: error
+          retention-days: 14
+  publish:
+    needs: native
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      candidate_index: ${{ steps.publish.outputs.candidate_index }}
+    env:
+      APPROVED_SOURCE: ${{ vars.BUILDER_APPROVED_SOURCE_REVISION }}
+      CANDIDATE_IMAGE: ${{ vars.BUILDER_CANDIDATE_IMAGE }}
+    steps:
+      - name: Gate publication to reviewed source and explicitly authorized isolated package
+        env:
+          TRUSTED_BUILD: ${{ vars.BUILDER_TRUSTED_BUILD_REVISION }}
+          ACTUAL_WORKFLOW: ${{ github.workflow_sha }}
+          TRUSTED_HARNESS: ${{ vars.BUILDER_TRUSTED_HARNESS_REVISION }}
+        run: |
+          python3 - <<'PY'
+          import os,re
+          e=os.environ
+          for name in ('APPROVED_SOURCE','TRUSTED_BUILD','TRUSTED_HARNESS'):
+              if not re.fullmatch('[0-9a-f]{40}',e[name]): raise ValueError('protected reviewed SHA required: '+name)
+          if e['GITHUB_SHA'] != e['APPROVED_SOURCE'] or e['ACTUAL_WORKFLOW'] != e['TRUSTED_BUILD']: raise ValueError('unapproved build/source')
+          if e['CANDIDATE_IMAGE'] != 'ghcr.io/'+e['GITHUB_REPOSITORY'].lower()+'-builder-candidate': raise ValueError('explicit isolated package authorization required')
+          PY
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ vars.BUILDER_TRUSTED_HARNESS_REVISION }}
+          path: harness
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Download current run native archives only
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: builder-native-*
+          path: native-artifacts
+          merge-multiple: false
+      - name: Install reviewed immutable OCI manifest publisher
+        uses: oras-project/setup-oras@22ce207df3b08e061f537244349aac6ae1d214f6
+        with:
+          url: https://github.com/oras-project/oras/releases/download/v1.3.0/oras_1.3.0_linux_amd64.tar.gz
+          checksum: 6cdc692f929100feb08aa8de584d02f7bcc30ec7d88bc2adc2054d782db57c64
+      - name: Publish exact native manifests and assembled immutable index
+        id: publish
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+          DOCKER_CONFIG: ${{ runner.temp }}/builder-publish-registry
+        run: |
+          set -euo pipefail
+          mkdir -p "$DOCKER_CONFIG"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf "$DOCKER_CONFIG"' EXIT
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          python3 harness/scripts/prepare-builder-build.py publish native-artifacts "$APPROVED_SOURCE" "$CANDIDATE_IMAGE" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" 2>&1 | tee publish.log
+      - name: Attest exact index and both native subjects with maintained default SLSA provenance
+        id: attest
+        uses: actions/attest@7a37fbbab9669658a566371acd1cf2f8c7a40d32
+        with:
+          subject-checksums: published/subjects.sha256
+          push-to-registry: false
+          create-storage-record: false
+      - name: Retain actual provenance bundle
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE_PATH" published/build-attestation.json
+      - name: Retain publication evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: builder-published-provenance
+          path: |
+            published/
+            publish.log
+            native-artifacts/*/receipt.json
+            native-artifacts/*/*.log
+          if-no-files-found: error
+          retention-days: 14
+# Root dispatches conformance separately after reviewing actual returned digest.

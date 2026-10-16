@@ -3,6 +3,91 @@
 Status: implementation in progress; no capability is issued by these files.
 Base: `7dd9f31dd6d3d8a39bd1057049506fce843f0d3c`.
 
+## Isolated normal build and independently pinned harness
+
+`builder-candidate-build.yml` is a manually dispatched, source-only prepared
+lane. It is not connected to ordinary main/release production builds. A reviewed
+owner must authorize the isolated same-repository GHCR package before dispatch;
+this source change creates no package, permission, variable, environment or run.
+No value defaults to a production image, main or latest tag.
+
+The protected owner must supply all of these repository variables through an
+administrative process independently of the candidate revision/document:
+
+| Input | Required owner value |
+| --- | --- |
+| `BUILDER_APPROVED_SOURCE_REVISION` | Exact reviewed candidate source SHA (40 lowercase hex). |
+| `BUILDER_TRUSTED_BUILD_WORKFLOW` | `langgenius/dify-sandbox/.github/workflows/builder-candidate-build.yml` for this repository. |
+| `BUILDER_TRUSTED_BUILD_REVISION` | Exact reviewed build workflow commit. Manual build requires its OIDC source to equal the approved source. |
+| `BUILDER_TRUSTED_HARNESS_REVISION` | Separately reviewed immutable harness checkout SHA, containing the verifier/provision scripts and fixture policy. Never filled from candidate input. |
+| `BUILDER_TRUSTED_QUALIFICATION_REVISION` | Exact reviewed conformance entrypoint SHA. Dispatch/call that owner-pinned workflow revision. |
+| `BUILDER_CANDIDATE_IMAGE` | Explicit registry-owner authorization for `ghcr.io/langgenius/dify-sandbox-builder-candidate`. This proposed package has not been created or tested for write authorization. |
+
+The owner must protect the actual workflow entrypoint/ref and these expected
+identities from candidate authors, and dispatch/call only that reviewed
+entrypoint. A workflow at an arbitrary attacker-controlled Git ref is outside
+this trust boundary: its own gate could be replaced. A trusted caller can pin
+the reusable conformance workflow to the reviewed SHA. Missing/malformed
+protected inputs fail before checkout; a selected candidate SHA must match the
+independently approved source. Candidate source never supplies verifier code,
+privileged setup, signer identity or expected harness identity.
+
+Native amd64 and arm64 build jobs have only contents-read permission and no
+registry login or OIDC grant. They execute the existing pinned Builder
+Dockerfile in Docker's embedded BuildKit, without build secrets/host network or
+emulation. Existing runner tools are pinned and checked before the Dockerfile:
+Docker server/client 28.0.4 at upstream commits `6430e49`/`b8034c0`, Buildx 0.37.2
+at `2d379c0`, and the default Docker driver. No privileged BuildKit container or
+mutable tool download is introduced. Different hosted tool versions fail for
+owner review rather than silently changing the builder. Both hosted runner
+architectures still need an actual tool/version compatibility run.
+
+A separate publish job consumes exactly two immutable current-run native
+archive artifacts. It checks both source/platform/run/attempt/content receipts
+before loading either image, confirms loaded config/architecture, pushes only
+`candidate-<source>-<run>-<attempt>[-<arch>]` tags in the isolated package, and
+assembles an OCI image index from the actual returned platform digests. The
+maintained ORAS 1.3.0 publisher uses an explicitly SHA256-pinned official archive
+and a commit-pinned setup action. Its returned OCI descriptor must match the
+exact index bytes, media type and size. It rechecks raw
+index/platform bytes and config bindings. Only this job requests packages-write,
+attestations-write and OIDC. `actions/attest` at reviewed commit
+`7a37fbbab9669658a566371acd1cf2f8c7a40d32` generates its maintained default SLSA
+provenance for the exact returned index and both platform subjects; no custom
+predicate stands in for a build. The bundle is stored in GitHub and retained
+with raw build/publication logs, receipts and exact image refs. Registry storage
+records and attestation registry pushes are disabled, so artifact-metadata-write
+is not requested. A partial rerun with old-attempt native artifacts is rejected;
+rebuild both native jobs for a fresh attempt.
+
+Conformance checks out only the protected harness SHA. That harness executes
+`gh attestation verify` with protected repository/signer workflow/signer SHA,
+approved source SHA, SLSA predicate and deny-self-hosted policy, separately for
+the immutable index and both native manifests. It checks authenticated subjects,
+exact two-platform inventory, raw OCI digests and native pulled config before
+provisioning. Read-only registry/API credentials exist only in that authentication
+step and are removed before setup. The successful current-job report is handed
+off as a root-owned 0600 file; candidate JSON cannot replace it. Provisioning
+checks its source/harness/run/attempt/image and the loaded config again before
+export. All setup scripts/services come from the pinned harness, and service
+payloads receive no CI credentials. No candidate checkout is executed by this
+workflow.
+
+Qualification `source_revision` remains the exact built candidate SHA;
+`ci.test_revision` records the independent harness SHA. Release verification
+requires an explicit well-formed protected `expected.harness_revision` matching
+that test revision, in addition to existing source/image/provenance/controller
+checks. The signed provenance envelope must bind both identities. Neither
+successful JSON assembly nor synthetic verifier tests issue a qualification.
+
+This preparation has not proven GHCR organization/package policy or actual
+attestation publication. Repository permissions observed were push/triage, not
+admin/maintain; Actions policy reads returned HTTP 403. An authorized owner must
+settle registry permission, protect the exact inputs/entrypoints, then explicitly
+approve and dispatch the reviewed build. Review the returned immutable index
+before separately authorizing native kernel conformance. Ordinary production
+build/release files are unchanged.
+
 ## Fixture setup contract (review before activation)
 
 Run only on a fresh disposable Linux host of the actual target architecture,

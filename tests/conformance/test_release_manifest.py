@@ -49,7 +49,7 @@ class SyntheticTrust:
 @pytest.fixture
 def release():
     ids = [f'linux/arm64/{lang}/{group}' for group in GROUPS for lang in ('python3', 'nodejs')]
-    expected = dict(architecture='arm64', source_revision='1' * 40,
+    expected = dict(architecture='arm64', source_revision='1' * 40, harness_revision='1' * 40,
                     image_index_digest=DIGEST, image_platform_digest=DIGEST,
                     image_config_digest=DIGEST, environment_digest=DIGEST,
                     profile_digest=DIGEST, endpoint_identity='fixture-endpoint',
@@ -106,6 +106,25 @@ def check(release, mutate=None, mutate_trust=None):
 
 def test_valid_immutable_fixture(release):
     assert check(release)['qualification_id'] == 'fixture-q'
+
+
+def test_accepts_independently_pinned_harness_distinct_from_candidate(release):
+    doc, expected, provenance, _ = release
+    expected['harness_revision'] = '2' * 40
+    doc['ci']['test_revision'] = expected['harness_revision']
+    provenance['ci']['test_revision'] = expected['harness_revision']
+    assert check(release)['source_revision'] == '1' * 40
+
+
+@pytest.mark.parametrize('harness', [None, '', 'invalid', '2' * 40])
+def test_rejects_missing_malformed_or_wrong_protected_harness(release, harness):
+    expected = release[1]
+    if harness is None:
+        expected.pop('harness_revision')
+    else:
+        expected['harness_revision'] = harness
+    with pytest.raises(ValueError, match='harness'):
+        check(release)
 
 
 def test_default_requires_external_trust(release):

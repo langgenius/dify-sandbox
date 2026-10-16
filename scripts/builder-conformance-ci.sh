@@ -13,6 +13,23 @@ case ${1:-} in
   image=${2:?immutable published image index required}
   architecture=${3:?native architecture required}
   [[ $image =~ @sha256:[0-9a-f]{64}$ ]]
+  # Root-owned current-job handoff is installed only by the pinned harness's
+  # successful authenticate step. A candidate-supplied JSON/verified flag is
+  # never consumed. No repository/registry/OIDC token enters fixture setup.
+  [[ -z ${GH_TOKEN:-} && -z ${GITHUB_TOKEN:-} && -z ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-} ]]
+  : "${CS5_SOURCE_REVISION:?protected approved source required}"
+  : "${CS5_HARNESS_REVISION:?protected harness revision required}"
+  [[ $(git -C "$repo" rev-parse HEAD) == "$CS5_HARNESS_REVISION" ]]
+  [[ $(sudo stat -c '%u:%a' /run/dify-builder-verified-build.json) == 0:600 ]]
+  sudo python3 - "$repo/scripts/verify-builder-build-binding.py" "$image" "$architecture" "$CS5_SOURCE_REVISION" "$CS5_HARNESS_REVISION" "$GITHUB_RUN_ID" "${GITHUB_RUN_ATTEMPT:-1}" <<'PY'
+import importlib.util,json,pathlib,sys
+script,image,arch,source,harness,run,attempt=sys.argv[1:]
+spec=importlib.util.spec_from_file_location('trusted_build_binding',script)
+verifier=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(verifier)
+r=json.loads(pathlib.Path('/run/dify-builder-verified-build.json').read_text())
+verifier.verify_handoff(r,image,source,harness,run,attempt,arch)
+PY
   [[ $(uname -s) == Linux && $(cat /proc/1/comm) == systemd ]]
   case $(uname -m):$architecture in x86_64:amd64|aarch64:arm64) ;; *) echo 'Native host/image architecture mismatch' >&2; exit 1;; esac
   # shellcheck source=/dev/null
@@ -23,19 +40,21 @@ case ${1:-} in
   [[ ! -e $root && ! -e $marker && ! -e /run/netns/dify-builder-ci ]]
   if id dify-builder-ci >/dev/null 2>&1; then echo 'Fixture account already exists' >&2;exit 1;fi
   if getent passwd | awk -F: '$3 >= 20000 && $3 < 20512 {found=1} END {exit !found}'; then echo 'Fixture UID lease range is occupied' >&2;exit 1;fi
-  # Authentication is owned by the protected normal build/release job. Require
-  # its exact verified source/image binding; no self-reported Docker label.
-  : "${CS5_BUILD_POLICY:?protected build attestation policy JSON required}"
-  python3 "$repo/scripts/verify-builder-build-binding.py" "$CS5_BUILD_POLICY" "$image" "$(git -C "$repo" rev-parse HEAD)" "$architecture" > "$RUNNER_TEMP/cs5-build-attestation.json"
-  docker pull --platform "linux/$architecture" "$image"
+  # The authenticated image was pulled before the registry token was removed.
   actual_arch=$(docker image inspect --format '{{.Architecture}}' "$image")
   [[ $actual_arch == "$architecture" ]]
+  config_id=$(docker image inspect --format '{{.Id}}' "$image")
+  sudo python3 - "$architecture" "$config_id" <<'PY'
+import json,pathlib,sys
+r=json.loads(pathlib.Path('/run/dify-builder-verified-build.json').read_text())
+assert r['platforms'][sys.argv[1]]['config_digest']==sys.argv[2],'executed config mismatch before export'
+PY
   printf '%s\n' "$owner" | sudo tee "$marker" >/dev/null
   sudo useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin dify-builder-ci
   sudo install -d -m 0755 "$root" "$root/image" "$root/qualification" "$root/observations" "$root/ordinary-conf" "$root/ordinary-dependencies" "$root/ordinary-state"
   sudo install -d -m 0700 "$root/state" "$root/state/work"
   sudo install -d -m 0700 -o 65534 -g 65534 "$root/artifacts"
-  container=$(docker create --network none --cap-drop ALL --security-opt no-new-privileges "$image")
+  container=$(docker create --platform "linux/$architecture" --network none --cap-drop ALL --security-opt no-new-privileges "$image")
   trap 'docker rm "$container" >/dev/null 2>&1 || true' EXIT
   docker export "$container" | sudo tar -xpf - -C "$root/image"
   docker rm "$container" >/dev/null
@@ -46,11 +65,14 @@ case ${1:-} in
   sudo python3 "$repo/tests/conformance/fixture/prepare.py" "$architecture"
   sudo chown -R dify-builder-ci:dify-builder-ci "$root/state" "$root/observations"
   sudo chown dify-builder-ci:dify-builder-ci "$root/qualification/server.yaml"
-  docker buildx imagetools inspect --raw "$image" | sudo tee "$root/index.json" >/dev/null
-  platform_digest=$(sudo python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); rows=[m["digest"] for m in d["manifests"] if m.get("platform",{}).get("os")=="linux" and m["platform"].get("architecture")==sys.argv[2]]; assert len(rows)==1; print(rows[0])' "$root/index.json" "$architecture")
-  docker buildx imagetools inspect --raw "${image%@*}@$platform_digest" | sudo tee "$root/platform.json" >/dev/null
-  config_id=$(docker image inspect --format '{{.Id}}' "$image")
-  sudo python3 "$repo/tests/conformance/fixture/identity.py" "$image" "$architecture" "$(git -C "$repo" rev-parse HEAD)" "${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT:-1}" "systemd-$version" "$config_id"
+  sudo python3 - "$architecture" <<'PY'
+import json,pathlib,sys
+root=pathlib.Path('/var/lib/dify-builder-ci')
+r=json.loads(pathlib.Path('/run/dify-builder-verified-build.json').read_text())
+(root/'index.json').write_text(r['index_raw'])
+(root/'platform.json').write_text(r['platforms'][sys.argv[1]]['manifest_raw'])
+PY
+  sudo python3 "$repo/tests/conformance/fixture/identity.py" "$image" "$architecture" "$CS5_SOURCE_REVISION" "${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT:-1}" "systemd-$version" "$config_id" "$CS5_HARNESS_REVISION"
   sudo install -m 0444 "$repo/tests/conformance/fixture/start-candidate.sh" "$root/qualification/start-candidate.sh"
   # Setup-only authority in a fresh owned namespace. There is no default route,
   # veth or host routing change. Candidate never receives outer NET_ADMIN.
@@ -114,7 +136,7 @@ case ${1:-} in
   owned || exit 0
   for role in integration candidate ordinary canary; do sudo systemctl kill --kill-whom=all --signal=KILL "dify-builder-$role.service" || true; sudo systemctl stop "dify-builder-$role.service" || true; done
   sudo ip netns delete dify-builder-ci
-  sudo rm -f "$root/client.env" "$root/ordinary.env" "$root/qualification/server.yaml" "$root/ordinary-conf/config.yaml" "$marker"
+  sudo rm -f "$root/client.env" "$root/ordinary.env" "$root/qualification/server.yaml" "$root/ordinary-conf/config.yaml" "$marker" /run/dify-builder-verified-build.json
   ;;
  *) echo 'Usage: builder-conformance-ci.sh provision IMAGE ARCH | measure | freeze | verify | logs | cleanup' >&2;exit 2;;
 esac
