@@ -85,6 +85,30 @@ func TestCaptureOutputReportsTimeoutAsExecutionError(t *testing.T) {
 	}
 }
 
+func TestCaptureOutputDoesNotReuseStderrChunkBuffer(t *testing.T) {
+	r := NewOutputCaptureRunner()
+	cmd := exec.Command("/bin/sh", "-c", "printf 'first' >&2; sleep 0.1; printf 'XXXXX' >&2")
+
+	if err := r.CaptureOutput(context.Background(), cmd); err != nil {
+		t.Fatalf("capture output failed: %v", err)
+	}
+
+	result := r.Result()
+	first := <-result.GetStderr()
+
+	// give the reader time to read the next chunk before inspecting the first one
+	time.Sleep(300 * time.Millisecond)
+
+	if string(first) != "first" {
+		t.Fatalf("expected first stderr chunk to stay intact, got %q", first)
+	}
+
+	output := collectCapturedOutput(result)
+	if output.stderr != "XXXXX" {
+		t.Fatalf("expected remaining stderr to be captured, got %q", output.stderr)
+	}
+}
+
 func collectCapturedOutput(result *OutputCaptureResult) capturedOutput {
 	var output capturedOutput
 
