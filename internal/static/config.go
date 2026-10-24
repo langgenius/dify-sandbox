@@ -14,7 +14,11 @@ import (
 var difySandboxGlobalConfigurations types.DifySandboxGlobalConfigurations
 
 func InitConfig(path string) error {
-	difySandboxGlobalConfigurations = types.DifySandboxGlobalConfigurations{}
+	// Preserve the historical behavior unless YAML or the environment explicitly
+	// disables the background updater.
+	difySandboxGlobalConfigurations = types.DifySandboxGlobalConfigurations{
+		EnablePythonDepsPeriodicUpdate: true,
+	}
 
 	configContent, err := os.ReadFile(path)
 	if err != nil {
@@ -116,6 +120,14 @@ func InitConfig(path string) error {
 	// if not set "PythonDepsUpdateInterval", update python dependencies every 30 minutes to keep the sandbox up-to-date
 	if difySandboxGlobalConfigurations.PythonDepsUpdateInterval == "" {
 		difySandboxGlobalConfigurations.PythonDepsUpdateInterval = "30m"
+	}
+
+	if enablePeriodicUpdates := os.Getenv("ENABLE_PYTHON_DEPS_PERIODIC_UPDATE"); enablePeriodicUpdates != "" {
+		parsed, err := strconv.ParseBool(enablePeriodicUpdates)
+		if err != nil {
+			return fmt.Errorf("parse ENABLE_PYTHON_DEPS_PERIODIC_UPDATE: %w", err)
+		}
+		difySandboxGlobalConfigurations.EnablePythonDepsPeriodicUpdate = parsed
 	}
 
 	nodejs_path := os.Getenv("NODEJS_PATH")
