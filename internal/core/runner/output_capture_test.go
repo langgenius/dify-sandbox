@@ -65,6 +65,40 @@ func TestCaptureOutputTracksNonZeroExitCodeWithoutDroppingStderr(t *testing.T) {
 	}
 }
 
+func TestSendBytesRecoversFromClosedChannel(t *testing.T) {
+	ch := make(chan []byte)
+	close(ch)
+
+	func() {
+		defer func() {
+			if recover() != nil {
+				t.Fatal("sendBytes should swallow send on closed channel panics")
+			}
+		}()
+		sendBytes(ch, []byte("error: timeout\n"))
+	}()
+}
+
+func TestCaptureOutputTimeoutRaceDoesNotPanic(t *testing.T) {
+	const iterations = 200
+	const timeout = 30 * time.Millisecond
+
+	for i := 0; i < iterations; i++ {
+		r := NewOutputCaptureRunner()
+		r.SetTimeout(timeout)
+		cmd := exec.Command("/bin/sh", "-c", "sleep 0.03")
+
+		if err := r.CaptureOutput(context.Background(), cmd); err != nil {
+			t.Fatalf("iteration %d: capture output failed: %v", i, err)
+		}
+
+		output := collectCapturedOutput(r.Result())
+		if output.exitCode == 0 && output.execError == "" {
+			t.Fatalf("iteration %d: expected timeout or completion near deadline", i)
+		}
+	}
+}
+
 func TestCaptureOutputReportsTimeoutAsExecutionError(t *testing.T) {
 	r := NewOutputCaptureRunner()
 	r.SetTimeout(50 * time.Millisecond)
