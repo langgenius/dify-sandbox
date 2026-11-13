@@ -46,4 +46,6 @@ jobs:
       - name: Build and run tests
         run: |
           docker build -t test -f docker/${{ matrix.arch }}-test.gen.dockerfile .
-          docker run --rm test
+          # Defer tests to docker run with seccomp=unconfined so Docker's default
+          # seccomp cannot mask validation of the sandbox's early io_uring filter.
+          docker run --rm --security-opt seccomp=unconfined test
