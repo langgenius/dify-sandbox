@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/langgenius/dify-sandbox/internal/controller"
+	"github.com/langgenius/dify-sandbox/internal/core/iouring"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/python"
 	"github.com/langgenius/dify-sandbox/internal/static"
 	"github.com/langgenius/dify-sandbox/internal/utils/log"
@@ -107,6 +108,11 @@ func updatePythonDependencies(dependencies static.RunnerDependencies) error {
 }
 
 func Run() {
+	if err := iouring.Disable(); err != nil {
+		slog.Error("failed to disable io_uring", "err", err)
+		panic(fmt.Sprintf("failed to disable io_uring: %v", err))
+	}
+
 	// init config
 	initConfig()
 	// init dependencies, it will cost some times

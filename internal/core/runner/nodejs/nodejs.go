@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/langgenius/dify-sandbox/internal/core/iouring"
 	"github.com/langgenius/dify-sandbox/internal/core/runner"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/types"
 	"github.com/langgenius/dify-sandbox/internal/core/runner/uidpool"
@@ -45,6 +46,11 @@ func (p *NodeJsRunner) Run(
 	preload string,
 	options *types.RunnerOptions,
 ) (*runner.OutputCaptureResult, error) {
+	// Direct service callers also need the filter before libuv initializes.
+	if err := iouring.Disable(); err != nil {
+		return nil, err
+	}
+
 	configuration := static.GetDifySandboxGlobalConfigurations()
 
 	uid, err := uidpool.AcquireUID(ctx)
