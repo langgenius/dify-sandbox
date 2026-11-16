@@ -219,3 +219,28 @@ console.log(process.env.UNLISTED_ENV_VAR || 'not_found');
 		t.Fatalf("expected UNLISTED_ENV_VAR NOT to be propagated, but it was: %q\n", data.Stdout)
 	}
 }
+
+func TestNodejsThreadPool(t *testing.T) {
+	// crypto.pbkdf2 runs on the libuv thread pool, which starts its threads
+	// on first use, after the seccomp filter is installed.
+	runMultipleTestings(t, 10, func(t *testing.T) {
+		resp := service.RunNodeJsCode(context.TODO(), `
+require("crypto").pbkdf2("a", "b", 1, 8, "sha256", (err, key) => {
+	console.log(err ? err.code : key.toString("hex"))
+})
+		`, "", &types.RunnerOptions{
+			EnableNetwork: true,
+		})
+		if resp.Code != 0 {
+			t.Fatal(resp)
+		}
+
+		data := resp.Data.(*service.RunCodeResponse)
+		if data.Error != "" {
+			t.Fatalf("unexpected error: %s\n", data.Error)
+		}
+		if data.Stdout != "ee212b01b70c9fb7\n" {
+			t.Fatalf("unexpected output: %q\n", data.Stdout)
+		}
+	})
+}

@@ -6,4 +6,5 @@ import "syscall"
 
 const (
 	SYS_SECCOMP = syscall.SYS_SECCOMP
+	SYS_CLONE3  = 435
 )

@@ -276,3 +276,51 @@ print(os.environ.get('UNLISTED_ENV_VAR', 'not_found'))
 		t.Fatalf("expected UNLISTED_ENV_VAR NOT to be propagated, but it was: %q\n", data.Stdout)
 	}
 }
+
+func TestPythonThreads(t *testing.T) {
+	// Threads must work after the seccomp filter is installed. Before, clone3
+	// returned 0 and glibc aborted with "rseq registration failed".
+	runMultipleTestings(t, 10, func(t *testing.T) {
+		resp := service.RunPython3Code(context.TODO(), `
+import threading
+from concurrent.futures import ThreadPoolExecutor
+t = threading.Thread(target=print, args=("thread",))
+t.start()
+t.join()
+with ThreadPoolExecutor(4) as ex:
+    print(sum(ex.map(lambda x: x * x, range(10))))
+		`, "", &types.RunnerOptions{
+			EnableNetwork: true,
+		})
+		if resp.Code != 0 {
+			t.Fatal(resp)
+		}
+
+		data := resp.Data.(*service.RunCodeResponse)
+		if data.Error != "" {
+			t.Fatalf("unexpected error: %s\n", data.Error)
+		}
+		if data.Stdout != "thread\n285\n" {
+			t.Fatalf("unexpected output: %q\n", data.Stdout)
+		}
+	})
+}
+
+func TestPythonClone3ReturnsENOSYS(t *testing.T) {
+	// clone3 must fail with ENOSYS (38), not report success without running.
+	resp := service.RunPython3Code(context.TODO(), `
+import ctypes
+libc = ctypes.CDLL(None, use_errno=True)
+print(libc.syscall(435, 0, 0), ctypes.get_errno())
+	`, "", &types.RunnerOptions{
+		EnableNetwork: true,
+	})
+	if resp.Code != 0 {
+		t.Fatal(resp)
+	}
+
+	data := resp.Data.(*service.RunCodeResponse)
+	if data.Stdout != "-1 38\n" {
+		t.Fatalf("unexpected output: %q, error: %s\n", data.Stdout, data.Error)
+	}
+}
