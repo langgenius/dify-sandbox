@@ -106,5 +106,6 @@ RUN case "${TARGETARCH}" in \
     && ln -s /usr/local/go/bin/go /usr/local/bin/go \
     && rm -f go${GOLANG_VERSION}.${GOLANG_ARCH}.tar.gz
 
-# Run tests
-RUN go test -timeout 120s -v ./tests/integration_tests/... 
+# Test at container runtime under seccomp=unconfined so Docker's default
+# seccomp cannot mask validation of the sandbox's early io_uring filter.
+ENTRYPOINT ["go", "test", "-timeout", "120s", "-v", "./internal/core/iouring/...", "./tests/integration_tests/..."]
