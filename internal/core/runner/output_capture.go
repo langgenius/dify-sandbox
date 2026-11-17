@@ -76,21 +76,31 @@ func NewOutputCaptureRunner() *OutputCaptureRunner {
 	}
 }
 
+func sendBytes(ch chan []byte, data []byte) {
+	if ch == nil {
+		return
+	}
+	func() {
+		defer func() { recover() }()
+		ch <- data
+	}()
+}
+
 func (s *OutputCaptureRunner) WriteExecError(data []byte) {
-	if s.result != nil && s.result.execError != nil {
-		s.result.execError <- data
+	if s.result != nil {
+		sendBytes(s.result.execError, data)
 	}
 }
 
 func (s *OutputCaptureRunner) WriteStderr(data []byte) {
-	if s.result != nil && s.result.stderr != nil {
-		s.result.stderr <- data
+	if s.result != nil {
+		sendBytes(s.result.stderr, data)
 	}
 }
 
 func (s *OutputCaptureRunner) WriteOutput(data []byte) {
-	if s.result != nil && s.result.stdout != nil {
-		s.result.stdout <- data
+	if s.result != nil {
+		sendBytes(s.result.stdout, data)
 	}
 }
 
@@ -109,11 +119,18 @@ func (s *OutputCaptureRunner) CaptureOutput(ctx context.Context, cmd *exec.Cmd) 
 		timeout = 5 * time.Second
 	}
 
+	var timerWg sync.WaitGroup
+	timerWg.Add(1)
+
+	var timeoutOnce sync.Once
+
 	timer := time.AfterFunc(timeout, func() {
+		defer timerWg.Done()
 		if cmd != nil && cmd.Process != nil {
-			s.result.SetExitCode(-1)
-			s.WriteExecError([]byte("error: timeout\n"))
-			// send a signal to the process
+			timeoutOnce.Do(func() {
+				s.result.SetExitCode(-1)
+				s.WriteExecError([]byte("error: timeout\n"))
+			})
 			cmd.Process.Kill()
 		}
 	})
@@ -187,8 +204,6 @@ func (s *OutputCaptureRunner) CaptureOutput(ctx context.Context, cmd *exec.Cmd) 
 
 	// wait for the process to finish
 	go func() {
-		defer timer.Stop()
-
 		// wait for the stdout and stderr to finish
 		wg.Wait()
 
@@ -213,6 +228,13 @@ func (s *OutputCaptureRunner) CaptureOutput(ctx context.Context, cmd *exec.Cmd) 
 					s.WriteExecError([]byte("error: operation not permitted\n"))
 				}
 			}
+		}
+
+		// If the timer already fired, wait for its callback to finish before
+		// signaling completion. timer.Stop() alone does not prevent a scheduled
+		// callback from sending on output channels after the process exits.
+		if !timer.Stop() {
+			timerWg.Wait()
 		}
 
 		if s.after_exit_hook != nil {
