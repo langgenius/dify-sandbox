@@ -167,10 +167,10 @@ func (s *OutputCaptureRunner) CaptureOutput(ctx context.Context, cmd *exec.Cmd) 
 
 	// read the error
 	go func() {
-		buf := make([]byte, 1024)
 		defer wg.Done()
 		defer stderrReader.Close()
 		for {
+			buf := make([]byte, 1024)
 			n, err := stderrReader.Read(buf)
 			// exit if EOF
 			if err != nil {
